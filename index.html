@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#151518">
   <meta name="description" content="LOOPA — ближе, даже на расстоянии. Совместный просмотр с теми, кто важен.">
   <title>LOOPA — Ближе, даже на расстоянии</title>
+  <meta name="loopa-build" content="home-polish-2026-11-02-v8">
   <style>
     :root {
       color-scheme:dark;
@@ -93,6 +94,18 @@
     }
     .circle:active {background:rgba(255,255,255,.20);}
     .circle svg{width:23px;height:23px;}
+    .top-profile-avatar{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;}
+    .top-profile-initial{font:normal 20px Georgia,serif;color:#f3efed;}
+    .page-enter{animation:loopaPageIn .28s cubic-bezier(.2,.65,.25,1) both;}
+    @keyframes loopaPageIn{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:translateY(0)}}
+    @media(prefers-reduced-motion:reduce){.page-enter{animation:none!important}}
+    .home-greeting{margin-bottom:10px;}
+    .home-title{margin:0 0 31px;font-size:clamp(39px,9.1vw,58px);line-height:1.08;letter-spacing:-1.8px;}
+    .join-wrap{display:flex;justify-content:center;margin-top:21px;}
+    .join-pill{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:39px;padding:8px 18px;border:1px solid rgba(255,255,255,.18);border-radius:999px;background:rgba(255,255,255,.045);color:#c9c3c2;font-size:12px;cursor:pointer;transition:background .2s ease,transform .2s ease;}
+    .join-pill svg{width:15px;height:15px;}
+    .join-pill:active{transform:scale(.97);background:rgba(255,255,255,.11);}
+
     main {position:relative;padding:35px 20px 36px;}
     .eyebrow {font-size:10px;letter-spacing:3.1px;font-weight:650;color:#b9aca4;}
     h1 {
@@ -244,6 +257,29 @@
     body[data-theme="warm"] .top{background:linear-gradient(114deg,rgba(28,20,21,.88),rgba(65,48,45,.56))}
     body[data-theme="warm"] .glass{background:radial-gradient(ellipse 85% 60% at 0% 0%,rgba(255,224,199,.13),transparent 75%),linear-gradient(140deg,rgba(132,88,74,.12),rgba(30,21,23,.68));}
     body[data-theme="warm"] .bottom{background:linear-gradient(180deg,rgba(40,28,29,.90),rgba(22,16,18,.98))}
+
+    /* LOOPA home polish · November 2026 */
+    .recent-rooms-card{
+      margin-top:40px;
+      padding:21px 19px 22px;
+      border-radius:var(--radius);
+      min-height:162px;
+    }
+    .recent-rooms-card .section-head{margin:0 0 18px;}
+    .recent-rooms-card .section-head h2{font-size:21px;line-height:1.25;}
+    .recent-rooms-card .empty{margin:0;max-width:none;}
+    .recent-rooms-card .text-link{padding:8px 2px;}
+    .circle.profile-with-photo{padding:0;overflow:hidden;border-color:rgba(245,241,237,.43);}
+    .circle.profile-with-photo .top-profile-avatar{width:100%;height:100%;border-radius:inherit;object-fit:cover;}
+    .circle.profile-with-photo .top-profile-initial{color:#252326;display:grid;place-items:center;width:100%;height:100%;background:#e4ddd7;}
+    [data-page]{transform-origin:50% 12%;}
+    @keyframes loopaPageArrive{
+      from{opacity:.03;transform:translate3d(0,17px,0) scale(.987);filter:blur(3px)}
+      to{opacity:1;transform:translate3d(0,0,0) scale(1);filter:blur(0)}
+    }
+    .page-enter{animation:loopaPageArrive .42s cubic-bezier(.19,1,.22,1) both;}
+    @media(prefers-reduced-motion:reduce){.page-enter{animation:none!important;}}
+    @media(max-width:360px){.recent-rooms-card{padding:19px 15px 21px;}.recent-rooms-card .section-head h2{font-size:19px;}}
   </style>
 </head>
 <body>
@@ -265,14 +301,14 @@
       <div><div class="brand">LOOPA</div><div class="tagline">Ближе, даже на расстоянии</div></div>
       <div class="top-actions">
         <button class="circle" type="button" data-message="Уведомлений пока нет" aria-label="Уведомления"><svg><use href="#i-bell"/></svg></button>
-        <button class="circle" type="button" data-go="profile" aria-label="Профиль"><svg><use href="#i-person"/></svg></button>
+        <button class="circle" id="top-profile-button" type="button" data-go="profile" aria-label="Профиль"><svg><use href="#i-person"/></svg></button>
       </div>
     </header>
 
     <main id="content">
       <section data-page="home">
-        <div class="eyebrow">ТВОЁ ПРОСТРАНСТВО</div>
-        <h1>Добро<br>пожаловать.</h1>
+        <div class="eyebrow home-greeting">ДОБРО ПОЖАЛОВАТЬ</div>
+        <h1 class="home-title">Ближе, даже<br>на расстоянии.</h1>
         <!-- Показывать блок продолжения просмотра только после появления настоящих комнат -->
         <div class="cards">
           <button class="card glass" type="button" data-message="Создание комнат подключим после настройки сервера">
@@ -282,9 +318,12 @@
             <svg><use href="#i-users"/></svg><span><strong>Мои друзья</strong><small>Твой круг</small></span>
           </button>
         </div>
-        <div class="section-head"><h2>Недавние комнаты</h2><button class="text-link" type="button" data-go="rooms">Все →</button></div>
-        <p class="empty">Здесь появятся комнаты, которые ты создашь или посетишь.</p>
-        <button class="join-link" type="button" data-message="Вход по коду станет доступен после подключения комнат">Войти по коду <svg><use href="#i-arrow"/></svg></button>
+        <div class="join-wrap"><button class="join-pill" type="button" data-message="Вход по коду станет доступен после подключения комнат">Войти по коду <svg><use href="#i-arrow"/></svg></button></div>
+        <div class="recent-rooms-card glass">
+          <div class="section-head"><h2>Недавние комнаты</h2><button class="text-link" type="button" data-go="rooms">Все →</button></div>
+          <p class="empty">Здесь появятся комнаты, которые ты создашь или посетишь.</p>
+        </div>
+
       </section>
 
       <section data-page="rooms" hidden>
@@ -426,8 +465,36 @@
     let currentUser = null;
     let authMode = 'login';
 
+    let lastPage = 'home';
+    function animateContent(element) {
+      if (!element || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      // Web Animations start reliably on Safari even when a section was hidden a moment ago.
+      if (element._loopaAnimation) element._loopaAnimation.cancel();
+      if (typeof element.animate === 'function') {
+        element._loopaAnimation = element.animate([
+          {opacity:0,transform:'translate3d(0,19px,0) scale(.985)'},
+          {opacity:1,transform:'translate3d(0,0,0) scale(1)'}
+        ],{duration:440,easing:'cubic-bezier(.19,1,.22,1)',fill:'both'});
+        element._loopaAnimation.onfinish = () => {
+          // Clear fill so interactive controls are never left in an animated stacking context.
+          if (element._loopaAnimation) element._loopaAnimation.cancel();
+          element._loopaAnimation = null;
+        };
+      } else {
+        element.classList.remove('page-enter');
+        void element.offsetWidth;
+        element.classList.add('page-enter');
+      }
+    }
     function showPage(destination) {
-      pages.forEach(page => { page.hidden = page.dataset.page !== destination; });
+      const changed = destination !== lastPage;
+      pages.forEach(page => {
+        const active = page.dataset.page === destination;
+        page.hidden = !active;
+        page.classList.remove('page-enter');
+        if (active && changed) animateContent(page);
+      });
+      lastPage = destination;
       tabs.forEach(tab => {
         const active = tab.dataset.go === destination;
         tab.classList.toggle('active', active);
@@ -486,7 +553,42 @@
       byId('settings-home').hidden = !signed || which !== 'home';
       byId('settings-detail').hidden = !signed || which === 'home';
       ['account','privacy','theme'].forEach(id => byId('settings-' + id).hidden = which !== id);
-      if (signed && which !== 'home') window.scrollTo({top:0,behavior:'instant'});
+      if (signed && which !== 'home') {
+        window.scrollTo({top:0,behavior:'instant'});
+        const pane = byId('settings-' + which);
+        if (pane) animateContent(pane);
+      }
+    }
+    function refreshTopProfileAvatar() {
+      const button = byId('top-profile-button');
+      if (!button) return;
+      button.replaceChildren();
+      button.classList.remove('profile-with-photo');
+      if (!currentUser) {
+        button.innerHTML = '<svg><use href="#i-person"/></svg>';
+        return;
+      }
+      button.classList.add('profile-with-photo');
+      const nickname = byId('profile-name').value.trim() || currentUser.user_metadata?.display_name || '';
+      const fallback = () => {
+        button.replaceChildren();
+        const letter = document.createElement('span');
+        letter.className = 'top-profile-initial';
+        letter.textContent = (nickname.charAt(0) || 'L').toUpperCase();
+        button.appendChild(letter);
+      };
+      // Use authenticated user metadata directly: do not rely on whether the profile tab was opened.
+      const path = currentUser.user_metadata?.avatar_path;
+      if (!path || !client) { fallback(); return; }
+      const {data} = client.storage.from('avatars').getPublicUrl(path);
+      if (!data?.publicUrl) { fallback(); return; }
+      const img = document.createElement('img');
+      img.className = 'top-profile-avatar';
+      img.alt = '';
+      img.decoding = 'async';
+      img.src = data.publicUrl + '?v=' + encodeURIComponent(currentUser.user_metadata?.avatar_version || '1');
+      img.addEventListener('error', fallback, {once:true});
+      button.appendChild(img);
     }
     function refreshSettingsIdentity() {
       const name = byId('profile-name').value.trim() || 'Профиль LOOPA';
@@ -497,6 +599,7 @@
       const actual = byId('account-avatar').querySelector('img');
       if (actual) mini.appendChild(actual.cloneNode());
       else mini.textContent = (name.charAt(0) || 'L').toUpperCase();
+      refreshTopProfileAvatar();
     }
     function setTheme(theme) {
       if (!['classic','midnight','warm'].includes(theme)) theme='classic';
@@ -529,6 +632,7 @@
       byId('auth-loading').hidden = true;
       byId('auth-account').hidden = true;
       byId('auth-guest').hidden = false;
+      refreshTopProfileAvatar();
     }
     async function displayAccount(user) {
       if (!user) return;
@@ -697,6 +801,7 @@
         if (update.error) throw update.error;
         currentUser = update.data.user;
         renderName(name);
+        refreshSettingsIdentity();
         feedback('profile-feedback','Профиль сохранён.');
       } catch (err) {
         feedback('profile-feedback',/profiles|schema cache|relation|permission denied/i.test(err.message || '')
@@ -711,6 +816,7 @@
       byId('sign-out').disabled = false;
       if (error) return feedback('profile-feedback',errorText(error),true);
       currentUser = null;
+      refreshTopProfileAvatar();
       byId('auth-password').value = '';
       selectAuthMode('login');
       displayGuest();
@@ -735,6 +841,12 @@
               currentUser = newUser;
               if (newUser) displayAccount(newUser);
               else displayGuest();
+            } else if (newUser && event === 'USER_UPDATED') {
+              currentUser = newUser;
+              renderAvatar(newUser);
+            } else if (newUser && event === 'TOKEN_REFRESHED') {
+              currentUser = newUser;
+              refreshTopProfileAvatar();
             }
             if (event === 'PASSWORD_RECOVERY') passwordRecovery();
           },0);
