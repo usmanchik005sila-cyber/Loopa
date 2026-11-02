@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#151518">
   <meta name="description" content="LOOPA — ближе, даже на расстоянии. Совместный просмотр с теми, кто важен.">
   <title>LOOPA — Ближе, даже на расстоянии</title>
-  <meta name="loopa-build" content="home-layout-2026-11-02-v9">
+  <meta name="loopa-build" content="friends-presence-v12-2026-11-03">
   <style>
     :root {
       color-scheme:dark;
@@ -331,6 +331,32 @@
     .presence-switch input:disabled + .presence-switch-track{opacity:.45}
     .presence-dot{width:10px;height:10px;flex:none;border-radius:50%;background:#777;box-shadow:0 0 0 4px rgba(255,255,255,.04)}
     .presence-dot.online{background:#64c894;box-shadow:0 0 0 4px rgba(100,200,148,.12)}
+
+    /* LOOPA v12 — настоящие друзья и статусы, с сохранением привычного дизайна. */
+    .friend-panel{margin-bottom:15px;}
+    .friend-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin:0 0 16px;}
+    .friend-head h2{font-size:19px;line-height:1.3;}
+    .friend-count{flex:none;font-size:12px;color:#b4aeb0;}
+    .friend-search-label{display:block;font-size:12px;color:#bcb4b7;margin:16px 0 8px;}
+    .friend-search-input{width:100%;min-height:48px;padding:13px 15px;border-radius:14px;border:1px solid rgba(255,255,255,.23);background:rgba(9,9,12,.32);color:#f5eeeb;font:inherit;font-size:14px;outline:none;}
+    .friend-search-input:focus{border-color:#c3b6ad;box-shadow:0 0 0 2px rgba(240,230,220,.08);}
+    .friend-help{font-size:12px!important;line-height:1.65!important;color:#b6b0b2!important;margin:12px 0 0!important;}
+    .friend-person{display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid rgba(255,255,255,.09);}
+    .friend-person:last-child{border-bottom:0;padding-bottom:2px;}
+    .friend-avatar{display:grid;place-items:center;overflow:hidden;flex-shrink:0;width:47px;height:47px;border-radius:50%;background:linear-gradient(135deg,#e7e0da,#918a89);color:#2a2527;font:24px Georgia,serif;}
+    .friend-avatar img{display:block;width:100%;height:100%;object-fit:cover;}
+    .friend-person-details{min-width:0;flex:1;}
+    .friend-person-name{font-size:14px;font-weight:630;line-height:1.3;overflow-wrap:anywhere;}
+    .friend-person-status{display:flex;align-items:center;gap:7px;color:#aba6a8;font-size:11px;line-height:1.45;margin-top:5px;}
+    .friend-person-status .presence-dot{width:7px;height:7px;box-shadow:none;}
+    .friend-person-status .presence-dot.online{box-shadow:none;}
+    .friend-small-action{flex-shrink:0;padding:10px 11px;max-width:128px;min-height:36px;border-radius:11px;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.075);color:#ece7e3;font-size:11px;cursor:pointer;}
+    .friend-small-action.primary{border-color:#e2d8d0;background:#e7e0d8;color:#242124;font-weight:650;}
+    .friend-small-action:disabled{opacity:.55;cursor:default;}
+    .friends-empty{padding:8px 0;color:#aaa4a7;font-size:13px;line-height:1.65;}
+    .friends-feedback{margin:12px 0 0;font-size:12px;line-height:1.55;color:#cce6d3;}
+    .friends-feedback.error{color:#f1bdbb;}
+    @media(max-width:360px){.friend-avatar{width:40px;height:40px;}.friend-person{gap:8px;}.friend-small-action{padding:8px;font-size:10px;}}
   </style>
 </head>
 <body>
@@ -389,7 +415,30 @@
       <section data-page="friends" hidden>
         <div class="eyebrow">ТВОЙ КРУГ</div>
         <h1>Быть<br>рядом.</h1>
-        <div class="panel glass"><p class="panel-note">ДРУЗЬЯ</p><h2>Друзей пока нет</h2><p>Аккаунты уже можно создавать. Запросы в друзья и список контактов подключим на следующем этапе.</p><button class="action secondary" type="button" data-message="Приглашения в друзья пока не подключены">Пригласить друга</button></div>
+        <div class="panel glass" id="friends-guest"><p class="panel-note">ТВОЙ КРУГ</p><h2>Войди в аккаунт</h2><p>Чтобы находить людей, отправлять заявки и видеть их активность, войди в LOOPA.</p><button class="action" type="button" data-go="profile">Перейти в профиль</button></div>
+        <div id="friends-app" hidden>
+          <div class="panel glass friend-panel">
+            <p class="panel-note">ЗНАКОМСТВО</p>
+            <h2>Найти человека</h2>
+            <label class="friend-search-label" for="friend-search">Поиск по никнейму</label>
+            <input id="friend-search" class="friend-search-input" type="search" maxlength="40" autocomplete="off" placeholder="Введи хотя бы 2 символа">
+            <p class="friend-help">Никнеймы могут совпадать. Рядом с именем увидишь аватарку и статус, если пользователь разрешил его показывать.</p>
+            <div id="friend-search-results" aria-live="polite"></div>
+          </div>
+          <div class="panel glass friend-panel">
+            <div class="friend-head"><h2>Мои друзья</h2><span class="friend-count" id="friend-count">0</span></div>
+            <div id="friend-list"><div class="friends-empty">Здесь появятся люди после принятия заявок.</div></div>
+          </div>
+          <div class="panel glass friend-panel" id="friend-incoming-panel" hidden>
+            <div class="friend-head"><h2>Заявки тебе</h2><span class="friend-count" id="friend-incoming-count">0</span></div>
+            <div id="friend-incoming"></div>
+          </div>
+          <div class="panel glass friend-panel" id="friend-outgoing-panel" hidden>
+            <div class="friend-head"><h2>Отправленные заявки</h2><span class="friend-count" id="friend-outgoing-count">0</span></div>
+            <div id="friend-outgoing"></div>
+          </div>
+          <p id="friends-feedback" class="friends-feedback" role="status" aria-live="polite" hidden></p>
+        </div>
       </section>
 
       <section data-page="profile" hidden>
@@ -469,7 +518,7 @@
                 <p id="presence-feedback" class="auth-feedback" role="status" aria-live="polite" hidden></p>
               </div>
               <div class="privacy-group"><h3>ОБЩЕНИЕ</h3>
-                <div class="privacy-item"><span class="privacy-item-icon"><svg><use href="#i-person"/></svg></span><span class="privacy-item-body"><strong>Заявки в друзья</strong><small>Кто сможет отправлять запросы</small></span><span class="privacy-coming">СКОРО</span></div>
+                <div class="privacy-item"><span class="privacy-item-icon"><svg><use href="#i-person"/></svg></span><span class="privacy-item-body"><strong>Заявки в друзья</strong><small>Другие зарегистрированные пользователи могут отправлять тебе заявки</small></span><span class="privacy-coming">ВКЛЮЧЕНО</span></div>
                 <div class="privacy-item"><span class="privacy-item-icon"><svg><use href="#i-room"/></svg></span><span class="privacy-item-body"><strong>Приглашения в комнаты</strong><small>Кто сможет приглашать на просмотр</small></span><span class="privacy-coming">СКОРО</span></div>
                 <div class="privacy-item"><span class="privacy-item-icon"><svg><use href="#i-lock"/></svg></span><span class="privacy-item-body"><strong>Заблокированные</strong><small>Управление чёрным списком</small></span><span class="privacy-coming">СКОРО</span></div>
               </div>
@@ -478,7 +527,7 @@
                 <p id="privacy-feedback" class="auth-feedback" role="status" aria-live="polite" hidden></p>
                 <button class="privacy-action" type="button" id="privacy-signout">Выйти из аккаунта →</button>
               </div>
-              <p class="privacy-section-note">Настройки со значком «Скоро» пока не действуют: для них нужна серверная проверка прав и система друзей. Статус обновляется, пока LOOPA открыта на активной вкладке; отключение активности скрывает и последнее посещение. Фотографии аватара по-прежнему доступны по публичной ссылке.</p>
+              <p class="privacy-section-note">Настройки со значком «Скоро» пока не действуют: для них нужна дополнительная серверная проверка прав. Статус обновляется, пока LOOPA открыта на активной вкладке; отключение активности скрывает и последнее посещение. Фотографии аватара по-прежнему доступны по публичной ссылке.</p>
             </div>
           </div>
           <div id="settings-theme" hidden>
@@ -558,6 +607,10 @@
       toast.hidden = true;
       if (destination === 'profile' && currentUser && !byId('recovery-form').hidden) openSettings('account');
       else if (destination === 'profile') openSettings('home');
+      if (destination === 'friends') {
+        syncFriendsSession();
+        if (currentUser) refreshFriendLists();
+      }
       window.scrollTo({top:0,behavior:'instant'});
     }
     function showToast(message) {
@@ -753,7 +806,247 @@
       } finally {this.disabled = false;}
     });
     document.addEventListener('visibilitychange',()=>{
-      if (document.visibilityState === 'visible') heartbeatPresence();
+      if (document.visibilityState === 'visible') {
+        heartbeatPresence();
+        if (lastPage==='friends' && currentUser) refreshFriendLists();
+      }
+    });
+
+
+    // LOOPA v12: discoverable names/avatars, friend requests and real status for allowed users.
+    // Privacy: never fetch other users' email, auth metadata or hidden presence rows.
+    let friendRelations = [];
+    let friendRefreshBusy = false;
+    let friendSessionId = null;
+    let friendSearchTimer = null;
+    let friendSearchGeneration = 0;
+    let friendAutoRefresh = null;
+    const friendPresenceWindow = 90000; // same 90-second threshold as own presence
+
+    function friendEmpty(parent, text) {
+      parent.replaceChildren();
+      const element = document.createElement('div');
+      element.className = 'friends-empty';
+      element.textContent = text;
+      parent.appendChild(element);
+    }
+    function friendAvatar(profile) {
+      const avatar = document.createElement('div');
+      avatar.className = 'friend-avatar';
+      const name = profile?.display_name || 'LOOPA';
+      avatar.textContent = name.charAt(0).toUpperCase();
+      const path = profile?.avatar_path;
+      if (path && client && typeof profile.id === 'string' && path.startsWith(profile.id + '/avatar.')) {
+        const {data} = client.storage.from('avatars').getPublicUrl(path);
+        if (data?.publicUrl) {
+          const img = document.createElement('img');
+          img.alt = '';
+          img.loading = 'lazy';
+          img.src = data.publicUrl + (profile.updated_at ? '?v=' + encodeURIComponent(profile.updated_at) : '');
+          img.onerror = () => { img.remove(); avatar.textContent = name.charAt(0).toUpperCase(); };
+          avatar.replaceChildren(img);
+        }
+      }
+      return avatar;
+    }
+    function friendPresenceLabel(row) {
+      if (!row || !row.last_active_at) return {label:'Активность скрыта или недоступна',online:false};
+      const age = Date.now() - new Date(row.last_active_at).getTime();
+      if (!Number.isFinite(age)) return {label:'Статус недоступен',online:false};
+      if (age >= 0 && age < friendPresenceWindow) return {label:'В сети',online:true};
+      const date = new Date(row.last_active_at);
+      return {label:'Последняя активность: ' + date.toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}),online:false};
+    }
+    function friendRow(profile, presence, buttons) {
+      const row = document.createElement('div');
+      row.className = 'friend-person';
+      row.appendChild(friendAvatar(profile));
+      const detail = document.createElement('div');
+      detail.className = 'friend-person-details';
+      const name = document.createElement('div');
+      name.className = 'friend-person-name';
+      name.textContent = profile.display_name || 'Пользователь LOOPA';
+      name.title = 'ID: ' + profile.id;
+      const status = document.createElement('div');
+      status.className = 'friend-person-status';
+      const indicator = document.createElement('span');
+      indicator.className = 'presence-dot' + (presence?.online ? ' online' : '');
+      indicator.setAttribute('aria-hidden','true');
+      const text = document.createElement('span');
+      text.textContent = presence?.label || 'Активность скрыта или недоступна';
+      status.append(indicator,text);
+      detail.append(name,status);
+      row.appendChild(detail);
+      for (const action of (buttons || [])) {
+        const btn = document.createElement('button');
+        btn.type='button';
+        btn.className = 'friend-small-action' + (action.primary ? ' primary':'');
+        btn.textContent = action.label;
+        btn.dataset.friendAction = action.action;
+        if (action.userId) btn.dataset.userId = action.userId;
+        if (action.requestId) btn.dataset.requestId = action.requestId;
+        if (action.disabled) btn.disabled = true;
+        row.appendChild(btn);
+      }
+      return row;
+    }
+    function resetFriends() {
+      friendSessionId=null;
+      friendRelations=[];
+      clearInterval(friendAutoRefresh);
+      friendAutoRefresh=null;
+      clearTimeout(friendSearchTimer);
+      friendSearchGeneration++;
+      byId('friends-guest').hidden=!!currentUser;
+      byId('friends-app').hidden=!currentUser;
+      friendEmpty(byId('friend-search-results'),'Найди знакомого по никнейму.');
+      friendEmpty(byId('friend-list'),'Здесь появятся люди после принятия заявок.');
+      byId('friend-incoming-panel').hidden=true;
+      byId('friend-outgoing-panel').hidden=true;
+      byId('friend-count').textContent='0';
+      byId('friend-search').value='';
+      feedback('friends-feedback','');
+    }
+    function syncFriendsSession() {
+      if (!currentUser || !client) { resetFriends(); return; }
+      byId('friends-guest').hidden=true;
+      byId('friends-app').hidden=false;
+      if (friendSessionId === currentUser.id) return;
+      friendSessionId=currentUser.id;
+      friendRelations=[];
+      clearInterval(friendAutoRefresh);
+      friendAutoRefresh=setInterval(()=>{
+        if (document.visibilityState==='visible' && lastPage==='friends') refreshFriendLists();
+      },30000);
+    }
+    async function getPublicPresence(ids) {
+      if (!ids.length) return {};
+      const {data,error} = await client.from('user_presence').select('user_id,last_active_at').in('user_id',ids);
+      if (error) throw error;
+      return Object.fromEntries((data||[]).map(row=>[row.user_id,friendPresenceLabel(row)]));
+    }
+    async function refreshFriendLists() {
+      if (!client || !currentUser || friendRefreshBusy) return;
+      syncFriendsSession();
+      const owner=currentUser.id;
+      friendRefreshBusy=true;
+      try {
+        const {data:relations,error} = await client.from('friend_requests')
+          .select('id,sender_id,receiver_id,status,created_at')
+          .or('sender_id.eq.'+owner+',receiver_id.eq.'+owner)
+          .order('created_at',{ascending:false}).limit(150);
+        if (error) throw error;
+        if (currentUser?.id !== owner) return;
+        friendRelations=relations||[];
+        const ids = [...new Set(friendRelations.map(rel=>rel.sender_id===owner?rel.receiver_id:rel.sender_id))];
+        let directory={};
+        let presence={};
+        if (ids.length) {
+          const {data:profiles,error:profileError} = await client.from('profiles')
+            .select('id,display_name,avatar_path,updated_at').in('id',ids);
+          if (profileError) throw profileError;
+          directory=Object.fromEntries((profiles||[]).map(profile=>[profile.id,profile]));
+          presence=await getPublicPresence(ids);
+        }
+        if (currentUser?.id !== owner) return;
+        const accepted=friendRelations.filter(rel=>rel.status==='accepted');
+        const received=friendRelations.filter(rel=>rel.status==='pending' && rel.receiver_id===owner);
+        const sent=friendRelations.filter(rel=>rel.status==='pending' && rel.sender_id===owner);
+        byId('friend-count').textContent=String(accepted.length);
+        byId('friend-incoming-count').textContent=String(received.length);
+        byId('friend-outgoing-count').textContent=String(sent.length);
+        byId('friend-incoming-panel').hidden=!received.length;
+        byId('friend-outgoing-panel').hidden=!sent.length;
+        function showRelations(target,list,kind) {
+          const parent=byId(target);
+          parent.replaceChildren();
+          if (!list.length && kind==='accepted') {friendEmpty(parent,'Друзей пока нет. Найди человека и отправь заявку.');return;}
+          for (const relation of list) {
+            const peer=relation.sender_id===owner?relation.receiver_id:relation.sender_id;
+            const profile=directory[peer] || {id:peer,display_name:'Пользователь LOOPA'};
+            const actions = kind==='accepted'?[{label:'Убрать',action:'remove',requestId:relation.id}]
+              :kind==='incoming'?[{label:'Принять',action:'accept',requestId:relation.id,primary:true},{label:'×',action:'decline',requestId:relation.id}]
+              :[{label:'Отменить',action:'cancel',requestId:relation.id}];
+            parent.appendChild(friendRow(profile,presence[peer],actions));
+          }
+        }
+        showRelations('friend-list',accepted,'accepted');
+        showRelations('friend-incoming',received,'incoming');
+        showRelations('friend-outgoing',sent,'outgoing');
+        const term=byId('friend-search').value.trim();
+        if (term.length>=2) runFriendSearch();
+        feedback('friends-feedback','');
+      } catch(err) {
+        if (currentUser?.id===owner) feedback('friends-feedback','Не удалось загрузить друзей. Проверь, что SQL-настройка LOOPA v12 выполнена: '+errorText(err),true);
+      } finally {friendRefreshBusy=false;}
+    }
+    async function runFriendSearch() {
+      if (!client || !currentUser) return;
+      const owner=currentUser.id;
+      const term=byId('friend-search').value.trim();
+      const generation=++friendSearchGeneration;
+      const parent=byId('friend-search-results');
+      if (term.length<2) {friendEmpty(parent,'Введи хотя бы 2 символа, чтобы найти пользователя.');return;}
+      friendEmpty(parent,'Ищем…');
+      try {
+        const escaped=term.replace(/[\%_]/g,'\\$&');
+        const {data,error} = await client.from('profiles')
+          .select('id,display_name,avatar_path,updated_at').ilike('display_name','%'+escaped+'%').limit(15);
+        if (error) throw error;
+        if (generation!==friendSearchGeneration || currentUser?.id!==owner) return;
+        const matches=(data||[]).filter(profile=>profile.id!==owner);
+        const presence=await getPublicPresence(matches.map(profile=>profile.id));
+        if (generation!==friendSearchGeneration || currentUser?.id!==owner) return;
+        if (!matches.length) {friendEmpty(parent,'Никого не нашли. Проверь написание никнейма.');return;}
+        parent.replaceChildren();
+        for (const profile of matches) {
+          const relation=friendRelations.find(rel=>rel.sender_id===profile.id || rel.receiver_id===profile.id);
+          let actions;
+          if (!relation) actions=[{label:'Добавить',action:'send',userId:profile.id,primary:true}];
+          else if (relation.status==='accepted') actions=[{label:'Вы друзья',action:'none',disabled:true}];
+          else if (relation.sender_id===owner) actions=[{label:'Отправлено',action:'none',disabled:true}];
+          else actions=[{label:'Принять',action:'accept',requestId:relation.id,primary:true}];
+          parent.appendChild(friendRow(profile,presence[profile.id],actions));
+        }
+      } catch(err) {
+        if (generation===friendSearchGeneration && currentUser?.id===owner) friendEmpty(parent,'Не удалось выполнить поиск: '+errorText(err));
+      }
+    }
+    byId('friend-search').addEventListener('input',()=>{
+      clearTimeout(friendSearchTimer);
+      friendSearchGeneration++;
+      friendSearchTimer=setTimeout(runFriendSearch,350);
+    });
+    async function handleFriendAction(button) {
+      if (!client || !currentUser || button.disabled) return;
+      const kind=button.dataset.friendAction;
+      if (kind==='none') return;
+      const actor=currentUser.id;
+      button.disabled=true;
+      feedback('friends-feedback','');
+      try {
+        let result;
+        if (kind==='send') {
+          result=await client.from('friend_requests').insert({sender_id:actor,receiver_id:button.dataset.userId,status:'pending'});
+        } else if (kind==='accept') {
+          result=await client.from('friend_requests').update({status:'accepted'})
+            .eq('id',button.dataset.requestId).eq('receiver_id',actor).eq('status','pending');
+        } else if (['decline','cancel','remove'].includes(kind)) {
+          result=await client.from('friend_requests').delete().eq('id',button.dataset.requestId);
+        } else return;
+        if (result.error) throw result.error;
+        if (currentUser?.id!==actor) return;
+        await refreshFriendLists();
+        showToast(kind==='send'?'Заявка отправлена':kind==='accept'?'Теперь вы друзья!':kind==='remove'?'Пользователь удалён из друзей':kind==='cancel'?'Заявка отменена':'Заявка отклонена');
+      } catch(err) {
+        feedback('friends-feedback',/duplicate key|unique constraint/i.test(err.message||'')
+          ? 'Между вами уже есть заявка. Обнови список.' : errorText(err),true);
+        button.disabled=false;
+      }
+    }
+    document.addEventListener('click',(event)=>{
+      const button=event.target.closest('[data-friend-action]');
+      if (button) handleFriendAction(button);
     });
 
     function displayGuest() {
@@ -764,10 +1057,13 @@
       byId('auth-guest').hidden = false;
       refreshTopProfileAvatar();
       stopPresence();
+      resetFriends();
     }
     async function displayAccount(user) {
       if (!user) return;
       startPresence(user);
+      syncFriendsSession();
+      if (lastPage==='friends') refreshFriendLists();
       byId('auth-loading').hidden = true;
       byId('auth-guest').hidden = true;
       byId('auth-account').hidden = false;
@@ -780,13 +1076,25 @@
       refreshSettingsIdentity();
       feedback('profile-feedback','');
       try {
-        const {data, error} = await client.from('profiles').select('display_name').eq('id', user.id).maybeSingle();
+        const {data, error} = await client.from('profiles').select('display_name,avatar_path').eq('id', user.id).maybeSingle();
         if (currentUser?.id !== user.id) return;
         if (error) {
-          feedback('profile-feedback', 'Для сохранения профиля в базе нужно один раз выполнить SQL-настройку из файла loopa-profiles.sql.', true);
-        } else if (data?.display_name) {
-          byId('profile-name').value = data.display_name;
-          renderName(data.display_name);
+          feedback('profile-feedback','Для поиска людей сначала выполни SQL из LOOPA-friends-setup.sql в Supabase. '+errorText(error),true);
+        } else {
+          if (data?.display_name) {
+            byId('profile-name').value = data.display_name;
+            renderName(data.display_name);
+          }
+          const avatarPath = user.user_metadata?.avatar_path;
+          const ownedPath = typeof avatarPath==='string' && new RegExp('^'+user.id+'/avatar\\.(jpg|png|webp)$','i').test(avatarPath) ? avatarPath : null;
+          const name = (data?.display_name || savedName || 'Пользователь').trim().slice(0,40);
+          if (!data) {
+            const {error:insertErr} = await client.from('profiles').insert({id:user.id,display_name:name,avatar_path:ownedPath});
+            if (insertErr && currentUser?.id===user.id) feedback('profile-feedback',errorText(insertErr),true);
+          } else if (ownedPath && data.avatar_path!==ownedPath) {
+            const {error:avatarErr} = await client.from('profiles').update({avatar_path:ownedPath,updated_at:new Date().toISOString()}).eq('id',user.id);
+            if (avatarErr && currentUser?.id===user.id) feedback('profile-feedback',errorText(avatarErr),true);
+          }
         }
       } catch (err) {
         feedback('profile-feedback', errorText(err), true);
@@ -831,7 +1139,10 @@
         if (result.error) throw result.error;
         currentUser = result.data.user;
         renderAvatar(currentUser);
-        feedback('profile-feedback','Фото профиля сохранено.');
+        const {error:directoryAvatarError} = await client.from('profiles').update({avatar_path:path,updated_at:new Date().toISOString()}).eq('id',currentUser.id);
+        feedback('profile-feedback',directoryAvatarError
+          ? 'Фото сохранено в аккаунте, но не обновлено для других пользователей: '+errorText(directoryAvatarError)
+          : 'Фото профиля сохранено.',!!directoryAvatarError);
       } catch(err) {
         feedback('profile-feedback',/bucket not found/i.test(err.message||'') ? 'Сначала нужно создать хранилище avatars в Supabase.' : errorText(err),true);
       } finally {label.style.opacity='';label.style.pointerEvents='';input.value='';}
@@ -999,6 +1310,7 @@
         feedback('auth-feedback',errorText(err),true);
       }
     }
+    resetFriends();
     init();
   </script>
 </body>
