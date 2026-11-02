@@ -176,6 +176,23 @@
     @media(min-width:640px){.app {border-inline:1px solid rgba(255,255,255,.1);}}
     @media(max-width:360px){.top {padding-inline:15px;}.brand {font-size:30px;}.circle{width:40px;height:40px;}.top-actions{gap:6px;}main{padding-inline:15px;}.card{padding:18px 13px;min-height:157px;}.card strong{font-size:15px;}.cards{gap:9px;}.tagline{font-size:11px;}h1{font-size:43px;}}
     @media(prefers-reduced-motion:reduce){.card{transition:none;}}
+
+    /* Учётная запись LOOPA */
+    .auth-switch{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:22px;padding:5px;border:1px solid var(--line);border-radius:15px;background:#11111490;}
+    .auth-switch button{border:0;border-radius:11px;padding:12px 8px;background:transparent;color:#a9a4a5;cursor:pointer;font-size:14px;}
+    .auth-switch button.selected{color:#18171a;background:#e9e4df;font-weight:650;}
+    .field{display:block;margin-top:15px;font-size:12px;color:#d0c9c8;letter-spacing:.2px;}
+    .field input{display:block;width:100%;margin-top:8px;padding:15px 14px;min-height:49px;color:#f9f5f2;background:rgba(11,11,13,.43);border:1px solid rgba(255,255,255,.22);border-radius:13px;font-size:16px;outline:none;}
+    .field input:focus{border-color:#d8c8ba;box-shadow:0 0 0 2px #d8c8ba22;}
+    .field input::placeholder{color:#797679;}
+    .field-note{font-size:12px!important;color:#b4abad!important;margin-top:12px!important;}
+    .auth-feedback{margin-top:16px!important;padding:12px 14px;border-radius:12px;border:1px solid #a6c4ad60;background:#99ba9b16;color:#e0f1e0!important;white-space:pre-wrap;}
+    .auth-feedback.error{border-color:#d49f9f77;background:#bd737316;color:#ffd6d6!important;}
+    .account-avatar{display:grid;place-items:center;width:66px;height:66px;margin-bottom:16px;border-radius:50%;background:linear-gradient(135deg,#eee7df,#9d9391);color:#262326;font:normal 32px Georgia,serif;}
+    .account-email{overflow-wrap:anywhere;}
+    .account-status{margin-top:10px!important;font-size:12px!important;color:#b8b3b4!important;}
+    .inline-link{display:inline-block;margin-top:14px;padding:5px 0;border:0;background:transparent;color:#e3d4c8;text-decoration:underline;text-underline-offset:4px;cursor:pointer;font-size:13px;}
+    .action[disabled]{opacity:.58;cursor:wait;}
   </style>
 </head>
 <body>
@@ -227,13 +244,59 @@
       <section data-page="friends" hidden>
         <div class="eyebrow">ТВОЙ КРУГ</div>
         <h1>Быть<br>рядом.</h1>
-        <div class="panel glass"><p class="panel-note">ДРУЗЬЯ</p><h2>Друзей пока нет</h2><p>Когда появятся настоящие аккаунты, здесь будут запросы в друзья и твой список контактов.</p><button class="action secondary" type="button" data-message="Приглашения появятся после подключения аккаунтов">Пригласить друга</button></div>
+        <div class="panel glass"><p class="panel-note">ДРУЗЬЯ</p><h2>Друзей пока нет</h2><p>Аккаунты уже можно создавать. Запросы в друзья и список контактов подключим на следующем этапе.</p><button class="action secondary" type="button" data-message="Приглашения в друзья пока не подключены">Пригласить друга</button></div>
       </section>
 
       <section data-page="profile" hidden>
         <div class="eyebrow">ЛИЧНОЕ ПРОСТРАНСТВО</div>
         <h1>Твой<br>профиль.</h1>
-        <div class="panel glass"><p class="panel-note">ЛИЧНОЕ ПРОСТРАНСТВО</p><h2>Гость LOOPA</h2><p>Сейчас это первая версия интерфейса. Настоящие аккаунты, имена и аватары появятся после подключения регистрации — без Clerk.</p><button class="action" type="button" data-message="Регистрация ещё не подключена">Войти или зарегистрироваться</button></div>
+        <div class="panel glass" id="auth-loading"><p class="panel-note">АККАУНТ LOOPA</p><h2>Подключаемся…</h2><p>Проверяем авторизацию.</p></div>
+        <div class="panel glass" id="auth-guest" hidden>
+          <p class="panel-note">АККАУНТ LOOPA</p>
+          <h2>Твоя история начинается здесь.</h2>
+          <p style="margin:12px 0 20px">Войди или создай аккаунт, чтобы сохранить свой профиль.</p>
+          <div class="auth-switch" aria-label="Режим авторизации">
+            <button type="button" data-auth-mode="login" class="selected" aria-pressed="true">Войти</button>
+            <button type="button" data-auth-mode="signup" aria-pressed="false">Регистрация</button>
+          </div>
+          <form id="auth-form">
+            <label class="field" id="signup-name-field" hidden>Твоё имя
+              <input id="auth-name" type="text" maxlength="40" autocomplete="nickname" placeholder="Как к тебе обращаться">
+            </label>
+            <label class="field">Электронная почта
+              <input id="auth-email" type="email" autocomplete="email" inputmode="email" required placeholder="you@example.com">
+            </label>
+            <label class="field">Пароль
+              <input id="auth-password" type="password" minlength="8" required autocomplete="current-password" placeholder="Минимум 8 символов">
+            </label>
+            <p class="field-note" id="signup-hint" hidden>После регистрации проверь почту и перейди по ссылке подтверждения.</p>
+            <button class="action" id="auth-submit" type="submit">Войти</button>
+          </form>
+          <button class="inline-link" type="button" id="forgot-password">Забыли пароль?</button>
+          <p id="auth-feedback" class="auth-feedback" role="status" aria-live="polite" hidden></p>
+        </div>
+        <div class="panel glass" id="auth-account" hidden>
+          <p class="panel-note">ТВОЙ АККАУНТ</p>
+          <div class="account-avatar" id="account-avatar" aria-hidden="true">L</div>
+          <h2 id="account-title">Профиль LOOPA</h2>
+          <p class="account-email" id="account-email"></p>
+          <p class="account-status">Аккаунт LOOPA</p>
+          <form id="profile-form">
+            <label class="field">Отображаемое имя
+              <input id="profile-name" type="text" maxlength="40" required autocomplete="nickname" placeholder="Твоё имя">
+            </label>
+            <button class="action" id="profile-save" type="submit">Сохранить профиль</button>
+          </form>
+          <p id="profile-feedback" class="auth-feedback" role="status" aria-live="polite" hidden></p>
+          <form id="recovery-form" hidden>
+            <p class="field-note">Восстановление доступа: введи новый пароль.</p>
+            <label class="field">Новый пароль
+              <input id="recovery-password" type="password" minlength="8" autocomplete="new-password" required placeholder="Минимум 8 символов">
+            </label>
+            <button class="action" id="recovery-submit" type="submit">Обновить пароль</button>
+          </form>
+          <button class="action secondary" type="button" id="sign-out">Выйти из аккаунта</button>
+        </div>
       </section>
     </main>
   </div>
@@ -246,34 +309,247 @@
   </nav>
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-  <script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
+  <script defer>
     'use strict';
+    const SUPABASE_URL = 'https://wnubqzwsvclvcvozibtc.supabase.co';
+    // Это публичный ключ браузерного клиента. Никогда не вставляйте service_role или secret key.
+    const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_yuWa66reRpb7j2q3Z4mnAA_bkGwIhpp';
+    const SITE_URL = 'https://usmanchik005sila-cyber.github.io/Loopa/';
     const pages = document.querySelectorAll('[data-page]');
     const tabs = document.querySelectorAll('.nav-item');
     const toast = document.getElementById('toast');
+    const byId = (id) => document.getElementById(id);
     let toastTimer;
+    let client = null;
+    let currentUser = null;
+    let authMode = 'login';
+
+    function showPage(destination) {
+      pages.forEach(page => { page.hidden = page.dataset.page !== destination; });
+      tabs.forEach(tab => {
+        const active = tab.dataset.go === destination;
+        tab.classList.toggle('active', active);
+        if (active) tab.setAttribute('aria-current', 'page');
+        else tab.removeAttribute('aria-current');
+      });
+      toast.hidden = true;
+      window.scrollTo({top:0,behavior:'instant'});
+    }
+    function showToast(message) {
+      toast.textContent = message;
+      toast.hidden = false;
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => { toast.hidden = true; }, 3600);
+    }
+    function feedback(id, message, isError = false) {
+      const el = byId(id);
+      el.textContent = message;
+      el.classList.toggle('error', isError);
+      el.hidden = !message;
+    }
+    function errorText(err) {
+      const msg = (err && err.message) || '';
+      if (/invalid login credentials/i.test(msg)) return 'Неверная почта или пароль.';
+      if (/email not confirmed/i.test(msg)) return 'Подтверди почту по ссылке из письма, затем войди.';
+      if (/user already registered/i.test(msg)) return 'Такой аккаунт уже зарегистрирован. Попробуй войти.';
+      if (/password should be|password must|weak_password/i.test(msg)) return 'Пароль не соответствует требованиям безопасности Supabase.';
+      if (/rate limit|too many requests|over_email_send_rate_limit/i.test(msg)) return 'Слишком много попыток. Попробуй позже.';
+      if (/failed to fetch|network|fetch failed/i.test(msg)) return 'Не удалось подключиться к Supabase. Проверь интернет.';
+      return msg || 'Не удалось выполнить действие. Попробуй ещё раз.';
+    }
+    function setBusy(id, busy) {
+      const button = byId(id);
+      button.disabled = busy;
+      return button;
+    }
+    function selectAuthMode(mode) {
+      authMode = mode;
+      document.querySelectorAll('[data-auth-mode]').forEach(button => {
+        const selected = button.dataset.authMode === mode;
+        button.classList.toggle('selected', selected);
+        button.setAttribute('aria-pressed', String(selected));
+      });
+      byId('signup-name-field').hidden = mode !== 'signup';
+      byId('auth-name').required = mode === 'signup';
+      byId('signup-hint').hidden = mode !== 'signup';
+      byId('auth-submit').textContent = mode === 'signup' ? 'Создать аккаунт' : 'Войти';
+      byId('forgot-password').hidden = mode === 'signup';
+      byId('auth-password').setAttribute('autocomplete', mode === 'signup' ? 'new-password' : 'current-password');
+      feedback('auth-feedback','');
+    }
+    function displayGuest() {
+      byId('auth-loading').hidden = true;
+      byId('auth-account').hidden = true;
+      byId('auth-guest').hidden = false;
+    }
+    async function displayAccount(user) {
+      if (!user) return;
+      byId('auth-loading').hidden = true;
+      byId('auth-guest').hidden = true;
+      byId('auth-account').hidden = false;
+      const savedName = (user.user_metadata && user.user_metadata.display_name) || '';
+      byId('profile-name').value = savedName;
+      byId('account-email').textContent = user.email || '';
+      renderName(savedName);
+      feedback('profile-feedback','');
+      try {
+        const {data, error} = await client.from('profiles').select('display_name').eq('id', user.id).maybeSingle();
+        if (currentUser?.id !== user.id) return;
+        if (error) {
+          feedback('profile-feedback', 'Для сохранения профиля в базе нужно один раз выполнить SQL-настройку из файла loopa-profiles.sql.', true);
+        } else if (data?.display_name) {
+          byId('profile-name').value = data.display_name;
+          renderName(data.display_name);
+        }
+      } catch (err) {
+        feedback('profile-feedback', errorText(err), true);
+      }
+    }
+    function renderName(name) {
+      const title = name.trim() || 'Профиль LOOPA';
+      byId('account-title').textContent = title;
+      byId('account-avatar').textContent = (name.trim().charAt(0) || 'L').toUpperCase();
+    }
+    async function syncSession() {
+      if (!client) return;
+      const {data, error} = await client.auth.getSession();
+      if (error) showToast(errorText(error));
+      currentUser = data?.session?.user || null;
+      if (currentUser) await displayAccount(currentUser);
+      else displayGuest();
+    }
     document.addEventListener('click', function(event) {
       const button = event.target.closest('button');
       if (!button) return;
-      if (button.dataset.go) {
-        const destination = button.dataset.go;
-        pages.forEach(page => { page.hidden = page.dataset.page !== destination; });
-        tabs.forEach(tab => {
-          const isActive = tab.dataset.go === destination;
-          tab.classList.toggle('active', isActive);
-          if(isActive) tab.setAttribute('aria-current','page');
-          else tab.removeAttribute('aria-current');
-        });
-        toast.hidden = true;
-        window.scrollTo({top:0,behavior:'instant'});
-      }
-      if (button.dataset.message) {
-        toast.textContent = button.dataset.message;
-        toast.hidden = false;
-        clearTimeout(toastTimer);
-        toastTimer = setTimeout(() => { toast.hidden = true; }, 3600);
-      }
+      if (button.dataset.go) showPage(button.dataset.go);
+      if (button.dataset.message) showToast(button.dataset.message);
+      if (button.dataset.authMode) selectAuthMode(button.dataset.authMode);
     });
+    byId('auth-form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!client) return feedback('auth-feedback','Подключение к Supabase пока недоступно.',true);
+      const email = byId('auth-email').value.trim();
+      const password = byId('auth-password').value;
+      const name = byId('auth-name').value.trim();
+      if (authMode === 'signup' && !name) return feedback('auth-feedback','Укажи имя.',true);
+      setBusy('auth-submit',true);
+      feedback('auth-feedback','');
+      try {
+        if (authMode === 'signup') {
+          const {data,error} = await client.auth.signUp({email,password,options:{data:{display_name:name},emailRedirectTo:SITE_URL}});
+          if (error) throw error;
+          if (data.session) {
+            currentUser = data.session.user;
+            await displayAccount(currentUser);
+            showToast('Аккаунт создан. Добро пожаловать в LOOPA!');
+          } else {
+            feedback('auth-feedback','Проверь почту: если для адреса доступна регистрация, Supabase отправит письмо со ссылкой подтверждения. После подтверждения вернись в LOOPA и войди.');
+          }
+        } else {
+          const {data,error} = await client.auth.signInWithPassword({email,password});
+          if (error) throw error;
+          currentUser = data.user;
+          await displayAccount(data.user);
+          byId('auth-password').value = '';
+        }
+      } catch (err) { feedback('auth-feedback',errorText(err),true); }
+      finally { setBusy('auth-submit',false); }
+    });
+    byId('forgot-password').addEventListener('click',async () => {
+      const email = byId('auth-email').value.trim();
+      if (!email || !byId('auth-email').checkValidity()) return feedback('auth-feedback','Сначала введи свой email.',true);
+      if (!client) return feedback('auth-feedback','Подключение к Supabase недоступно.',true);
+      byId('forgot-password').disabled = true;
+      try {
+        const {error} = await client.auth.resetPasswordForEmail(email,{redirectTo:SITE_URL});
+        if (error) throw error;
+        feedback('auth-feedback','Если аккаунт существует, на почту придёт ссылка для сброса пароля.');
+      } catch (err) {feedback('auth-feedback',errorText(err),true);}
+      finally {byId('forgot-password').disabled=false;}
+    });
+    // Recovery link from Supabase opens the site with a recovery session.
+    // Ask for a new password rather than leaving the account signed in without changing it.
+    function passwordRecovery() {
+      showPage('profile');
+      byId('recovery-form').hidden = false;
+      feedback('profile-feedback','Введите новый пароль, чтобы завершить восстановление доступа.');
+    }
+    byId('recovery-form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!client) return;
+      setBusy('recovery-submit',true);
+      const {error} = await client.auth.updateUser({password:byId('recovery-password').value});
+      setBusy('recovery-submit',false);
+      if (error) return feedback('profile-feedback',errorText(error),true);
+      byId('recovery-password').value='';
+      byId('recovery-form').hidden = true;
+      feedback('profile-feedback','Пароль изменён. Теперь можно пользоваться LOOPA.');
+    });
+    byId('profile-form').addEventListener('submit',async (event) => {
+      event.preventDefault();
+      if (!currentUser || !client) return;
+      const name = byId('profile-name').value.trim();
+      if (!name || name.length > 40) return feedback('profile-feedback','Имя должно содержать от 1 до 40 символов.',true);
+      setBusy('profile-save',true);
+      feedback('profile-feedback','');
+      try {
+        const {error} = await client.from('profiles').upsert({id:currentUser.id,display_name:name},{onConflict:'id'});
+        if (error) throw error;
+        // Metadata is a convenient fallback while session/profile is loading.
+        const update = await client.auth.updateUser({data:{display_name:name}});
+        if (update.error) throw update.error;
+        currentUser = update.data.user;
+        renderName(name);
+        feedback('profile-feedback','Профиль сохранён.');
+      } catch (err) {
+        feedback('profile-feedback',/profiles|schema cache|relation|permission denied/i.test(err.message || '')
+          ? 'Таблица профилей ещё не настроена. Выполни SQL из файла loopa-profiles.sql в Supabase → SQL Editor.'
+          : errorText(err),true);
+      } finally {setBusy('profile-save',false);}
+    });
+    byId('sign-out').addEventListener('click',async () => {
+      if (!client) return;
+      byId('sign-out').disabled = true;
+      const {error} = await client.auth.signOut();
+      byId('sign-out').disabled = false;
+      if (error) return feedback('profile-feedback',errorText(error),true);
+      currentUser = null;
+      byId('auth-password').value = '';
+      selectAuthMode('login');
+      displayGuest();
+      showToast('Ты вышел из аккаунта.');
+    });
+    async function init() {
+      if (!window.supabase?.createClient) {
+        byId('auth-loading').hidden = true;
+        displayGuest();
+        feedback('auth-feedback','Не удалось загрузить библиотеку Supabase. Проверь подключение к интернету и обнови страницу.',true);
+        return;
+      }
+      try {
+        client = window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{
+          auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+        });
+        client.auth.onAuthStateChange((event, session) => {
+          // Run outside the auth callback to avoid blocking Supabase internal locks.
+          setTimeout(() => {
+            const newUser = session?.user || null;
+            if (newUser?.id !== currentUser?.id) {
+              currentUser = newUser;
+              if (newUser) displayAccount(newUser);
+              else displayGuest();
+            }
+            if (event === 'PASSWORD_RECOVERY') passwordRecovery();
+          },0);
+        });
+        await syncSession();
+      } catch (err) {
+        displayGuest();
+        feedback('auth-feedback',errorText(err),true);
+      }
+    }
+    init();
   </script>
 </body>
 </html>
