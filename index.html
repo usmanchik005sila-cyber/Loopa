@@ -197,6 +197,39 @@
     .account-status{margin-top:10px!important;font-size:12px!important;color:#b8b3b4!important;}
     .inline-link{display:inline-block;margin-top:14px;padding:5px 0;border:0;background:transparent;color:#e3d4c8;text-decoration:underline;text-underline-offset:4px;cursor:pointer;font-size:13px;}
     .action[disabled]{opacity:.58;cursor:wait;}
+
+    /* LOOPA account settings */
+    .settings-overview{display:grid;gap:13px}
+    .settings-user{display:flex;align-items:center;gap:15px;padding:20px;border-radius:22px}
+    .settings-mini-avatar{width:64px;height:64px;border-radius:50%;overflow:hidden;display:grid;place-items:center;flex-shrink:0;background:#dcd4ce;color:#201d20;font:35px Georgia,serif}
+    .settings-mini-avatar img{width:100%;height:100%;object-fit:cover}
+    .settings-user h2{font-size:20px;margin:0 0 5px;overflow-wrap:anywhere}
+    .settings-user p{font-size:12px;color:#b6b0b2;margin:0;overflow-wrap:anywhere}
+    .settings-group-title{margin:23px 4px 11px;font-size:10px;letter-spacing:2.6px;color:#c1b5ae;font-weight:700}
+    .setting-row{display:flex;width:100%;align-items:center;gap:14px;padding:17px 16px;margin:0;border-radius:18px;border:1px solid rgba(255,255,255,.14);text-align:left;cursor:pointer}
+    .setting-row .setting-icon{display:grid;place-items:center;width:43px;height:43px;flex-shrink:0;border:1px solid rgba(255,255,255,.15);border-radius:14px;background:#ffffff0b}
+    .setting-icon svg{width:22px;height:22px}
+    .setting-row strong{display:block;font-size:15px;font-weight:580}
+    .setting-row small{display:block;font-size:12px;color:#b4afb2;margin-top:5px;line-height:1.4}
+    .setting-row .chevron{font-size:25px;font-weight:300;color:#bdb7bb;margin-left:auto}
+    .settings-back{display:inline-flex;gap:9px;align-items:center;border:0;background:transparent;color:#d4c9c6;padding:4px 0 22px;font-size:14px;cursor:pointer}
+    .settings-back svg{height:17px;width:17px;transform:rotate(180deg)}
+    .settings-content .panel{margin-bottom:15px}
+    .settings-content .eyebrow{margin-bottom:17px}
+    .privacy-copy{font-size:13px;line-height:1.8;color:#c6c0c1}
+    .privacy-copy p{margin:0 0 15px}
+    .theme-options{display:grid;gap:11px;margin-top:17px}
+    .theme-choice{display:flex;width:100%;align-items:center;justify-content:space-between;padding:18px;border-radius:16px;border:1px solid rgba(255,255,255,.18);background:#ffffff09;text-align:left;cursor:pointer}
+    .theme-choice[aria-pressed="true"]{border-color:#e8dcd2;background:#ffffff1a}
+    .theme-choice span{font-size:14px}.theme-choice small{font-size:12px;color:#bbb3b4}
+    body[data-theme="midnight"] .app{background:radial-gradient(ellipse 90% 70% at 99% 40%,rgba(46,58,82,.25),transparent 73%),linear-gradient(110deg,#0b0e16,#161b26 55%,#111523)}
+    body[data-theme="midnight"] .top{background:linear-gradient(114deg,rgba(12,15,25,.9),rgba(35,42,59,.6))}
+    body[data-theme="midnight"] .glass{background:radial-gradient(ellipse 85% 60% at 0% 0%,rgba(209,219,246,.11),transparent 75%),linear-gradient(140deg,rgba(86,100,131,.15),rgba(18,24,38,.7));}
+    body[data-theme="midnight"] .bottom{background:linear-gradient(180deg,rgba(16,20,31,.91),rgba(8,11,19,.98))}
+    body[data-theme="warm"] .app{background:radial-gradient(ellipse 85% 65% at 100% 45%,rgba(105,73,62,.24),transparent 72%),linear-gradient(110deg,#191415,#292021 55%,#221a1b)}
+    body[data-theme="warm"] .top{background:linear-gradient(114deg,rgba(28,20,21,.88),rgba(65,48,45,.56))}
+    body[data-theme="warm"] .glass{background:radial-gradient(ellipse 85% 60% at 0% 0%,rgba(255,224,199,.13),transparent 75%),linear-gradient(140deg,rgba(132,88,74,.12),rgba(30,21,23,.68));}
+    body[data-theme="warm"] .bottom{background:linear-gradient(180deg,rgba(40,28,29,.90),rgba(22,16,18,.98))}
   </style>
 </head>
 <body>
@@ -205,6 +238,8 @@
     <symbol id="i-room" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9 6 3-6 3z"/></symbol>
     <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M17 5a3 3 0 0 1 0 6m1 4a5 5 0 0 1 3 5"/></symbol>
     <symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></symbol>
+    <symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18h1.5a2 2 0 0 0 1.5-3.4 1.7 1.7 0 0 1 1.2-2.9H18a3 3 0 0 0 3-3A9 9 0 0 0 12 3z"/><circle cx="7.5" cy="11" r=".7"/><circle cx="10" cy="7" r=".7"/><circle cx="15" cy="7.5" r=".7"/></symbol>
     <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></symbol>
     <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/></symbol>
     <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h16m-7-7 7 7-7 7"/></symbol>
@@ -278,6 +313,20 @@
           <button class="inline-link" type="button" id="forgot-password">Забыли пароль?</button>
           <p id="auth-feedback" class="auth-feedback" role="status" aria-live="polite" hidden></p>
         </div>
+        <div id="settings-home" class="settings-overview" hidden>
+          <div class="settings-user glass">
+            <div class="settings-mini-avatar" id="settings-mini-avatar" aria-hidden="true">L</div>
+            <div style="min-width:0"><h2 id="settings-user-name">Профиль LOOPA</h2><p id="settings-user-email"></p></div>
+          </div>
+          <div class="settings-group-title">ТВОИ НАСТРОЙКИ</div>
+          <button class="setting-row glass" type="button" data-settings="account"><span class="setting-icon"><svg><use href="#i-person"/></svg></span><span><strong>Личные данные</strong><small>Аватар, имя и информация аккаунта</small></span><span class="chevron">›</span></button>
+          <button class="setting-row glass" type="button" data-settings="privacy"><span class="setting-icon"><svg><use href="#i-lock"/></svg></span><span><strong>Конфиденциальность</strong><small>Безопасность и доступ к аккаунту</small></span><span class="chevron">›</span></button>
+          <button class="setting-row glass" type="button" data-settings="theme"><span class="setting-icon"><svg><use href="#i-palette"/></svg></span><span><strong>Оформление</strong><small>Выбор темы LOOPA</small></span><span class="chevron">›</span></button>
+          <p style="margin:13px 5px 0;color:#999296;font-size:12px;line-height:1.5">LOOPA · Твоё пространство, твои настройки.</p>
+        </div>
+        <div id="settings-detail" class="settings-content" hidden>
+          <button class="settings-back" type="button" id="settings-back"><svg><use href="#i-arrow"/></svg>Все настройки</button>
+          <div id="settings-account" hidden>
         <div class="panel glass" id="auth-account" hidden>
           <p class="panel-note">ТВОЙ АККАУНТ</p>
           <div class="account-avatar" id="account-avatar" aria-hidden="true">L</div>
@@ -302,6 +351,29 @@
             <button class="action" id="recovery-submit" type="submit">Обновить пароль</button>
           </form>
           <button class="action secondary" type="button" id="sign-out">Выйти из аккаунта</button>
+        </div>
+          </div>
+          <div id="settings-privacy" hidden>
+            <div class="panel glass"><p class="panel-note">БЕЗОПАСНОСТЬ</p><h2>Конфиденциальность</h2>
+              <div class="privacy-copy" style="margin-top:20px">
+                <p><strong>Твои данные.</strong> Никнейм и фотография привязаны к твоему аккаунту Supabase. Фотографии профиля доступны по публичной ссылке; не загружай сюда фото, которые хочешь сохранить полностью закрытыми.</p>
+                <p><strong>Доступ к аккаунту.</strong> Для входа используется адрес электронной почты и пароль. Не сообщай пароль другим людям.</p>
+                <p><strong>Приватный профиль.</strong> Функция скрытия профиля ещё не реализована. Мы не добавляем неработающий переключатель.</p>
+              </div>
+              <button class="action secondary" type="button" id="privacy-reset">Отправить письмо для смены пароля</button>
+              <p id="privacy-feedback" class="auth-feedback" role="status" aria-live="polite" hidden></p>
+              <button class="action secondary" type="button" id="privacy-signout">Выйти из аккаунта</button>
+            </div>
+          </div>
+          <div id="settings-theme" hidden>
+            <div class="panel glass"><p class="panel-note">ВНЕШНИЙ ВИД</p><h2>Тема LOOPA</h2><p>Выбери настроение приложения. Тема сохраняется на этом устройстве.</p>
+              <div class="theme-options">
+                <button class="theme-choice" type="button" data-theme-choice="classic" aria-pressed="true"><span>Графит <small>· оригинальная тема</small></span><span class="theme-check">○</span></button>
+                <button class="theme-choice" type="button" data-theme-choice="midnight" aria-pressed="false"><span>Полночь <small>· холодные оттенки</small></span><span class="theme-check">○</span></button>
+                <button class="theme-choice" type="button" data-theme-choice="warm" aria-pressed="false"><span>Какао <small>· тёплые оттенки</small></span><span class="theme-check">○</span></button>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
     </main>
@@ -340,6 +412,8 @@
         else tab.removeAttribute('aria-current');
       });
       toast.hidden = true;
+      if (destination === 'profile' && currentUser && !byId('recovery-form').hidden) openSettings('account');
+      else if (destination === 'profile') openSettings('home');
       window.scrollTo({top:0,behavior:'instant'});
     }
     function showToast(message) {
@@ -384,7 +458,51 @@
       byId('auth-password').setAttribute('autocomplete', mode === 'signup' ? 'new-password' : 'current-password');
       feedback('auth-feedback','');
     }
+    function openSettings(which) {
+      const signed = !!currentUser;
+      byId('settings-home').hidden = !signed || which !== 'home';
+      byId('settings-detail').hidden = !signed || which === 'home';
+      ['account','privacy','theme'].forEach(id => byId('settings-' + id).hidden = which !== id);
+      if (signed && which !== 'home') window.scrollTo({top:0,behavior:'instant'});
+    }
+    function refreshSettingsIdentity() {
+      const name = byId('profile-name').value.trim() || 'Профиль LOOPA';
+      byId('settings-user-name').textContent = name;
+      byId('settings-user-email').textContent = currentUser?.email || '';
+      const mini = byId('settings-mini-avatar');
+      mini.replaceChildren();
+      const actual = byId('account-avatar').querySelector('img');
+      if (actual) mini.appendChild(actual.cloneNode());
+      else mini.textContent = (name.charAt(0) || 'L').toUpperCase();
+    }
+    function setTheme(theme) {
+      if (!['classic','midnight','warm'].includes(theme)) theme='classic';
+      document.body.dataset.theme=theme;
+      document.querySelectorAll('[data-theme-choice]').forEach(button => {
+        const chosen=button.dataset.themeChoice===theme;
+        button.setAttribute('aria-pressed',String(chosen));
+        button.querySelector('.theme-check').textContent=chosen?'✓':'○';
+      });
+      try {localStorage.setItem('loopa-theme',theme);}catch(e){}
+    }
+    try {setTheme(localStorage.getItem('loopa-theme') || 'classic');}catch(e){setTheme('classic');}
+    byId('settings-back').addEventListener('click',()=>openSettings('home'));
+    document.querySelectorAll('[data-settings]').forEach(button => button.addEventListener('click',()=>openSettings(button.dataset.settings)));
+    document.querySelectorAll('[data-theme-choice]').forEach(button => button.addEventListener('click',()=>setTheme(button.dataset.themeChoice)));
+    byId('privacy-reset').addEventListener('click',async ()=>{
+      if (!currentUser?.email || !client) return;
+      byId('privacy-reset').disabled=true;
+      try {
+        const {error}=await client.auth.resetPasswordForEmail(currentUser.email,{redirectTo:SITE_URL});
+        if(error) throw error;
+        feedback('privacy-feedback','Письмо для изменения пароля отправлено, проверь почту.');
+      }catch(err){feedback('privacy-feedback',errorText(err),true);}
+      finally{byId('privacy-reset').disabled=false;}
+    });
+    byId('privacy-signout').addEventListener('click',()=>byId('sign-out').click());
     function displayGuest() {
+      byId('settings-home').hidden=true;
+      byId('settings-detail').hidden=true;
       byId('auth-loading').hidden = true;
       byId('auth-account').hidden = true;
       byId('auth-guest').hidden = false;
@@ -394,11 +512,13 @@
       byId('auth-loading').hidden = true;
       byId('auth-guest').hidden = true;
       byId('auth-account').hidden = false;
+      openSettings('home');
       const savedName = (user.user_metadata && user.user_metadata.display_name) || '';
       byId('profile-name').value = savedName;
       byId('account-email').textContent = user.email || '';
       renderName(savedName);
       renderAvatar(user);
+      refreshSettingsIdentity();
       feedback('profile-feedback','');
       try {
         const {data, error} = await client.from('profiles').select('display_name').eq('id', user.id).maybeSingle();
@@ -422,9 +542,11 @@
         const img = document.createElement('img');
         img.alt = '';
         img.src = data.publicUrl + '?v=' + encodeURIComponent(user?.user_metadata?.avatar_version || '1');
-        img.onerror = () => { avatar.replaceChildren(); avatar.textContent = (byId('profile-name').value.trim().charAt(0) || 'L').toUpperCase(); };
+        img.onload = refreshSettingsIdentity;
+        img.onerror = () => { avatar.replaceChildren(); avatar.textContent = (byId('profile-name').value.trim().charAt(0) || 'L').toUpperCase(); refreshSettingsIdentity(); };
         avatar.appendChild(img);
       } else avatar.textContent = (byId('profile-name').value.trim().charAt(0) || 'L').toUpperCase();
+      refreshSettingsIdentity();
     }
     byId('avatar-file').addEventListener('change', async (event) => {
       const file = event.target.files?.[0];
@@ -459,6 +581,7 @@
       const title = name.trim() || 'Профиль LOOPA';
       byId('account-title').textContent = title;
       if (!currentUser?.user_metadata?.avatar_path) byId('account-avatar').textContent = (name.trim().charAt(0) || 'L').toUpperCase();
+      refreshSettingsIdentity();
     }
     async function syncSession() {
       if (!client) return;
@@ -521,6 +644,7 @@
     // Ask for a new password rather than leaving the account signed in without changing it.
     function passwordRecovery() {
       showPage('profile');
+      openSettings('account');
       byId('recovery-form').hidden = false;
       feedback('profile-feedback','Введите новый пароль, чтобы завершить восстановление доступа.');
     }
