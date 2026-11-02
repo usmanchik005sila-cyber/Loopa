@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0c0c0e">
+  <title>LOOPA — Ближе, даже на расстоянии</title>
+  <style>
+    :root { color-scheme:dark; --bg:#0c0c0e; --panel:#1d1d20; --line:#343438; --text:#f4f0eb; --muted:#a4a0a2; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    button { font:inherit; -webkit-tap-highlight-color:transparent; }
+    button:focus-visible { outline:2px solid #f2d6ac; outline-offset:4px; }
+    .app { max-width:640px; min-height:100dvh; margin:auto; padding-bottom:calc(100px + env(safe-area-inset-bottom)); position:relative; overflow:hidden; }
+    .app::before { content:""; pointer-events:none; position:absolute; top:200px; right:-220px; width:440px; height:440px; border:1px solid #ffffff0a; border-radius:50%; }
+    .top { display:flex; justify-content:space-between; align-items:center; padding:27px 24px 20px; border-bottom:1px solid #ffffff12; }
+    .brand { font:30px Georgia,"Times New Roman",serif; letter-spacing:3px; }
+    .tagline { font-size:12px; color:var(--muted); margin-top:5px; }
+    .top-actions { display:flex; gap:9px; }
+    .circle { width:43px; height:43px; border:1px solid var(--line); border-radius:50%; background:#242427; color:var(--text); display:grid; place-items:center; cursor:pointer; }
+    svg { width:23px; height:23px; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+    main { padding:40px 24px 30px; position:relative; }
+    .eyebrow { font-size:11px; font-weight:600; letter-spacing:2.6px; color:#b2a79b; }
+    h1 { font:normal clamp(43px,9vw,63px)/1.08 Georgia,"Times New Roman",serif; letter-spacing:-1.5px; margin:19px 0 38px; }
+    h2 { font-size:21px; font-weight:550; letter-spacing:-.4px; margin:0; }
+    .cards { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+    .card { text-align:left; min-height:178px; padding:21px 17px; display:flex; flex-direction:column; justify-content:space-between; color:var(--text); background:linear-gradient(145deg,#29292b,#19191b 75%); border:1px solid #424144; border-radius:24px; cursor:pointer; }
+    .card svg { width:30px; height:30px; }
+    .card strong { font-size:16px; font-weight:550; display:block; }
+    .card small { display:block; color:var(--muted); font-size:12px; margin-top:7px; line-height:1.35; }
+    .section-head { margin:48px 0 16px; display:flex; align-items:center; justify-content:space-between; gap:15px; }
+    .text-link { background:none; border:0; color:#c5c0c1; font-size:13px; padding:8px 0; cursor:pointer; }
+    .empty { color:var(--muted); font-size:15px; line-height:1.7; margin:0; max-width:340px; }
+    .panel { padding:23px; background:linear-gradient(145deg,#222225,#171719); border:1px solid var(--line); border-radius:24px; }
+    .panel h2 { margin-bottom:10px; }
+    .panel p { color:var(--muted); line-height:1.65; margin:0; font-size:14px; }
+    .action { margin-top:22px; width:100%; min-height:48px; background:#eee9e2; color:#171719; border:0; border-radius:13px; font-weight:600; cursor:pointer; }
+    .secondary { background:#28282b; border:1px solid #454549; color:var(--text); }
+    [hidden] { display:none !important; }
+    .bottom { position:fixed; z-index:10; bottom:0; left:50%; transform:translateX(-50%); width:min(100%,640px); display:grid; grid-template-columns:repeat(4,1fr); background:#101012f5; backdrop-filter:blur(14px); border-top:1px solid #ffffff16; padding:13px 8px calc(15px + env(safe-area-inset-bottom)); }
+    .nav-item { border:0; background:none; color:#8e898c; display:grid; justify-items:center; gap:7px; font-size:11px; cursor:pointer; }
+    .nav-item.active { color:var(--text); }
+    .nav-item svg { width:24px; height:24px; }
+    .toast { position:fixed; z-index:20; left:50%; transform:translateX(-50%); bottom:calc(105px + env(safe-area-inset-bottom)); width:min(calc(100% - 32px),500px); background:#302e30; border:1px solid #5c5554; border-radius:16px; padding:16px 18px; font-size:14px; line-height:1.45; box-shadow:0 16px 40px #0008; }
+    @media (min-width:640px) { .app { border-inline:1px solid #ffffff12; } }
+  </style>
+</head>
+<body>
+  <svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></symbol>
+    <symbol id="i-room" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9 6 3-6 3z"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M17 5a3 3 0 0 1 0 6m1 4a5 5 0 0 1 3 5"/></symbol>
+    <symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/></symbol>
+  </svg>
+
+  <div class="app">
+    <header class="top">
+      <div><div class="brand">LOOPA</div><div class="tagline">Ближе, даже на расстоянии</div></div>
+      <div class="top-actions">
+        <button class="circle" type="button" data-message="Уведомлений пока нет" aria-label="Уведомления"><svg><use href="#i-bell"/></svg></button>
+        <button class="circle" type="button" data-go="profile" aria-label="Открыть профиль"><svg><use href="#i-person"/></svg></button>
+      </div>
+    </header>
+
+    <main>
+      <section data-page="home">
+        <div class="eyebrow">ТВОЁ ПРОСТРАНСТВО</div>
+        <h1>Добро<br>пожаловать.</h1>
+        <div class="cards">
+          <button class="card" type="button" data-message="Комнаты станут доступны после подключения сервера">
+            <svg><use href="#i-plus"/></svg><span><strong>Создать комнату</strong><small>Начать просмотр</small></span>
+          </button>
+          <button class="card" type="button" data-go="friends">
+            <svg><use href="#i-users"/></svg><span><strong>Мои друзья</strong><small>Твой круг</small></span>
+          </button>
+        </div>
+        <div class="section-head"><h2>Недавние комнаты</h2><button class="text-link" type="button" data-go="rooms">Все →</button></div>
+        <p class="empty">Здесь появятся комнаты, которые ты создашь или посетишь.</p>
+      </section>
+
+      <section data-page="rooms" hidden>
+        <div class="eyebrow">СОВМЕСТНЫЙ ПРОСМОТР</div>
+        <h1>Твои<br>комнаты.</h1>
+        <div class="panel"><h2>Пока пусто</h2><p>Здесь будут твои настоящие комнаты. На следующем этапе подключим создание комнат и приглашения.</p><button class="action" type="button" data-message="Создание комнат пока не подключено">Создать комнату</button></div>
+      </section>
+
+      <section data-page="friends" hidden>
+        <div class="eyebrow">ТВОЙ КРУГ</div>
+        <h1>Быть<br>рядом.</h1>
+        <div class="panel"><h2>Друзей пока нет</h2><p>После подключения аккаунтов здесь появятся запросы в друзья и список людей, с которыми ты смотришь видео.</p><button class="action secondary" type="button" data-message="Добавление друзей появится после регистрации">Пригласить друга</button></div>
+      </section>
+
+      <section data-page="profile" hidden>
+        <div class="eyebrow">ЛИЧНОЕ ПРОСТРАНСТВО</div>
+        <h1>Твой<br>профиль.</h1>
+        <div class="panel"><h2>Гость LOOPA</h2><p>Ты просматриваешь первую версию интерфейса. Аккаунты, имя пользователя и аватары подключим отдельно — без Clerk.</p><button class="action" type="button" data-message="Регистрация ещё не подключена">Войти или зарегистрироваться</button></div>
+      </section>
+    </main>
+  </div>
+
+  <nav class="bottom" aria-label="Основная навигация">
+    <button class="nav-item active" type="button" data-go="home" aria-current="page"><svg><use href="#i-home"/></svg>Главная</button>
+    <button class="nav-item" type="button" data-go="rooms"><svg><use href="#i-room"/></svg>Комнаты</button>
+    <button class="nav-item" type="button" data-go="friends"><svg><use href="#i-users"/></svg>Друзья</button>
+    <button class="nav-item" type="button" data-go="profile"><svg><use href="#i-person"/></svg>Профиль</button>
+  </nav>
+  <div class="toast" id="toast" role="status" hidden></div>
+
+  <script>
+    const pages = document.querySelectorAll('[data-page]');
+    const tabs = document.querySelectorAll('.nav-item');
+    const toast = document.getElementById('toast');
+    let toastTimer;
+
+    document.addEventListener('click', (event) => {
+      const button = event.target.closest('button');
+      if (!button) return;
+      if (button.dataset.go) {
+        const target = button.dataset.go;
+        pages.forEach(page => { page.hidden = page.dataset.page !== target; });
+        tabs.forEach(tab => {
+          const active = tab.dataset.go === target;
+          tab.classList.toggle('active', active);
+          if (active) tab.setAttribute('aria-current', 'page');
+          else tab.removeAttribute('aria-current');
+        });
+        toast.hidden = true;
+        window.scrollTo(0, 0);
+      }
+      if (button.dataset.message) {
+        toast.textContent = button.dataset.message;
+        toast.hidden = false;
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => { toast.hidden = true; }, 3500);
+      }
+    });
+  </script>
+</body>
+</html>
