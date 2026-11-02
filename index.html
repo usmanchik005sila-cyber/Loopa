@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#151518">
   <meta name="description" content="LOOPA — ближе, даже на расстоянии. Совместный просмотр с теми, кто важен.">
   <title>LOOPA — Ближе, даже на расстоянии</title>
-  <meta name="loopa-build" content="home-polish-2026-11-02-v8">
+  <meta name="loopa-build" content="home-layout-2026-11-02-v9">
   <style>
     :root {
       color-scheme:dark;
@@ -280,6 +280,38 @@
     .page-enter{animation:loopaPageArrive .42s cubic-bezier(.19,1,.22,1) both;}
     @media(prefers-reduced-motion:reduce){.page-enter{animation:none!important;}}
     @media(max-width:360px){.recent-rooms-card{padding:19px 15px 21px;}.recent-rooms-card .section-head h2{font-size:19px;}}
+
+    /* LOOPA v9: compact actions aligned beneath the two primary tiles. */
+    .home-shortcuts{
+      display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+      column-gap:12px;row-gap:8px;margin-top:16px;
+    }
+    .home-shortcut-cell{display:flex;justify-content:center;min-width:0;}
+    .home-shortcut{
+      display:inline-flex;align-items:center;justify-content:center;gap:7px;
+      min-height:40px;max-width:100%;padding:9px 12px;
+      border:1px solid rgba(255,255,255,.2);border-radius:999px;
+      background:rgba(255,255,255,.045);color:#ccc6c5;
+      white-space:nowrap;font-size:clamp(10px,2.7vw,12px);line-height:1.2;
+      cursor:pointer;transition:transform .2s ease,background-color .2s ease,border-color .2s ease;
+      -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
+    }
+    .home-shortcut svg{height:13px;width:13px;flex:none;}
+    .home-shortcut:active{transform:scale(.96);background:rgba(255,255,255,.12);}
+    .top{min-height:86px;}
+    /* Photo must fill the entire circle, not sit inside its gray glass backing. */
+    .circle.profile-with-photo{
+      position:relative;overflow:hidden;padding:0;border:0;
+      background:transparent!important;backdrop-filter:none;-webkit-backdrop-filter:none;
+      box-shadow:0 0 0 1px rgba(244,240,239,.3),0 6px 18px rgba(0,0,0,.22);
+      isolation:isolate;
+    }
+    .circle.profile-with-photo .top-profile-avatar{
+      position:absolute;inset:0;display:block;width:100%;height:100%;
+      border:0;border-radius:50%;object-fit:cover;object-position:center;
+    }
+    .circle.profile-with-photo .top-profile-initial{border-radius:50%;}
+    @media(max-width:360px){.home-shortcuts{column-gap:9px}.home-shortcut{gap:4px;padding:8px 8px;font-size:10px}.home-shortcut svg{width:11px;height:11px}}
   </style>
 </head>
 <body>
@@ -298,7 +330,7 @@
   <div class="app">
     <div class="scenery" aria-hidden="true"><div class="scenery-line"></div></div>
     <header class="top">
-      <div><div class="brand">LOOPA</div><div class="tagline">Ближе, даже на расстоянии</div></div>
+      <div class="brand">LOOPA</div>
       <div class="top-actions">
         <button class="circle" type="button" data-message="Уведомлений пока нет" aria-label="Уведомления"><svg><use href="#i-bell"/></svg></button>
         <button class="circle" id="top-profile-button" type="button" data-go="profile" aria-label="Профиль"><svg><use href="#i-person"/></svg></button>
@@ -318,10 +350,13 @@
             <svg><use href="#i-users"/></svg><span><strong>Мои друзья</strong><small>Твой круг</small></span>
           </button>
         </div>
-        <div class="join-wrap"><button class="join-pill" type="button" data-message="Вход по коду станет доступен после подключения комнат">Войти по коду <svg><use href="#i-arrow"/></svg></button></div>
-        <div class="recent-rooms-card glass">
-          <div class="section-head"><h2>Недавние комнаты</h2><button class="text-link" type="button" data-go="rooms">Все →</button></div>
-          <p class="empty">Здесь появятся комнаты, которые ты создашь или посетишь.</p>
+        <div class="home-shortcuts" aria-label="Быстрые действия">
+          <div class="home-shortcut-cell">
+            <button class="home-shortcut" type="button" data-message="Вход по коду станет доступен после подключения комнат">Войти по коду <svg><use href="#i-arrow"/></svg></button>
+          </div>
+          <div class="home-shortcut-cell">
+            <button class="home-shortcut" type="button" data-go="rooms">Недавние комнаты <svg><use href="#i-arrow"/></svg></button>
+          </div>
         </div>
 
       </section>
