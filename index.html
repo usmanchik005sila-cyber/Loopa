@@ -208,6 +208,13 @@
     .avatar-upload input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;}
     .account-email{overflow-wrap:anywhere;}
     .account-status{margin-top:10px!important;font-size:12px!important;color:#b8b3b4!important;}
+    .account-name-field{margin-top:0;font-size:12px;}
+    .account-name-field input{font-size:21px;font-weight:600;letter-spacing:-.4px;min-height:56px;}
+    #profile-form .account-email{margin:15px 0 24px;color:#bcb5b7;font-size:13px;line-height:1.5;}
+    .profile-saved{display:flex;align-items:center;justify-content:center;gap:8px;margin:12px 0 0!important;color:#d7eddb!important;font-size:13px;animation:loopaSavedIn .22s ease-out both;}
+    .profile-saved[hidden]{display:none!important;}
+    .profile-saved span{display:grid;place-items:center;width:21px;height:21px;border-radius:50%;border:1px solid #a4c8ad99;background:#91b79b22;font-size:13px;}
+    @keyframes loopaSavedIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
     .inline-link{display:inline-block;margin-top:14px;padding:5px 0;border:0;background:transparent;color:#e3d4c8;text-decoration:underline;text-underline-offset:4px;cursor:pointer;font-size:13px;}
     .action[disabled]{opacity:.58;cursor:wait;}
 
@@ -421,14 +428,13 @@
           <label class="avatar-upload" id="avatar-upload-label">Изменить фото профиля
             <input id="avatar-file" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif">
           </label>
-          <h2 id="account-title">Профиль LOOPA</h2>
-          <p class="account-email" id="account-email"></p>
-          <p class="account-status">Аккаунт LOOPA</p>
           <form id="profile-form">
-            <label class="field">Отображаемое имя
+            <label class="field account-name-field">Отображаемое имя
               <input id="profile-name" type="text" maxlength="40" required autocomplete="nickname" placeholder="Твоё имя">
             </label>
+            <p class="account-email" id="account-email"></p>
             <button class="action" id="profile-save" type="submit">Сохранить профиль</button>
+            <p id="profile-saved" class="profile-saved" role="status" aria-live="polite" hidden><span aria-hidden="true">✓</span> Сохранено</p>
           </form>
           <p id="profile-feedback" class="auth-feedback" role="status" aria-live="polite" hidden></p>
           <form id="recovery-form" hidden>
@@ -741,7 +747,7 @@
     });
     function renderName(name) {
       const title = name.trim() || 'Профиль LOOPA';
-      byId('account-title').textContent = title;
+      // Имя отображается прямо в редактируемом поле профиля.
       if (!currentUser?.user_metadata?.avatar_path) byId('account-avatar').textContent = (name.trim().charAt(0) || 'L').toUpperCase();
       refreshSettingsIdentity();
     }
@@ -821,12 +827,19 @@
       byId('recovery-form').hidden = true;
       feedback('profile-feedback','Пароль изменён. Теперь можно пользоваться LOOPA.');
     });
+    let profileSavedTimer;
+    function hideProfileSaved() {
+      clearTimeout(profileSavedTimer);
+      byId('profile-saved').hidden = true;
+    }
+    byId('profile-name').addEventListener('input', hideProfileSaved);
     byId('profile-form').addEventListener('submit',async (event) => {
       event.preventDefault();
       if (!currentUser || !client) return;
       const name = byId('profile-name').value.trim();
       if (!name || name.length > 40) return feedback('profile-feedback','Имя должно содержать от 1 до 40 символов.',true);
       setBusy('profile-save',true);
+      hideProfileSaved();
       feedback('profile-feedback','');
       try {
         const {error} = await client.from('profiles').upsert({id:currentUser.id,display_name:name},{onConflict:'id'});
@@ -837,7 +850,9 @@
         currentUser = update.data.user;
         renderName(name);
         refreshSettingsIdentity();
-        feedback('profile-feedback','Профиль сохранён.');
+        feedback('profile-feedback','');
+        byId('profile-saved').hidden = false;
+        profileSavedTimer = setTimeout(() => { byId('profile-saved').hidden = true; }, 2600);
       } catch (err) {
         feedback('profile-feedback',/profiles|schema cache|relation|permission denied/i.test(err.message || '')
           ? 'Таблица профилей ещё не настроена. Выполни SQL из файла loopa-profiles.sql в Supabase → SQL Editor.'
