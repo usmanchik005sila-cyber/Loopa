@@ -319,6 +319,18 @@
     }
     .circle.profile-with-photo .top-profile-initial{border-radius:50%;}
     @media(max-width:360px){.home-shortcuts{column-gap:9px}.home-shortcut{gap:4px;padding:8px 8px;font-size:10px}.home-shortcut svg{width:11px;height:11px}}
+
+    /* LOOPA: presence controls */
+    .presence-switch{display:inline-flex;align-items:center;flex:none;cursor:pointer;position:relative}
+    .presence-switch input{position:absolute;opacity:0;width:1px;height:1px}
+    .presence-switch-track{width:44px;height:26px;border-radius:999px;background:#5b575b;border:1px solid #858084;position:relative;transition:background .2s ease}
+    .presence-switch-track:before{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#f1ece7;transition:transform .2s ease}
+    .presence-switch input:checked + .presence-switch-track{background:#477e65;border-color:#76ae90}
+    .presence-switch input:checked + .presence-switch-track:before{transform:translateX(18px)}
+    .presence-switch input:focus-visible + .presence-switch-track{outline:2px solid white;outline-offset:3px}
+    .presence-switch input:disabled + .presence-switch-track{opacity:.45}
+    .presence-dot{width:10px;height:10px;flex:none;border-radius:50%;background:#777;box-shadow:0 0 0 4px rgba(255,255,255,.04)}
+    .presence-dot.online{background:#64c894;box-shadow:0 0 0 4px rgba(100,200,148,.12)}
   </style>
 </head>
 <body>
@@ -452,8 +464,9 @@
               <p class="panel-note">ЛИЧНОЕ ПРОСТРАНСТВО</p><h2>Конфиденциальность</h2>
               <p class="privacy-section-note">Решай, кто сможет видеть твою активность и взаимодействовать с тобой в LOOPA.</p>
               <div class="privacy-group"><h3>ВИДИМОСТЬ</h3>
-                <div class="privacy-item"><span class="privacy-item-icon"><svg><use href="#i-person"/></svg></span><span class="privacy-item-body"><strong>Статус в сети</strong><small>Кто видит, что ты сейчас онлайн</small></span><span class="privacy-coming">СКОРО</span></div>
-                <div class="privacy-item"><span class="privacy-item-icon"><svg><use href="#i-arrow"/></svg></span><span class="privacy-item-body"><strong>Последнее посещение</strong><small>Когда ты в последний раз был в LOOPA</small></span><span class="privacy-coming">СКОРО</span></div>
+                <div class="privacy-item"><span class="privacy-item-icon"><svg><use href="#i-person"/></svg></span><span class="privacy-item-body"><strong>Показывать активность</strong><small>Все пользователи LOOPA смогут видеть онлайн и последнее посещение</small></span><label class="presence-switch" aria-label="Показывать активность"><input id="presence-visible" type="checkbox" checked disabled><span class="presence-switch-track"></span></label></div>
+                <div class="privacy-item"><span class="privacy-item-icon"><svg><use href="#i-arrow"/></svg></span><span class="privacy-item-body"><strong>Мой статус</strong><small id="presence-status">Подключаем статус…</small></span><span id="presence-indicator" class="presence-dot" aria-hidden="true"></span></div>
+                <p id="presence-feedback" class="auth-feedback" role="status" aria-live="polite" hidden></p>
               </div>
               <div class="privacy-group"><h3>ОБЩЕНИЕ</h3>
                 <div class="privacy-item"><span class="privacy-item-icon"><svg><use href="#i-person"/></svg></span><span class="privacy-item-body"><strong>Заявки в друзья</strong><small>Кто сможет отправлять запросы</small></span><span class="privacy-coming">СКОРО</span></div>
@@ -465,7 +478,7 @@
                 <p id="privacy-feedback" class="auth-feedback" role="status" aria-live="polite" hidden></p>
                 <button class="privacy-action" type="button" id="privacy-signout">Выйти из аккаунта →</button>
               </div>
-              <p class="privacy-section-note">Настройки со значком «Скоро» пока не действуют: для них нужна серверная проверка прав и система друзей. Фотографии аватара по-прежнему доступны по публичной ссылке.</p>
+              <p class="privacy-section-note">Настройки со значком «Скоро» пока не действуют: для них нужна серверная проверка прав и система друзей. Статус обновляется, пока LOOPA открыта на активной вкладке; отключение активности скрывает и последнее посещение. Фотографии аватара по-прежнему доступны по публичной ссылке.</p>
             </div>
           </div>
           <div id="settings-theme" hidden>
@@ -667,6 +680,82 @@
       finally{byId('privacy-reset').disabled=false;}
     });
     byId('privacy-signout').addEventListener('click',()=>byId('sign-out').click());
+
+    // Presence is server-backed. RLS permits reading only visible rows or your own.
+    // An inactive/closed tab stops heartbeats; after 90 seconds the user is offline.
+    let presenceTimer = null;
+    let presenceReady = false;
+    let presenceBusy = false;
+    let presenceUserId = null;
+    const PRESENCE_ONLINE_MS = 90000;
+    function presenceStatus(message, online=false) {
+      byId('presence-status').textContent = message;
+      byId('presence-indicator').classList.toggle('online', online);
+    }
+    function stopPresence() {
+      if (presenceTimer) clearInterval(presenceTimer);
+      presenceTimer = null;
+      presenceReady = false;
+      presenceUserId = null;
+      byId('presence-visible').disabled = true;
+      presenceStatus('Войдите в аккаунт, чтобы видеть статус');
+      feedback('presence-feedback','');
+    }
+    async function heartbeatPresence() {
+      if (!client || !currentUser || !presenceReady || presenceBusy || document.visibilityState !== 'visible') return;
+      presenceBusy = true;
+      try {
+        const {error} = await client.from('user_presence').upsert({user_id:currentUser.id,last_active_at:new Date().toISOString()},{onConflict:'user_id'});
+        if (error) throw error;
+        if (byId('presence-visible').checked) presenceStatus('В сети · видно всем пользователям',true);
+        else presenceStatus('Активность скрыта');
+      } catch(e) {
+        presenceStatus('Не удалось обновить статус');
+        feedback('presence-feedback',errorText(e),true);
+      } finally {presenceBusy = false;}
+    }
+    async function startPresence(user) {
+      if (!client || !user || presenceUserId === user.id) return;
+      stopPresence();
+      presenceUserId = user.id;
+      presenceStatus('Загружаем настройки…');
+      try {
+        const {data,error} = await client.from('user_presence').select('visible,last_active_at').eq('user_id',user.id).maybeSingle();
+        if (error) throw error;
+        if (presenceUserId !== user.id) return;
+        if (!data) {
+          const {error:insertError} = await client.from('user_presence').insert({user_id:user.id,visible:true});
+          if (insertError) throw insertError;
+        }
+        byId('presence-visible').checked = data?.visible ?? true;
+        byId('presence-visible').disabled = false;
+        presenceReady = true;
+        await heartbeatPresence();
+        presenceTimer = setInterval(heartbeatPresence,30000);
+      } catch(e) {
+        presenceStatus('Нужна настройка базы данных');
+        feedback('presence-feedback','Сначала выполни SQL из файла LOOPA-online-setup.sql в Supabase. '+errorText(e),true);
+      }
+    }
+    byId('presence-visible').addEventListener('change',async function() {
+      if (!client || !currentUser || !presenceReady) return;
+      const desired = this.checked;
+      this.disabled = true;
+      feedback('presence-feedback','');
+      try {
+        const {error} = await client.from('user_presence').update({visible:desired}).eq('user_id',currentUser.id);
+        if (error) throw error;
+        presenceStatus(desired ? 'В сети · видно всем пользователям' : 'Активность скрыта',desired);
+        feedback('presence-feedback',desired?'Теперь твоя активность видна пользователям LOOPA.':'Твоя активность и последнее посещение скрыты.');
+      } catch(e) {
+        this.checked = !desired;
+        feedback('presence-feedback',errorText(e),true);
+      } finally {this.disabled = false;}
+    });
+    document.addEventListener('visibilitychange',()=>{
+      if (document.visibilityState === 'visible') heartbeatPresence();
+    });
+
     function displayGuest() {
       byId('settings-home').hidden=true;
       byId('settings-detail').hidden=true;
@@ -674,9 +763,11 @@
       byId('auth-account').hidden = true;
       byId('auth-guest').hidden = false;
       refreshTopProfileAvatar();
+      stopPresence();
     }
     async function displayAccount(user) {
       if (!user) return;
+      startPresence(user);
       byId('auth-loading').hidden = true;
       byId('auth-guest').hidden = true;
       byId('auth-account').hidden = false;
@@ -866,6 +957,7 @@
       byId('sign-out').disabled = false;
       if (error) return feedback('profile-feedback',errorText(error),true);
       currentUser = null;
+      stopPresence();
       refreshTopProfileAvatar();
       byId('auth-password').value = '';
       selectAuthMode('login');
