@@ -212,8 +212,22 @@
     .setting-row strong{display:block;font-size:15px;font-weight:580}
     .setting-row small{display:block;font-size:12px;color:#b4afb2;margin-top:5px;line-height:1.4}
     .setting-row .chevron{font-size:25px;font-weight:300;color:#bdb7bb;margin-left:auto}
-    .settings-back{display:inline-flex;gap:9px;align-items:center;border:0;background:transparent;color:#d4c9c6;padding:4px 0 22px;font-size:14px;cursor:pointer}
-    .settings-back svg{height:17px;width:17px;transform:rotate(180deg)}
+    .settings-back{display:inline-flex;align-items:center;justify-content:center;width:47px;height:47px;border:1px solid rgba(255,255,255,.25);border-radius:15px;background:linear-gradient(145deg,rgba(255,255,255,.15),rgba(255,255,255,.055));color:#f0ebe8;margin:0 0 22px;cursor:pointer;transition:background .2s,transform .2s;box-shadow:0 6px 22px #0002}
+    .settings-back:active{transform:scale(.94)}
+    .settings-back svg{height:22px;width:22px;transform:rotate(180deg)}
+    .privacy-group{margin-bottom:18px}
+    .privacy-group h3{font-size:11px;letter-spacing:2.1px;color:#bfb5b0;margin:25px 4px 12px;font-weight:650}
+    .privacy-item{display:flex;align-items:center;gap:13px;padding:17px 16px;border-radius:18px;border:1px solid rgba(255,255,255,.13);margin-bottom:9px;background:rgba(255,255,255,.055)}
+    .privacy-item-icon{width:41px;height:41px;border:1px solid rgba(255,255,255,.14);border-radius:13px;display:grid;place-items:center;flex-shrink:0;background:rgba(255,255,255,.05)}
+    .privacy-item-icon svg{width:20px;height:20px}
+    .privacy-item-body{flex:1;min-width:0}
+    .privacy-item strong{display:block;font-size:14px;font-weight:600}
+    .privacy-item small{display:block;font-size:12px;line-height:1.5;color:#bcb4b6;margin-top:5px}
+    .privacy-coming{font-size:10px;color:#c8bbb0;border:1px solid rgba(255,255,255,.2);padding:5px 8px;border-radius:8px;white-space:nowrap}
+    .privacy-section-note{font-size:12px;line-height:1.65;color:#b8b0b1;margin:15px 4px}
+    .privacy-action{width:100%;text-align:left;border:1px solid rgba(255,255,255,.15);border-radius:16px;padding:17px 18px;color:inherit;background:rgba(255,255,255,.06);font:inherit;margin-bottom:10px;cursor:pointer}
+    .privacy-action:disabled{opacity:.55}
+
     .settings-content .panel{margin-bottom:15px}
     .settings-content .eyebrow{margin-bottom:17px}
     .privacy-copy{font-size:13px;line-height:1.8;color:#c6c0c1}
@@ -325,7 +339,7 @@
           <p style="margin:13px 5px 0;color:#999296;font-size:12px;line-height:1.5">LOOPA · Твоё пространство, твои настройки.</p>
         </div>
         <div id="settings-detail" class="settings-content" hidden>
-          <button class="settings-back" type="button" id="settings-back"><svg><use href="#i-arrow"/></svg>Все настройки</button>
+          <button class="settings-back" type="button" id="settings-back" aria-label="Назад к настройкам" title="Назад к настройкам"><svg><use href="#i-arrow"/></svg></button>
           <div id="settings-account" hidden>
         <div class="panel glass" id="auth-account" hidden>
           <p class="panel-note">ТВОЙ АККАУНТ</p>
@@ -354,15 +368,24 @@
         </div>
           </div>
           <div id="settings-privacy" hidden>
-            <div class="panel glass"><p class="panel-note">БЕЗОПАСНОСТЬ</p><h2>Конфиденциальность</h2>
-              <div class="privacy-copy" style="margin-top:20px">
-                <p><strong>Твои данные.</strong> Никнейм и фотография привязаны к твоему аккаунту Supabase. Фотографии профиля доступны по публичной ссылке; не загружай сюда фото, которые хочешь сохранить полностью закрытыми.</p>
-                <p><strong>Доступ к аккаунту.</strong> Для входа используется адрес электронной почты и пароль. Не сообщай пароль другим людям.</p>
-                <p><strong>Приватный профиль.</strong> Функция скрытия профиля ещё не реализована. Мы не добавляем неработающий переключатель.</p>
+            <div class="panel glass" style="padding-bottom:13px">
+              <p class="panel-note">ЛИЧНОЕ ПРОСТРАНСТВО</p><h2>Конфиденциальность</h2>
+              <p class="privacy-section-note">Решай, кто сможет видеть твою активность и взаимодействовать с тобой в LOOPA.</p>
+              <div class="privacy-group"><h3>ВИДИМОСТЬ</h3>
+                <div class="privacy-item"><span class="privacy-item-icon"><svg><use href="#i-person"/></svg></span><span class="privacy-item-body"><strong>Статус в сети</strong><small>Кто видит, что ты сейчас онлайн</small></span><span class="privacy-coming">СКОРО</span></div>
+                <div class="privacy-item"><span class="privacy-item-icon"><svg><use href="#i-arrow"/></svg></span><span class="privacy-item-body"><strong>Последнее посещение</strong><small>Когда ты в последний раз был в LOOPA</small></span><span class="privacy-coming">СКОРО</span></div>
               </div>
-              <button class="action secondary" type="button" id="privacy-reset">Отправить письмо для смены пароля</button>
-              <p id="privacy-feedback" class="auth-feedback" role="status" aria-live="polite" hidden></p>
-              <button class="action secondary" type="button" id="privacy-signout">Выйти из аккаунта</button>
+              <div class="privacy-group"><h3>ОБЩЕНИЕ</h3>
+                <div class="privacy-item"><span class="privacy-item-icon"><svg><use href="#i-person"/></svg></span><span class="privacy-item-body"><strong>Заявки в друзья</strong><small>Кто сможет отправлять запросы</small></span><span class="privacy-coming">СКОРО</span></div>
+                <div class="privacy-item"><span class="privacy-item-icon"><svg><use href="#i-room"/></svg></span><span class="privacy-item-body"><strong>Приглашения в комнаты</strong><small>Кто сможет приглашать на просмотр</small></span><span class="privacy-coming">СКОРО</span></div>
+                <div class="privacy-item"><span class="privacy-item-icon"><svg><use href="#i-lock"/></svg></span><span class="privacy-item-body"><strong>Заблокированные</strong><small>Управление чёрным списком</small></span><span class="privacy-coming">СКОРО</span></div>
+              </div>
+              <div class="privacy-group"><h3>БЕЗОПАСНОСТЬ</h3>
+                <button class="privacy-action" type="button" id="privacy-reset">Сменить пароль по электронной почте →</button>
+                <p id="privacy-feedback" class="auth-feedback" role="status" aria-live="polite" hidden></p>
+                <button class="privacy-action" type="button" id="privacy-signout">Выйти из аккаунта →</button>
+              </div>
+              <p class="privacy-section-note">Настройки со значком «Скоро» пока не действуют: для них нужна серверная проверка прав и система друзей. Фотографии аватара по-прежнему доступны по публичной ссылке.</p>
             </div>
           </div>
           <div id="settings-theme" hidden>
