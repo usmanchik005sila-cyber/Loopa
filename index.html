@@ -2,188 +2,180 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#111214">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#151518">
+  <meta name="description" content="LOOPA — ближе, даже на расстоянии. Совместный просмотр с теми, кто важен.">
   <title>LOOPA — Ближе, даже на расстоянии</title>
   <style>
-    :root { color-scheme:dark; --bg:#0c0c0e; --panel:#1d1d20; --line:#343438; --text:#f4f0eb; --muted:#a4a0a2; }
-    * { box-sizing:border-box; }
-    body { margin:0; min-height:100vh; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
-    button { font:inherit; -webkit-tap-highlight-color:transparent; }
-    button:focus-visible { outline:2px solid #f2d6ac; outline-offset:4px; }
-    .app { max-width:640px; min-height:100dvh; margin:auto; padding-bottom:calc(100px + env(safe-area-inset-bottom)); position:relative; overflow:hidden; }
-    .app::before { content:""; pointer-events:none; position:absolute; top:200px; right:-220px; width:440px; height:440px; border:1px solid #ffffff0a; border-radius:50%; }
-    .top { display:flex; justify-content:space-between; align-items:center; padding:27px 24px 20px; border-bottom:1px solid #ffffff12; }
-    .brand { font:30px Georgia,"Times New Roman",serif; letter-spacing:3px; }
-    .tagline { font-size:12px; color:var(--muted); margin-top:5px; }
-    .top-actions { display:flex; gap:9px; }
-    .circle { width:43px; height:43px; border:1px solid var(--line); border-radius:50%; background:#242427; color:var(--text); display:grid; place-items:center; cursor:pointer; }
-    svg { width:23px; height:23px; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
-    main { padding:40px 24px 30px; position:relative; }
-    .eyebrow { font-size:11px; font-weight:600; letter-spacing:2.6px; color:#b2a79b; }
-    h1 { font:normal clamp(43px,9vw,63px)/1.08 Georgia,"Times New Roman",serif; letter-spacing:-1.5px; margin:19px 0 38px; }
-    h2 { font-size:21px; font-weight:550; letter-spacing:-.4px; margin:0; }
-    .cards { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
-    .card { text-align:left; min-height:178px; padding:21px 17px; display:flex; flex-direction:column; justify-content:space-between; color:var(--text); background:linear-gradient(145deg,#29292b,#19191b 75%); border:1px solid #424144; border-radius:24px; cursor:pointer; }
-    .card svg { width:30px; height:30px; }
-    .card strong { font-size:16px; font-weight:550; display:block; }
-    .card small { display:block; color:var(--muted); font-size:12px; margin-top:7px; line-height:1.35; }
-    .section-head { margin:48px 0 16px; display:flex; align-items:center; justify-content:space-between; gap:15px; }
-    .text-link { background:none; border:0; color:#c5c0c1; font-size:13px; padding:8px 0; cursor:pointer; }
-    .empty { color:var(--muted); font-size:15px; line-height:1.7; margin:0; max-width:340px; }
-    .panel { padding:23px; background:linear-gradient(145deg,#222225,#171719); border:1px solid var(--line); border-radius:24px; }
-    .panel h2 { margin-bottom:10px; }
-    .panel p { color:var(--muted); line-height:1.65; margin:0; font-size:14px; }
-    .action { margin-top:22px; width:100%; min-height:48px; background:#eee9e2; color:#171719; border:0; border-radius:13px; font-weight:600; cursor:pointer; }
-    .secondary { background:#28282b; border:1px solid #454549; color:var(--text); }
-    [hidden] { display:none !important; }
-    .bottom { position:fixed; z-index:10; bottom:0; left:50%; transform:translateX(-50%); width:min(100%,640px); display:grid; grid-template-columns:repeat(4,1fr); background:#101012f5; backdrop-filter:blur(14px); border-top:1px solid #ffffff16; padding:13px 8px calc(15px + env(safe-area-inset-bottom)); }
-    .nav-item { border:0; background:none; color:#8e898c; display:grid; justify-items:center; gap:7px; font-size:11px; cursor:pointer; }
-    .nav-item.active { color:var(--text); }
-    .nav-item svg { width:24px; height:24px; }
-    .toast { position:fixed; z-index:20; left:50%; transform:translateX(-50%); bottom:calc(105px + env(safe-area-inset-bottom)); width:min(calc(100% - 32px),500px); background:#302e30; border:1px solid #5c5554; border-radius:16px; padding:16px 18px; font-size:14px; line-height:1.45; box-shadow:0 16px 40px #0008; }
-    @media (min-width:640px) { .app { border-inline:1px solid #ffffff12; } }
-
-    /* LOOPA 2.0 — premium layered glass */
     :root {
-      --bg:#111214;
-      --panel:#232427;
-      --line:rgba(255,255,255,.14);
-      --text:#f5f1eb;
-      --muted:#a6a3a5;
+      color-scheme:dark;
+      --ink:#f3f0ed;
+      --muted:#a7a4a7;
+      --silver:#dcd7d2;
+      --line:rgba(245,242,241,.13);
+      --radius:23px;
     }
-    html { background:#0d0e10; }
+    * { box-sizing:border-box; }
+    html { min-height:100%; background:#111113; }
     body {
-      background:
-        radial-gradient(ellipse 90% 44% at 110% 24%,rgba(123,117,112,.15),transparent 72%),
-        radial-gradient(ellipse 75% 50% at -25% 74%,rgba(62,67,76,.13),transparent 70%),
-        linear-gradient(115deg,#101113 0%,#1a1b1e 56%,#111214 100%);
+      margin:0;
+      min-height:100%;
+      color:var(--ink);
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+      -webkit-font-smoothing:antialiased;
+      background:linear-gradient(125deg,#101012,#222124 70%,#121315);
     }
+    button { font:inherit; color:inherit; -webkit-tap-highlight-color:transparent; }
+    button:focus-visible {outline:2px solid #d9bfa6;outline-offset:3px;}
+    button, a {touch-action:manipulation;}
+    [hidden] {display:none!important;}
+    svg {width:23px;height:23px;stroke:currentColor;fill:none;stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;}
+
     .app {
+      position:relative;
       isolation:isolate;
+      width:min(100%,640px);
+      min-height:100dvh;
+      margin:0 auto;
+      overflow:hidden;
+      padding-bottom:calc(108px + env(safe-area-inset-bottom));
       background:
-        linear-gradient(90deg,rgba(255,255,255,.015) 0 51%,rgba(255,255,255,.045) 51% 51.15%,transparent 51.15%),
-        radial-gradient(ellipse 90% 42% at 110% 35%,rgba(109,105,103,.12),transparent 72%);
+        radial-gradient(ellipse 84% 62% at 102% 39%,rgba(92,88,86,.24),transparent 77%),
+        radial-gradient(ellipse 82% 42% at -18% 82%,rgba(40,42,46,.32),transparent 74%),
+        linear-gradient(106deg,#141517 0%,#1d1d20 52%,#232326 100%);
     }
-    .app::before {
-      z-index:-1;
-      top:310px;
-      right:-255px;
-      width:580px;
-      height:580px;
-      border:1px solid rgba(255,255,255,.075);
-      box-shadow:0 0 0 140px rgba(255,255,255,.008),0 0 0 270px rgba(255,255,255,.006);
-    }
-    .app::after {
+    .scenery {position:absolute;inset:0;z-index:-1;pointer-events:none;overflow:hidden;}
+    .scenery::before {
       content:"";
       position:absolute;
-      pointer-events:none;
-      z-index:-1;
-      top:0;
-      right:29%;
-      width:1px;
-      height:100%;
-      background:linear-gradient(to bottom,rgba(255,255,255,.055),transparent 70%);
+      top:0;bottom:0;left:51.4%;width:1px;
+      background:linear-gradient(to bottom,rgba(255,255,255,.11),rgba(255,255,255,.028) 70%,transparent);
+      box-shadow:112px 0 0 rgba(255,255,255,.018);
+    }
+    .scenery::after {
+      content:"";
+      position:absolute;
+      width:680px;height:680px;top:280px;right:-420px;
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:50%;
+      box-shadow:0 0 0 123px rgba(255,255,255,.009),0 0 0 246px rgba(255,255,255,.007);
+      transform:rotate(-23deg);
+    }
+    .scenery-line {
+      position:absolute; width:1px; top:0; bottom:0; right:27.8%;
+      background:linear-gradient(180deg,rgba(255,255,255,.095),rgba(255,255,255,.008) 61%,transparent);
     }
     .top {
-      padding:24px 20px 22px;
-      background:linear-gradient(110deg,rgba(23,24,27,.83),rgba(35,35,37,.55));
-      border-bottom:1px solid rgba(255,255,255,.09);
-      backdrop-filter:blur(24px);
-      -webkit-backdrop-filter:blur(24px);
+      position:relative;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      padding:22px 20px 22px;
+      min-height:107px;
+      border-bottom:1px solid rgba(255,255,255,.105);
+      background:linear-gradient(114deg,rgba(20,20,22,.84),rgba(48,46,48,.48));
+      backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
     }
-    .brand { font-size:32px; letter-spacing:2px; }
-    .tagline { margin-top:7px; font-size:12px; color:#a9a5a4; }
+    .brand {font:normal 34px/1 Georgia,"Times New Roman",serif;letter-spacing:2px;}
+    .tagline {margin-top:9px;font-size:12px;letter-spacing:.04px;color:#b0abae;white-space:nowrap;}
+    .top-actions {display:flex;gap:8px;align-items:center;}
     .circle {
-      width:44px;height:44px;
-      background:linear-gradient(145deg,rgba(255,255,255,.12),rgba(255,255,255,.035));
-      border:1px solid rgba(255,255,255,.16);
-      box-shadow:inset 0 1px 0 rgba(255,255,255,.10),0 8px 24px rgba(0,0,0,.18);
-      backdrop-filter:blur(18px);
-      -webkit-backdrop-filter:blur(18px);
+      display:grid;place-items:center;
+      width:44px;height:44px; flex-shrink:0;
+      padding:0;
+      border:1px solid rgba(244,240,239,.18);
+      border-radius:50%;
+      background:linear-gradient(140deg,rgba(241,236,234,.145),rgba(177,172,175,.045) 66%);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.14),inset 0 -1px 0 rgba(255,255,255,.025),0 6px 18px #0003;
+      backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+      cursor:pointer;
     }
-    main { padding:34px 20px 35px; }
-    .eyebrow { color:#b7aba0; font-size:10px; letter-spacing:3.2px; }
+    .circle:active {background:rgba(255,255,255,.20);}
+    .circle svg{width:23px;height:23px;}
+    main {position:relative;padding:35px 20px 36px;}
+    .eyebrow {font-size:10px;letter-spacing:3.1px;font-weight:650;color:#b9aca4;}
     h1 {
-      font-size:clamp(43px,10vw,61px);
-      line-height:1.03;
-      letter-spacing:-1.8px;
-      margin:19px 0 30px;
-      text-shadow:0 3px 20px rgba(0,0,0,.13);
+      margin:19px 0 31px;
+      font:normal clamp(44px,10.4vw,61px)/1.04 Georgia,"Times New Roman",serif;
+      letter-spacing:-2.1px;
+      text-shadow:0 2px 20px rgba(0,0,0,.14);
     }
-    .cards { gap:12px; }
-    .card, .panel {
+    h2 {margin:0;font-size:22px;font-weight:550;letter-spacing:-.6px;}
+    .cards {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
+    .glass {
       position:relative;
       overflow:hidden;
+      isolation:isolate;
+      border:1px solid rgba(255,255,255,.175);
       background:
-        linear-gradient(135deg,rgba(255,255,255,.11) 0%,rgba(255,255,255,.035) 45%,rgba(255,255,255,.012) 100%),
-        rgba(28,29,32,.69);
-      border:1px solid rgba(255,255,255,.18);
+        radial-gradient(ellipse 92% 70% at 0% 0%,rgba(250,245,239,.14),transparent 73%),
+        linear-gradient(144deg,rgba(255,255,255,.075) 0%,rgba(255,255,255,.021) 42%,rgba(5,5,7,.16) 100%),
+        rgba(39,39,42,.65);
       box-shadow:
-        inset 0 1px 0 rgba(255,255,255,.12),
-        inset 0 -1px 0 rgba(255,255,255,.035),
-        0 15px 38px rgba(0,0,0,.20);
-      backdrop-filter:blur(22px) saturate(115%);
-      -webkit-backdrop-filter:blur(22px) saturate(115%);
+        inset 0 1px 0 rgba(255,255,255,.13),
+        inset 1px 0 0 rgba(255,255,255,.05),
+        inset 0 -1px 0 rgba(255,255,255,.04),
+        0 16px 38px rgba(0,0,0,.19);
+      backdrop-filter:blur(24px) saturate(113%);
+      -webkit-backdrop-filter:blur(24px) saturate(113%);
     }
-    .card::before,.panel::before {
-      content:"";
-      position:absolute;
-      pointer-events:none;
-      inset:0;
-      background:radial-gradient(ellipse 100% 70% at 5% 0%,rgba(255,255,255,.085),transparent 65%);
+    .glass::after {
+      content:"";position:absolute;inset:1px;border-radius:inherit;pointer-events:none;
+      background:linear-gradient(140deg,rgba(255,255,255,.045),transparent 33%,transparent 75%,rgba(255,255,255,.018));
+      z-index:-1;
     }
     .card {
-      min-height:158px;
+      display:flex;flex-direction:column;justify-content:space-between;
+      text-align:left;
+      min-height:167px;
       padding:20px 17px;
-      border-radius:23px;
-      transition:transform .16s ease,border-color .16s ease;
+      border-radius:var(--radius);
+      cursor:pointer;
+      transition:transform .18s ease,border-color .18s ease,background-color .18s ease;
     }
-    .card:active { transform:scale(.98); border-color:rgba(255,255,255,.33); }
-    .card svg { width:29px;height:29px;filter:drop-shadow(0 2px 8px rgba(255,255,255,.08)); }
-    .card strong { font-size:16px; font-weight:580; line-height:1.25; }
-    .card small { font-size:12px; color:#aaa6a6; }
-    .section-head { margin:44px 0 20px; }
-    h2 { font-size:21px; }
-    .empty { color:#aaa7a8; font-size:14px; }
-    .panel { border-radius:25px; padding:24px 22px; }
-    .action {
-      background:linear-gradient(180deg,#f2eee9,#e6e0d9);
-      border:1px solid rgba(255,255,255,.35);
-      border-radius:15px;
-      box-shadow:0 8px 20px rgba(0,0,0,.17);
-    }
-    .action.secondary {
-      color:var(--text);
-      background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.035));
-      border-color:rgba(255,255,255,.16);
-    }
+    .card svg {width:28px;height:28px;stroke-width:1.75;filter:drop-shadow(0 2px 5px #ffffff16);}
+    .card strong {display:block;font-size:16px;font-weight:570;line-height:1.22;letter-spacing:-.25px;}
+    .card small {display:block;margin-top:6px;color:#aaa6a8;font-size:12px;line-height:1.45;}
+    .card:active {transform:scale(.98);border-color:rgba(255,255,255,.35);}
+    .section-head {display:flex;align-items:center;justify-content:space-between;gap:12px;margin:48px 0 22px;}
+    .text-link {padding:8px 1px;background:transparent;border:0;color:#c4bec0;font-size:13px;cursor:pointer;white-space:nowrap;}
+    .empty {margin:0;max-width:360px;color:#aaa6a8;font-size:14px;line-height:1.75;}
+    .join-link {display:inline-flex;align-items:center;gap:8px;padding:0;margin-top:24px;color:#bcb7b9;background:none;border:0;font-size:13px;cursor:pointer;}
+    .join-link svg {width:15px;height:15px;}
+    .panel {padding:23px;border-radius:var(--radius);}
+    .panel h2 {margin-bottom:13px;}
+    .panel p {margin:0;color:#bab5b7;font-size:14px;line-height:1.7;}
+    .panel-note {font-size:11px!important;letter-spacing:1.5px!important;color:#b9aca4!important;margin-bottom:10px!important;}
+    .action {width:100%;min-height:50px;margin-top:24px;background:linear-gradient(165deg,#f3efea,#ded8d1);border:1px solid #f8f5f2;border-radius:15px;color:#171619;font-weight:620;font-size:14px;cursor:pointer;}
+    .action:active {filter:brightness(.94);}
+    .action.secondary {background:linear-gradient(135deg,#39393c,#27272b);color:var(--ink);border-color:var(--line);}
     .bottom {
-      background:linear-gradient(180deg,rgba(22,23,26,.90),rgba(14,15,17,.96));
-      border-top:1px solid rgba(255,255,255,.12);
-      backdrop-filter:blur(28px) saturate(120%);
-      -webkit-backdrop-filter:blur(28px) saturate(120%);
-      box-shadow:0 -10px 32px rgba(0,0,0,.12);
+      position:fixed;bottom:0;left:50%;transform:translateX(-50%);z-index:10;
+      width:min(100%,640px);
+      display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+      padding:13px 6px calc(15px + env(safe-area-inset-bottom));
+      border-top:1px solid rgba(255,255,255,.11);
+      background:linear-gradient(180deg,rgba(26,26,29,.87),rgba(14,14,16,.97));
+      box-shadow:0 -8px 25px #0002;
+      backdrop-filter:blur(30px) saturate(112%);-webkit-backdrop-filter:blur(30px) saturate(112%);
     }
-    .nav-item { color:#989497; }
-    .nav-item.active { color:#f5f1eb; }
+    .nav-item {display:grid;justify-items:center;gap:7px;background:none;border:0;padding:1px 0 2px;color:#959195;font-size:11px;cursor:pointer;min-width:0;}
+    .nav-item svg {width:24px;height:24px;stroke-width:1.7;}
+    .nav-item.active {color:#f3efed;}
     .toast {
-      background:rgba(43,43,47,.94);
-      border:1px solid rgba(255,255,255,.2);
-      backdrop-filter:blur(20px);
-      -webkit-backdrop-filter:blur(20px);
+      position:fixed;z-index:20;bottom:calc(98px + env(safe-area-inset-bottom));
+      left:50%;transform:translateX(-50%);
+      width:min(calc(100% - 32px),490px);padding:15px 17px;
+      border-radius:16px;border:1px solid rgba(255,255,255,.24);
+      background:rgba(41,41,45,.95);color:#f4efeb;
+      box-shadow:0 16px 44px #0009;
+      backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+      line-height:1.5;font-size:13px;
     }
-    @media(max-width:370px) {
-      main {padding-inline:16px;}
-      .top {padding-inline:16px;}
-      .cards {gap:10px;}
-      .card {padding:18px 14px;}
-      .card strong {font-size:15px;}
-    }
-    @media(prefers-reduced-motion:reduce) {
-      .card {transition:none;}
-    }
-
+    @media(min-width:640px){.app {border-inline:1px solid rgba(255,255,255,.1);}}
+    @media(max-width:360px){.top {padding-inline:15px;}.brand {font-size:30px;}.circle{width:40px;height:40px;}.top-actions{gap:6px;}main{padding-inline:15px;}.card{padding:18px 13px;min-height:157px;}.card strong{font-size:15px;}.cards{gap:9px;}.tagline{font-size:11px;}h1{font-size:43px;}}
+    @media(prefers-reduced-motion:reduce){.card{transition:none;}}
   </style>
 </head>
 <body>
@@ -194,87 +186,92 @@
     <symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
     <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></symbol>
     <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h16m-7-7 7 7-7 7"/></symbol>
   </svg>
 
   <div class="app">
+    <div class="scenery" aria-hidden="true"><div class="scenery-line"></div></div>
     <header class="top">
       <div><div class="brand">LOOPA</div><div class="tagline">Ближе, даже на расстоянии</div></div>
       <div class="top-actions">
         <button class="circle" type="button" data-message="Уведомлений пока нет" aria-label="Уведомления"><svg><use href="#i-bell"/></svg></button>
-        <button class="circle" type="button" data-go="profile" aria-label="Открыть профиль"><svg><use href="#i-person"/></svg></button>
+        <button class="circle" type="button" data-go="friends" aria-label="Мои друзья"><svg><use href="#i-users"/></svg></button>
+        <button class="circle" type="button" data-go="profile" aria-label="Профиль"><svg><use href="#i-person"/></svg></button>
       </div>
     </header>
 
-    <main>
+    <main id="content">
       <section data-page="home">
         <div class="eyebrow">ТВОЁ ПРОСТРАНСТВО</div>
         <h1>Добро<br>пожаловать.</h1>
+        <!-- Показывать блок продолжения просмотра только после появления настоящих комнат -->
         <div class="cards">
-          <button class="card" type="button" data-message="Комнаты станут доступны после подключения сервера">
+          <button class="card glass" type="button" data-message="Создание комнат подключим после настройки сервера">
             <svg><use href="#i-plus"/></svg><span><strong>Создать комнату</strong><small>Начать просмотр</small></span>
           </button>
-          <button class="card" type="button" data-go="friends">
+          <button class="card glass" type="button" data-go="friends">
             <svg><use href="#i-users"/></svg><span><strong>Мои друзья</strong><small>Твой круг</small></span>
           </button>
         </div>
         <div class="section-head"><h2>Недавние комнаты</h2><button class="text-link" type="button" data-go="rooms">Все →</button></div>
         <p class="empty">Здесь появятся комнаты, которые ты создашь или посетишь.</p>
+        <button class="join-link" type="button" data-message="Вход по коду станет доступен после подключения комнат">Войти по коду <svg><use href="#i-arrow"/></svg></button>
       </section>
 
       <section data-page="rooms" hidden>
         <div class="eyebrow">СОВМЕСТНЫЙ ПРОСМОТР</div>
         <h1>Твои<br>комнаты.</h1>
-        <div class="panel"><h2>Пока пусто</h2><p>Здесь будут твои настоящие комнаты. На следующем этапе подключим создание комнат и приглашения.</p><button class="action" type="button" data-message="Создание комнат пока не подключено">Создать комнату</button></div>
+        <div class="panel glass"><p class="panel-note">ТВОИ КОМНАТЫ</p><h2>Пока пусто</h2><p>Здесь появятся твои настоящие комнаты. Создание комнат и приглашения подключим после настройки серверной части.</p><button class="action" type="button" data-message="Создание комнат пока не подключено">Создать комнату</button></div>
       </section>
 
       <section data-page="friends" hidden>
         <div class="eyebrow">ТВОЙ КРУГ</div>
         <h1>Быть<br>рядом.</h1>
-        <div class="panel"><h2>Друзей пока нет</h2><p>После подключения аккаунтов здесь появятся запросы в друзья и список людей, с которыми ты смотришь видео.</p><button class="action secondary" type="button" data-message="Добавление друзей появится после регистрации">Пригласить друга</button></div>
+        <div class="panel glass"><p class="panel-note">ДРУЗЬЯ</p><h2>Друзей пока нет</h2><p>Когда появятся настоящие аккаунты, здесь будут запросы в друзья и твой список контактов.</p><button class="action secondary" type="button" data-message="Приглашения появятся после подключения аккаунтов">Пригласить друга</button></div>
       </section>
 
       <section data-page="profile" hidden>
         <div class="eyebrow">ЛИЧНОЕ ПРОСТРАНСТВО</div>
         <h1>Твой<br>профиль.</h1>
-        <div class="panel"><h2>Гость LOOPA</h2><p>Ты просматриваешь первую версию интерфейса. Аккаунты, имя пользователя и аватары подключим отдельно — без Clerk.</p><button class="action" type="button" data-message="Регистрация ещё не подключена">Войти или зарегистрироваться</button></div>
+        <div class="panel glass"><p class="panel-note">ЛИЧНОЕ ПРОСТРАНСТВО</p><h2>Гость LOOPA</h2><p>Сейчас это первая версия интерфейса. Настоящие аккаунты, имена и аватары появятся после подключения регистрации — без Clerk.</p><button class="action" type="button" data-message="Регистрация ещё не подключена">Войти или зарегистрироваться</button></div>
       </section>
     </main>
   </div>
 
   <nav class="bottom" aria-label="Основная навигация">
-    <button class="nav-item active" type="button" data-go="home" aria-current="page"><svg><use href="#i-home"/></svg>Главная</button>
-    <button class="nav-item" type="button" data-go="rooms"><svg><use href="#i-room"/></svg>Комнаты</button>
-    <button class="nav-item" type="button" data-go="friends"><svg><use href="#i-users"/></svg>Друзья</button>
-    <button class="nav-item" type="button" data-go="profile"><svg><use href="#i-person"/></svg>Профиль</button>
+    <button class="nav-item active" type="button" data-go="home" aria-current="page"><svg><use href="#i-home"/></svg><span>Главная</span></button>
+    <button class="nav-item" type="button" data-go="rooms"><svg><use href="#i-room"/></svg><span>Комнаты</span></button>
+    <button class="nav-item" type="button" data-go="friends"><svg><use href="#i-users"/></svg><span>Друзья</span></button>
+    <button class="nav-item" type="button" data-go="profile"><svg><use href="#i-person"/></svg><span>Профиль</span></button>
   </nav>
-  <div class="toast" id="toast" role="status" hidden></div>
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
   <script>
+    'use strict';
     const pages = document.querySelectorAll('[data-page]');
     const tabs = document.querySelectorAll('.nav-item');
     const toast = document.getElementById('toast');
     let toastTimer;
-
-    document.addEventListener('click', (event) => {
+    document.addEventListener('click', function(event) {
       const button = event.target.closest('button');
       if (!button) return;
       if (button.dataset.go) {
-        const target = button.dataset.go;
-        pages.forEach(page => { page.hidden = page.dataset.page !== target; });
+        const destination = button.dataset.go;
+        pages.forEach(page => { page.hidden = page.dataset.page !== destination; });
         tabs.forEach(tab => {
-          const active = tab.dataset.go === target;
-          tab.classList.toggle('active', active);
-          if (active) tab.setAttribute('aria-current', 'page');
+          const isActive = tab.dataset.go === destination;
+          tab.classList.toggle('active', isActive);
+          if(isActive) tab.setAttribute('aria-current','page');
           else tab.removeAttribute('aria-current');
         });
         toast.hidden = true;
-        window.scrollTo(0, 0);
+        window.scrollTo({top:0,behavior:'instant'});
       }
       if (button.dataset.message) {
         toast.textContent = button.dataset.message;
         toast.hidden = false;
         clearTimeout(toastTimer);
-        toastTimer = setTimeout(() => { toast.hidden = true; }, 3500);
+        toastTimer = setTimeout(() => { toast.hidden = true; }, 3600);
       }
     });
   </script>
