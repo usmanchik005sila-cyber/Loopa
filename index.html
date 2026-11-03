@@ -372,6 +372,13 @@
     .friend-small-action{flex-shrink:0;padding:10px 11px;max-width:128px;min-height:36px;border-radius:11px;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.075);color:#ece7e3;font-size:11px;cursor:pointer;}
     .friend-small-action.primary{border-color:#e2d8d0;background:#e7e0d8;color:#242124;font-weight:650;}
     .friend-small-action:disabled{opacity:.55;cursor:default;}
+    .friend-actions{position:relative;flex:none}
+    .friend-actions-trigger{width:38px;height:36px;border-radius:11px;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.075);color:#f0eae6;font-size:20px;line-height:1;cursor:pointer}
+    .friend-actions-menu{position:absolute;right:0;top:calc(100% + 7px);z-index:15;min-width:180px;padding:6px;border:1px solid rgba(255,255,255,.18);border-radius:13px;background:rgba(35,35,38,.98);box-shadow:0 12px 30px #0009}
+    .friend-actions-menu[hidden]{display:none}
+    .friend-actions-menu button{display:block;width:100%;padding:10px 11px;border:0;border-radius:9px;background:transparent;color:#f2ece8;text-align:left;font:inherit;font-size:12px;cursor:pointer}
+    .friend-actions-menu button:hover{background:rgba(255,255,255,.09)}
+    .friend-actions-menu button.danger{color:#edaaa0}
     .friends-empty{padding:8px 0;color:#aaa4a7;font-size:13px;line-height:1.65;}
     .friends-feedback{margin:12px 0 0;font-size:12px;line-height:1.55;color:#cce6d3;}
     .friends-feedback.error{color:#f1bdbb;}
@@ -936,6 +943,20 @@
       detail.append(name,status);
       row.appendChild(detail);
       for (const action of (buttons || [])) {
+        if (action.menu) {
+          const wrap=document.createElement('div'); wrap.className='friend-actions';
+          const trigger=document.createElement('button'); trigger.type='button'; trigger.className='friend-actions-trigger'; trigger.textContent='⋯';
+          trigger.setAttribute('aria-label','Действия: '+(profile.display_name||'пользователь')); trigger.setAttribute('aria-expanded','false'); trigger.dataset.friendMenuToggle='true';
+          const menu=document.createElement('div'); menu.className='friend-actions-menu'; menu.hidden=true;
+          for(const item of action.items||[]){
+            const option=document.createElement('button'); option.type='button'; option.textContent=item.label;
+            if(item.action==='block') {option.classList.add('danger');option.dataset.friendAction='block';option.dataset.userId=profile.id;}
+            else if(item.action==='remove'){option.classList.add('danger');option.dataset.friendAction='remove';option.dataset.requestId=item.requestId;}
+            else {option.dataset.openBlacklist='true';}
+            menu.appendChild(option);
+          }
+          wrap.append(trigger,menu); row.appendChild(wrap); continue;
+        }
         const btn = document.createElement('button');
         btn.type='button';
         btn.className = 'friend-small-action' + (action.primary ? ' primary':'');
@@ -1056,7 +1077,7 @@
           for (const relation of list) {
             const peer=relation.sender_id===owner?relation.receiver_id:relation.sender_id;
             const profile=directory[peer] || {id:peer,display_name:'Пользователь LOOPA'};
-            const actions = kind==='accepted'?[{label:'Убрать',action:'remove',requestId:relation.id}]
+            const actions = kind==='accepted'?[{menu:true,items:[{label:'Удалить из друзей',action:'remove',requestId:relation.id},{label:'Заблокировать',action:'block'},{label:'Чёрный список',action:'blacklist'}]}]
               :kind==='incoming'?[{label:'Принять',action:'accept',requestId:relation.id,primary:true},{label:'×',action:'decline',requestId:relation.id}]
               :[{label:'Отменить',action:'cancel',requestId:relation.id}];
             parent.appendChild(friendRow(profile,presence[peer],actions));
@@ -1153,6 +1174,21 @@
     }
     document.addEventListener('keydown',(event)=>{
       if (event.key==='Escape' && !byId('requests-overlay').hidden) closeRequestsDialog();
+    });
+    document.addEventListener('click',(event)=>{
+      const toggle=event.target.closest('[data-friend-menu-toggle]');
+      if(toggle){
+        const menu=toggle.parentElement.querySelector('.friend-actions-menu');
+        const opening=menu.hidden;
+        document.querySelectorAll('.friend-actions-menu').forEach(item=>item.hidden=true);
+        document.querySelectorAll('[data-friend-menu-toggle]').forEach(item=>item.setAttribute('aria-expanded','false'));
+        menu.hidden=!opening; toggle.setAttribute('aria-expanded',String(opening)); return;
+      }
+      if(event.target.closest('[data-open-blacklist]')){
+        document.querySelectorAll('.friend-actions-menu').forEach(item=>item.hidden=true);
+        showPage('profile'); openSettings('privacy'); return;
+      }
+      if(!event.target.closest('.friend-actions')) document.querySelectorAll('.friend-actions-menu').forEach(item=>item.hidden=true);
     });
     document.addEventListener('click',(event)=>{
       const button=event.target.closest('[data-friend-action]');
