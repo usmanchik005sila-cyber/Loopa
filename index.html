@@ -384,7 +384,7 @@
     .friends-feedback{margin:12px 0 0;font-size:12px;line-height:1.55;color:#cce6d3;}
     .friends-feedback.error{color:#f1bdbb;}
     @media(max-width:360px){.friend-avatar{width:40px;height:40px;}.friend-person{gap:8px;}.friend-small-action{padding:8px;font-size:10px;}}
-  #room-frame{width:100%;aspect-ratio:16/9;border:0;background:#111;margin:12px 0}#room-note{overflow-wrap:anywhere}</style>
+  #room-frame{width:100%;aspect-ratio:16/9;border:0;background:#111;margin:12px 0}#room-note{overflow-wrap:anywhere}.roomBar,#chatForm{display:flex;align-items:center;gap:9px}.roomBar small{margin-left:auto}.roomChat{margin-top:22px;border-top:1px solid var(--line);padding-top:16px}#chatLog{max-height:38vh;overflow:auto;display:flex;flex-direction:column;gap:8px;padding:8px 0 14px}.bubble{align-self:flex-start;max-width:82%;padding:9px 12px;background:#39353a;border-radius:14px;overflow-wrap:anywhere;white-space:pre-wrap}.bubble.peer{align-self:flex-end;background:#29292e}.bubble small{display:block;color:#c7bab0;font-size:10px}#roomSheet{position:fixed;top:auto;bottom:0;margin:0 auto;width:min(100%,480px);max-height:75dvh;overflow:auto;background:#252428;color:inherit;color:#eee;border:1px solid #555;border-radius:22px 22px 0 0;padding:22px 22px max(22px,env(safe-area-inset-bottom))}#roomSheet::backdrop{background:#0009}#pick label{display:block;padding:8px}#videoEdit summary{cursor:pointer;padding:10px 0;font-size:13px}section[data-page="rooms"]:has(#room-active:not([hidden]))>h1,section[data-page="rooms"]:has(#room-active:not([hidden]))>.eyebrow{display:none}</style>
 </head>
 <body>
   <svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden" xmlns="http://www.w3.org/2000/svg">
@@ -437,7 +437,9 @@
         <div class="eyebrow">СОВМЕСТНЫЙ ПРОСМОТР</div>
         <h1>Твои<br>комнаты.</h1>
         <div id="room-lobby" class="panel glass"><h2>Смотреть вместе</h2><button class="action" data-room="create">Создать комнату</button><label class="friend-search-label" for="join-code">Код от ведущего</label><input id="join-code" class="friend-search-input" autocomplete="off" maxlength="12"><button class="action secondary" data-room="join">Войти по коду</button><h3>Мои комнаты</h3><div id="room-recent"></div></div>
-<div id="room-active" class="panel glass" hidden><p class="panel-note">КОД КОМНАТЫ</p><h2 id="room-code"></h2><button class="friend-small-action" data-room="copy">Скопировать код</button><p id="room-status"></p><iframe id="room-frame" title="Видео комнаты" hidden></iframe><div id="room-host"><label class="friend-search-label" for="room-link">Ссылка на видео</label><input id="room-link" type="url" class="friend-search-input" placeholder="YouTube, VK Видео или RUTUBE"><button class="action" data-room="video">Открыть для всех</button></div><button class="text-link" data-room="exit">К списку комнат</button></div><p id="room-note" role="status"></p>
+<div id="room-active" class="panel glass" hidden><div class="roomBar"><button class="text-link" data-room="exit">‹ Комнаты</button><small id="accessBadge"></small><button id="moreRoom" class="friend-small-action" aria-label="Меню комнаты">⋯</button></div><iframe id="room-frame" hidden title="Видео комнаты"></iframe><small id="room-status"></small><div id="room-host"><details id="videoEdit"><summary>Сменить видео</summary><input id="room-link" type="url" class="friend-search-input" placeholder="Ссылка на видео"><button class="friend-small-action" data-room="video">Открыть видео</button></details></div>
+<section class="roomChat"><h2>Чат комнаты</h2><div id="chatLog"></div><form id="chatForm"><input class="friend-search-input" id="chatText" maxlength="1000" aria-label="Сообщение" placeholder="Сообщение…" required><button class="friend-small-action" aria-label="Отправить">↑</button></form></section></div>
+<dialog id="roomSheet"><button class="text-link" onclick="this.parentElement.close()">Закрыть ×</button><p>Код комнаты · <b id="room-code"></b></p><button class="friend-small-action" data-room="copy">Скопировать код</button><h3>Участники</h3><p id="people"></p><div id="accessEdit"><h3>Кто может войти</h3><select id="accessMode" class="privacy-select"><option value="code">По коду</option><option value="friends">Только друзья</option><option value="private">Приватная</option></select><div id="pick"></div><small id="accessWarning"></small><button class="action" id="saveAccess">Сохранить доступ</button></div></dialog><p id="room-note" role="status"></p>
       </section>
 
       <section data-page="friends" hidden>
@@ -699,7 +701,31 @@
     });
     setInterval(()=>{if(!roomState?.video||document.hidden)return;bindRoomPlayers();samplePlayers();},350);
     document.addEventListener('visibilitychange',()=>{if(!document.hidden&&roomState)roomRun('read');});
-    function roomExit(){roomEpoch++;roomState=null;roomUser=null;mountRoomPlayer('');byId('room-active').hidden=true;byId('room-lobby').hidden=false;byId('room-recent').replaceChildren();byId('room-note').textContent='';}
+    const modeNames={code:'По коду',friends:'Только друзья',private:'Приватная'};
+    function renderSocial(data,prev){
+      const messages=data.chat||[], members=data.members||[];
+      byId('accessBadge').textContent=modeNames[data.access_mode];
+      byId('people').textContent=members.filter(m=>m.online).map(m=>m.name).join(' · ');
+      if(prev?.code===data.code)for(const m of members)if(m.online&&m.id!==currentUser.id&&!prev.members?.some(old=>old.online&&old.id===m.id))showToast(m.name+' в комнате');
+      if(!prev||prev.chat?.at(-1)?.id!==messages.at(-1)?.id){
+        const log=byId('chatLog'), near=log.scrollHeight-log.scrollTop-log.clientHeight<40;
+        log.replaceChildren();if(!messages.length)log.textContent='Пока тихо. Напиши первым.';
+        for(const msg of messages){const el=document.createElement('div'), own=msg.author===currentUser.id;
+          el.className='bubble'+(own?'':' peer');const who=document.createElement('small');who.textContent=own?'Ты':msg.name||'Участник';
+          el.append(who,document.createTextNode(msg.body));log.append(el);}
+        if(near||!prev||messages.at(-1)?.author===currentUser.id)log.scrollTop=log.scrollHeight;
+      }
+    }
+    byId('chatForm').onsubmit=async e=>{e.preventDefault();const input=byId('chatText'),value=input.value.trim();if(!value||input.disabled)return;input.disabled=true;try{await roomCall('chat',{media:value});input.value='';}catch(err){showToast(err.message);}finally{input.disabled=false;input.focus();}};
+    byId('moreRoom').onclick=()=>{const d=roomState;byId('accessEdit').hidden=!hostHere();byId('accessMode').value=d.access_mode;const pick=byId('pick');pick.replaceChildren();
+      for(const m of d.members.filter(m=>m.id!==d.host)){const l=document.createElement('label'),c=document.createElement('input');c.type='checkbox';c.value=m.id;c.checked=d.allowed.includes(m.id);l.append(c,document.createTextNode(' '+m.name));pick.append(l);}
+      byId('accessMode').onchange();byId('roomSheet').showModal();};
+    function warnAccess(){const privateMode=byId('accessMode').value==='private';byId('pick').hidden=!privateMode;
+      const excluded=[...byId('pick').querySelectorAll('input:not(:checked)')].map(c=>c.parentElement.textContent.trim());
+      byId('accessWarning').textContent=privateMode?(excluded.length?'Потеряют доступ: '+excluded.join(', '):'Войти смогут только ты и отмеченные участники.'):(byId('accessMode').value==='friends'?'Только друзья ведущего сохранят доступ.':'Войти можно по коду.');}
+    byId('accessMode').onchange=warnAccess;byId('pick').onchange=warnAccess;
+    byId('saveAccess').onclick=async function(){this.disabled=true;try{await roomCall('access',{media:JSON.stringify({mode:byId('accessMode').value,ids:[...byId('pick').querySelectorAll('input:checked')].map(c=>c.value)})});byId('roomSheet').close();showToast('Доступ обновлён');}catch(err){showToast(err.message);}finally{this.disabled=false;}};
+    function roomExit(){byId('roomSheet').close();byId('chatText').value='';byId('chatLog').replaceChildren();roomEpoch++;roomState=null;roomUser=null;mountRoomPlayer('');byId('room-active').hidden=true;byId('room-lobby').hidden=false;byId('room-recent').replaceChildren();byId('room-note').textContent='';}
     async function roomCall(op,args={}){
       if(!currentUser||!client){showPage('profile');showToast('Войди в аккаунт');return;}
       const u=currentUser.id, epoch=roomEpoch;
@@ -709,6 +735,8 @@
       if(op==='list'){const parent=byId('room-recent');parent.replaceChildren();for(const code of data){const b=document.createElement('button');b.className='friend-small-action';b.textContent=code;b.onclick=()=>roomRun('join',{room:code});parent.append(b);}return;}
       const prev=roomState;
       if(op==='read'&&prev&&data.changed<prev.changed)return;
+      if(prev?.code===data.code && data.server_time<prev.server_time)return;
+      renderSocial(data,prev);if(!prev||prev.video!==data.video)byId('videoEdit').open=!data.video;
       roomState=data;roomUser=u;roomClock=performance.now();
       byId('room-active').hidden=false;byId('room-lobby').hidden=true;byId('room-code').textContent=data.code;byId('room-host').hidden=data.host!==u;
       byId('room-status').textContent=!data.video?'Ведущий выбирает видео':data.playing?'Идёт просмотр':'На паузе';
