@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#151518">
   <meta name="description" content="LOOPA — ближе, даже на расстоянии. Совместный просмотр с теми, кто важен.">
   <title>LOOPA — Ближе, даже на расстоянии</title>
-  <meta name="loopa-build" content="friends-presence-v12-2026-11-03">
+  <meta name="loopa-build" content="friends-requests-v13-2026-11-03">
   <style>
     :root {
       color-scheme:dark;
@@ -176,6 +176,23 @@
     .nav-item {display:grid;justify-items:center;gap:7px;background:none;border:0;padding:1px 0 2px;color:#959195;font-size:11px;cursor:pointer;min-width:0;}
     .nav-item svg {width:24px;height:24px;stroke-width:1.7;}
     .nav-item.active {color:#f3efed;}
+    .nav-item-icon-wrap{position:relative;display:inline-grid;place-items:center;}
+    .nav-badge,.top-badge{display:none;position:absolute;align-items:center;justify-content:center;min-width:17px;height:17px;padding:0 4px;border-radius:999px;background:#d98673;color:#201a19;font-size:10px;line-height:1;font-weight:750;border:1px solid rgba(22,18,18,.8);}
+    .nav-badge{top:-5px;right:-9px;}
+    .top-badge{top:-3px;right:-3px;}
+    .nav-badge.visible,.top-badge.visible{display:inline-flex;}
+    .circle{position:relative;}
+    .friends-title-row{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin:19px 0 31px;}
+    .friends-title-row h1{margin:0;}
+    .requests-trigger{display:inline-flex;align-items:center;gap:7px;flex:none;margin-bottom:5px;padding:9px 11px;border-radius:13px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.075);color:#f0e9e5;font:inherit;font-size:12px;cursor:pointer;}
+    .requests-trigger:active{background:rgba(255,255,255,.14);}
+    .requests-trigger-count{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#e2d8d0;color:#252124;font-size:10px;font-weight:750;}
+    .requests-overlay{position:fixed;inset:0;z-index:30;display:grid;place-items:center;padding:20px;background:rgba(0,0,0,.62);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);}
+    .requests-overlay[hidden]{display:none;}
+    .requests-dialog{width:min(100%,480px);max-height:min(78vh,640px);overflow:auto;padding:22px;border-radius:22px;}
+    .requests-dialog .friend-head{align-items:center;margin-bottom:14px;}
+    .requests-dialog-close{width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.07);color:#eee;font-size:20px;line-height:1;cursor:pointer;}
+    .top-actions .circle{display:grid;}
     .toast {
       position:fixed;z-index:20;bottom:calc(98px + env(safe-area-inset-bottom));
       left:50%;transform:translateX(-50%);
@@ -377,7 +394,7 @@
     <header class="top">
       <div class="brand">LOOPA</div>
       <div class="top-actions">
-        <button class="circle" type="button" data-message="Уведомлений пока нет" aria-label="Уведомления"><svg><use href="#i-bell"/></svg></button>
+        <button class="circle" id="top-notifications-button" type="button" data-open-requests aria-label="Новые заявки"><svg><use href="#i-bell"/></svg><span class="top-badge" id="top-request-badge" aria-hidden="true"></span></button>
         <button class="circle" id="top-profile-button" type="button" data-go="profile" aria-label="Профиль"><svg><use href="#i-person"/></svg></button>
       </div>
     </header>
@@ -414,7 +431,7 @@
 
       <section data-page="friends" hidden>
         <div class="eyebrow">ТВОЙ КРУГ</div>
-        <h1>Быть<br>рядом.</h1>
+        <div class="friends-title-row"><h1>Быть<br>рядом.</h1><button class="requests-trigger" type="button" data-open-requests aria-haspopup="dialog" aria-controls="requests-dialog">Заявки <span class="requests-trigger-count" id="friends-header-request-count">0</span></button></div>
         <div class="panel glass" id="friends-guest"><p class="panel-note">ТВОЙ КРУГ</p><h2>Войди в аккаунт</h2><p>Чтобы находить людей, отправлять заявки и видеть их активность, войди в LOOPA.</p><button class="action" type="button" data-go="profile">Перейти в профиль</button></div>
         <div id="friends-app" hidden>
           <div class="panel glass friend-panel">
@@ -428,10 +445,6 @@
           <div class="panel glass friend-panel">
             <div class="friend-head"><h2>Мои друзья</h2><span class="friend-count" id="friend-count">0</span></div>
             <div id="friend-list"><div class="friends-empty">Здесь появятся люди после принятия заявок.</div></div>
-          </div>
-          <div class="panel glass friend-panel" id="friend-incoming-panel" hidden>
-            <div class="friend-head"><h2>Заявки тебе</h2><span class="friend-count" id="friend-incoming-count">0</span></div>
-            <div id="friend-incoming"></div>
           </div>
           <div class="panel glass friend-panel" id="friend-outgoing-panel" hidden>
             <div class="friend-head"><h2>Отправленные заявки</h2><span class="friend-count" id="friend-outgoing-count">0</span></div>
@@ -547,9 +560,15 @@
   <nav class="bottom" aria-label="Основная навигация">
     <button class="nav-item active" type="button" data-go="home" aria-current="page"><svg><use href="#i-home"/></svg><span>Главная</span></button>
     <button class="nav-item" type="button" data-go="rooms"><svg><use href="#i-room"/></svg><span>Комнаты</span></button>
-    <button class="nav-item" type="button" data-go="friends"><svg><use href="#i-users"/></svg><span>Друзья</span></button>
+    <button class="nav-item" type="button" data-go="friends"><span class="nav-item-icon-wrap"><svg><use href="#i-users"/></svg><span class="nav-badge" id="friends-nav-badge" aria-hidden="true"></span></span><span>Друзья</span></button>
     <button class="nav-item" type="button" data-go="profile"><svg><use href="#i-person"/></svg><span>Профиль</span></button>
   </nav>
+  <div class="requests-overlay" id="requests-overlay" hidden>
+    <section class="requests-dialog glass" id="requests-dialog" role="dialog" aria-modal="true" aria-labelledby="requests-dialog-title">
+      <div class="friend-head"><div><p class="panel-note">ТВОЙ КРУГ</p><h2 id="requests-dialog-title">Новые заявки</h2></div><button class="requests-dialog-close" id="requests-dialog-close" type="button" data-close-requests aria-label="Закрыть">×</button></div>
+      <div id="friend-incoming"><div class="friends-empty">Загрузка заявок…</div></div>
+    </section>
+  </div>
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
@@ -808,7 +827,7 @@
     document.addEventListener('visibilitychange',()=>{
       if (document.visibilityState === 'visible') {
         heartbeatPresence();
-        if (lastPage==='friends' && currentUser) refreshFriendLists();
+        if (currentUser) refreshFriendLists();
       }
     });
 
@@ -821,6 +840,7 @@
     let friendSearchTimer = null;
     let friendSearchGeneration = 0;
     let friendAutoRefresh = null;
+    let lastIncomingCount = null;
     const friendPresenceWindow = 90000; // same 90-second threshold as own presence
 
     function friendEmpty(parent, text) {
@@ -901,9 +921,12 @@
       byId('friends-app').hidden=!currentUser;
       friendEmpty(byId('friend-search-results'),'Найди знакомого по никнейму.');
       friendEmpty(byId('friend-list'),'Здесь появятся люди после принятия заявок.');
-      byId('friend-incoming-panel').hidden=true;
       byId('friend-outgoing-panel').hidden=true;
       byId('friend-count').textContent='0';
+      updateRequestBadges(0);
+      lastIncomingCount=null;
+      closeRequestsDialog();
+      friendEmpty(byId('friend-incoming'),'Новых заявок пока нет.');
       byId('friend-search').value='';
       feedback('friends-feedback','');
     }
@@ -916,8 +939,35 @@
       friendRelations=[];
       clearInterval(friendAutoRefresh);
       friendAutoRefresh=setInterval(()=>{
-        if (document.visibilityState==='visible' && lastPage==='friends') refreshFriendLists();
+        if (document.visibilityState==='visible') refreshFriendLists();
       },30000);
+    }
+    function updateRequestBadges(count) {
+      const safeCount=Math.max(0,Number(count)||0);
+      const text=safeCount>99?'99+':String(safeCount);
+      const header=byId('friends-header-request-count');
+      const top=byId('top-request-badge');
+      const nav=byId('friends-nav-badge');
+      if (header) header.textContent=text;
+      [[top,'top-badge'],[nav,'nav-badge']].forEach(([badge,cls])=>{
+        if (!badge) return;
+        badge.textContent=text;
+        badge.classList.toggle('visible',safeCount>0);
+        badge.setAttribute('aria-label',safeCount+' новых заявок');
+      });
+      const trigger=document.querySelector('.requests-trigger');
+      if (trigger) trigger.setAttribute('aria-label',safeCount+' новых заявок');
+    }
+    function openRequestsDialog() {
+      if (!currentUser) { showPage('profile'); showToast('Войди в аккаунт, чтобы посмотреть заявки'); return; }
+      byId('requests-overlay').hidden=false;
+      if (lastPage!=='friends') showPage('friends');
+      refreshFriendLists();
+      byId('requests-dialog-close')?.focus();
+    }
+    function closeRequestsDialog() {
+      const overlay=byId('requests-overlay');
+      if (overlay) overlay.hidden=true;
     }
     async function getPublicPresence(ids) {
       if (!ids.length) return {};
@@ -953,10 +1003,14 @@
         const received=friendRelations.filter(rel=>rel.status==='pending' && rel.receiver_id===owner);
         const sent=friendRelations.filter(rel=>rel.status==='pending' && rel.sender_id===owner);
         byId('friend-count').textContent=String(accepted.length);
-        byId('friend-incoming-count').textContent=String(received.length);
         byId('friend-outgoing-count').textContent=String(sent.length);
-        byId('friend-incoming-panel').hidden=!received.length;
         byId('friend-outgoing-panel').hidden=!sent.length;
+        updateRequestBadges(received.length);
+        if (lastIncomingCount !== null && received.length > lastIncomingCount) {
+          const added=received.length-lastIncomingCount;
+          showToast(added===1?'Новая заявка в друзья':'Новые заявки в друзья: '+added);
+        }
+        lastIncomingCount=received.length;
         function showRelations(target,list,kind) {
           const parent=byId(target);
           parent.replaceChildren();
@@ -971,7 +1025,8 @@
           }
         }
         showRelations('friend-list',accepted,'accepted');
-        showRelations('friend-incoming',received,'incoming');
+        if (received.length) showRelations('friend-incoming',received,'incoming');
+        else friendEmpty(byId('friend-incoming'),'Новых заявок пока нет.');
         showRelations('friend-outgoing',sent,'outgoing');
         const term=byId('friend-search').value.trim();
         if (term.length>=2) runFriendSearch();
@@ -1044,6 +1099,9 @@
         button.disabled=false;
       }
     }
+    document.addEventListener('keydown',(event)=>{
+      if (event.key==='Escape' && !byId('requests-overlay').hidden) closeRequestsDialog();
+    });
     document.addEventListener('click',(event)=>{
       const button=event.target.closest('[data-friend-action]');
       if (button) handleFriendAction(button);
@@ -1063,7 +1121,7 @@
       if (!user) return;
       startPresence(user);
       syncFriendsSession();
-      if (lastPage==='friends') refreshFriendLists();
+      refreshFriendLists();
       byId('auth-loading').hidden = true;
       byId('auth-guest').hidden = true;
       byId('auth-account').hidden = false;
@@ -1162,8 +1220,11 @@
       else displayGuest();
     }
     document.addEventListener('click', function(event) {
+      if (event.target.closest('[data-close-requests]')) { closeRequestsDialog(); return; }
+      if (event.target.id==='requests-overlay') { closeRequestsDialog(); return; }
       const button = event.target.closest('button');
       if (!button) return;
+      if (button.hasAttribute('data-open-requests')) { openRequestsDialog(); return; }
       if (button.dataset.go) showPage(button.dataset.go);
       if (button.dataset.message) showToast(button.dataset.message);
       if (button.dataset.authMode) selectAuthMode(button.dataset.authMode);
