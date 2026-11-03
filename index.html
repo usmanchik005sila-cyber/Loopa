@@ -398,6 +398,11 @@
 #inviteSheet{box-sizing:border-box;width:min(94vw,480px);max-height:80dvh;padding:22px;color:#eee;border:1px solid #ffffff30;border-radius:24px;background:radial-gradient(ellipse at top left,#ffffff0d,transparent 65%),#101013;box-shadow:0 28px 100px #0009;overflow:auto}
 #inviteSheet::backdrop{background:#000a;backdrop-filter:blur(5px)}#inviteSheet header{display:flex;align-items:center;justify-content:space-between;gap:10px}#inviteSheet h2{font:600 20px system-ui;margin:0}#inviteSheet button{cursor:pointer;color:#eee;border:1px solid #ffffff25;background:#ffffff09;border-radius:11px;min-height:40px;padding:8px 10px;font:12px system-ui}#inviteSheet #closeInvites{font-size:22px;border:0}#inviteHint{color:#aaa5aa;font:13px/1.6 system-ui;margin:10px 0 20px}#inviteList{display:grid;gap:10px;margin-bottom:18px;color:#bab5bb;font-size:13px}.inviteRow{display:flex;align-items:center;gap:10px;border:1px solid #ffffff16;border-radius:16px;background:#08080b;padding:12px}.inviteAvatar{flex-shrink:0;display:grid;place-items:center;width:34px;height:34px;background:#373238;color:#eee;border-radius:50%;font:600 17px Georgia}.inviteName{flex:1;min-width:0;overflow-wrap:anywhere;color:#eee;font:500 14px system-ui}.inviteName small{display:block;color:#aaa4ac;font:11px system-ui;margin-top:5px}.inviteActions{display:flex;flex-direction:column;gap:5px}#inviteSheet button:disabled{opacity:.45;cursor:default}#inviteSheet #shareRoomLink{float:none;width:100%}#inviteSheet [hidden]{display:none!important}#roomInboxButton{position:relative;font-size:19px}#roomInboxButton[hidden]{display:none}#roomInboxCount:not(:empty){position:absolute;right:-3px;top:-3px;border-radius:20px;background:#d98673;color:#171419;font:700 10px system-ui;padding:3px 5px}
 #roomInviteNotice{position:fixed;top:max(14px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:9999;box-sizing:border-box;width:min(94vw,450px);display:flex;align-items:center;gap:8px;background:#151518f5;border:1px solid #ffffff35;border-radius:17px;padding:13px;box-shadow:0 10px 40px #0008;color:#eee;font:13px/1.4 system-ui;backdrop-filter:blur(18px)}#roomInviteNotice[hidden]{display:none}#roomInviteNotice span{flex:1}#roomInviteNotice button{border:1px solid #ffffff25;background:#ffffff10;color:#eee;border-radius:9px;padding:9px;font:12px system-ui;cursor:pointer}
+
+/* Monochrome smoked glass notifications */
+#requests-dialog{background:radial-gradient(ellipse at top left,#ffffff0c,transparent 60%),linear-gradient(145deg,#252528f5,#101012fa);border:1px solid #ffffff30;border-radius:24px;box-shadow:0 24px 80px #0009;max-height:85dvh;overflow-y:auto;padding:22px}
+.noticeTabs{display:flex;gap:8px;margin:16px 0 20px}.noticeTabs button{flex:1;min-height:40px;border:1px solid #ffffff25;border-radius:12px;background:#ffffff05;color:#bbb;font:13px system-ui;cursor:pointer}.noticeTabs button[aria-pressed=true]{background:#e5e3e0;color:#171719;border-color:#e5e3e0}
+#unifiedRooms{display:grid;gap:12px;margin-bottom:16px}#unifiedRooms[hidden],#friend-incoming[hidden]{display:none}.roomNotice,#friend-incoming .friend-person{padding:14px;background:linear-gradient(145deg,#1b1b1ee8,#08080bea);border:1px solid #ffffff22;border-radius:18px;box-shadow:inset 0 1px #ffffff08}.roomNotice .inviteRow{padding:0;border:0;background:none}.roomNotice .inviteName small{display:block;color:#aaa;font:12px/1.5 system-ui;margin-top:5px}.noticeActions{display:flex;gap:8px;margin-top:15px}.noticeActions button,.watchJoin{min-height:40px;padding:9px 13px;border:1px solid #ffffff28;border-radius:11px;background:#ffffff08;color:#ddd;font:500 12px system-ui;cursor:pointer}.noticeActions button{flex:1}.noticeActions button:first-child,.watchJoin{background:linear-gradient(#eeedeb,#d4d3d1);color:#171719;border-color:#ffffff55}.noticeActions button:disabled{opacity:.45}.noticeEmpty{color:#a5a5aa;font:13px/1.5 system-ui;margin:8px 0}.watchTitle{font:500 13px/1.5 system-ui;color:#e4e3e6;margin-top:6px;overflow-wrap:anywhere}.watchJoin{margin-top:10px;max-width:100%}#friend-list .friend-person{align-items:flex-start;padding:16px 12px;border:1px solid #ffffff1c;border-radius:17px;background:linear-gradient(145deg,#222225c9,#0c0c0fe8);margin:10px 0}#friend-list .friend-person-status{align-items:flex-start;font-size:11px;line-height:1.5}.presence-dot.online{background:#d2d2d7;box-shadow:0 0 8px #ffffff20}.top-badge,.nav-badge{background:#d8d8db;color:#18181b}.inviteAvatar{background:#343438}.requests-overlay{backdrop-filter:blur(8px)}
 </style>
 </head>
 <body>
@@ -418,7 +423,7 @@
     <header class="top">
       <div class="brand">LOOPA</div>
       <div class="top-actions">
-        <button class="circle" id="roomInboxButton" type="button" aria-label="Приглашения в комнаты" hidden>✉<span id="roomInboxCount"></span></button><button class="circle" id="top-notifications-button" type="button" data-open-requests aria-label="Новые заявки"><svg><use href="#i-bell"/></svg><span class="top-badge" id="top-request-badge" aria-hidden="true"></span></button>
+        <button class="circle" id="roomInboxButton" style="display:none!important" type="button" aria-label="Приглашения в комнаты" hidden>✉<span id="roomInboxCount"></span></button><button class="circle" id="top-notifications-button" type="button" data-open-requests aria-label="Новые заявки"><svg><use href="#i-bell"/></svg><span class="top-badge" id="top-request-badge" aria-hidden="true"></span></button>
         <button class="circle" id="top-profile-button" type="button" data-go="profile" aria-label="Профиль"><svg><use href="#i-person"/></svg></button>
       </div>
     </header>
@@ -593,8 +598,8 @@
   </nav>
   <div class="requests-overlay" id="requests-overlay" hidden>
     <section class="requests-dialog glass" id="requests-dialog" role="dialog" aria-modal="true" aria-labelledby="requests-dialog-title">
-      <div class="friend-head"><div><p class="panel-note">ТВОЙ КРУГ</p><h2 id="requests-dialog-title">Новые заявки</h2></div><button class="requests-dialog-close" id="requests-dialog-close" type="button" data-close-requests aria-label="Закрыть">×</button></div>
-      <div id="friend-incoming"><div class="friends-empty">Загрузка заявок…</div></div>
+      <div class="friend-head"><div><p class="panel-note">ТВОЙ КРУГ</p><h2 id="requests-dialog-title">Уведомления</h2></div><button class="requests-dialog-close" id="requests-dialog-close" type="button" data-close-requests aria-label="Закрыть">×</button></div>
+      <div class="noticeTabs"><button data-notice-tab="all" aria-pressed="true">Все</button><button data-notice-tab="rooms">Комнаты</button><button data-notice-tab="friends">Друзья</button></div><div id="unifiedRooms"></div><div id="friend-incoming"><div class="friends-empty">Загрузка заявок…</div></div>
     </section>
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
@@ -813,6 +818,7 @@
       byId('source').value=b.dataset.provider;byId('source').onchange();
     });
 
+    let friendNoticeCount=0,noticeTab='all',friendActivity={},publishedTitle='';
     let inviteBusy=false,inviteOwner=null,inviteInbox=[],inviteSeen=new Set();
     const inviteDialog=byId('inviteSheet');
     function inviteError(e){return /loopa_invite25|schema cache|does not exist/i.test(e.message||'')?'Сначала выполни SQL для приглашений в Supabase.':e.message||'Не удалось загрузить приглашения';}
@@ -871,7 +877,7 @@
       if(inviteBusy)return;inviteBusy=true;
       try{const data=await inviteRPC('inbox');if(currentUser?.id!==owner)return;
         if(inviteOwner!==owner){inviteOwner=owner;inviteSeen.clear();}inviteInbox=data;
-        byId('roomInboxCount').textContent=data.length?String(data.length):'';
+        updateUnifiedBadge();renderRoomNotices();
         const fresh=data.find(x=>!inviteSeen.has(x.id+':'+x.sent));
         data.forEach(x=>inviteSeen.add(x.id+':'+x.sent));
         if(fresh){byId('roomInviteNoticeText').textContent=fresh.name+' приглашает в комнату';byId('roomInviteNotice').hidden=false;}
@@ -879,10 +885,29 @@
       }catch(e){if(inviteDialog.open&&byId('shareRoomLink').hidden)byId('inviteHint').textContent=inviteError(e);}
       finally{inviteBusy=false;}
     }
-    byId('roomInboxButton').onclick=showInviteInbox;byId('viewRoomInvites').onclick=()=>{byId('roomInviteNotice').hidden=true;showInviteInbox();};
+    byId('roomInboxButton').onclick=showInviteInbox;byId('viewRoomInvites').onclick=()=>{byId('roomInviteNotice').hidden=true;openRequestsDialog();};
     byId('hideRoomInvites').onclick=()=>byId('roomInviteNotice').hidden=true;
     setInterval(()=>{if(!document.hidden)pollInvites();},8000);
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)pollInvites();});
+
+
+    function updateUnifiedBadge(){const count=friendNoticeCount+inviteInbox.length,badge=byId('top-request-badge');badge.textContent=count>99?'99+':String(count);badge.classList.toggle('visible',count>0);byId('top-notifications-button').setAttribute('aria-label','Уведомления: '+count);}
+    function filterNotices(){byId('unifiedRooms').hidden=noticeTab==='friends';byId('friend-incoming').hidden=noticeTab==='rooms';document.querySelectorAll('[data-notice-tab]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.noticeTab===noticeTab)));}
+    document.querySelectorAll('[data-notice-tab]').forEach(b=>b.onclick=()=>{noticeTab=b.dataset.noticeTab;filterNotices();});
+    function renderRoomNotices(){
+      const list=byId('unifiedRooms');list.replaceChildren();
+      if(!inviteInbox.length){const empty=document.createElement('p');empty.className='noticeEmpty';empty.textContent='Приглашений в комнаты пока нет';list.append(empty);}
+      for(const item of inviteInbox){const card=document.createElement('article');card.className='roomNotice';const row=inviteRow(item.name);const text=document.createElement('small');text.textContent='Приглашает посмотреть вместе';row.querySelector('.inviteName').append(text);card.append(row);const actions=document.createElement('div');actions.className='noticeActions';
+        for(const [action,label] of [['accept','Войти'],['decline','Отклонить']]){const b=document.createElement('button');b.type='button';b.textContent=label;b.onclick=async()=>{if(action==='accept'&&roomState&&roomState.code!==item.code&&!confirm('Перейти в комнату друга?'))return;actions.querySelectorAll('button').forEach(x=>x.disabled=true);try{await inviteRPC(action,{invitation:item.id});if(action==='accept'){closeRequestsDialog();showPage('rooms');await roomRun('join',{room:item.code});}await pollInvites();}catch(e){showToast(inviteError(e));actions.querySelectorAll('button').forEach(x=>x.disabled=false);}};actions.append(b);}card.append(actions);list.append(card);
+      }filterNotices();
+    }
+    async function publishWatchTitle(title){
+      if(!hostHere()||!roomState.video||!title)return;
+      const key=roomState.code+roomState.video+title;if(publishedTitle===key)return;
+      const {error}=await client.rpc('loopa_activity26',{action:'title',room_code:roomState.code,media:roomState.video,title:String(title).slice(0,200)});if(!error)publishedTitle=key;
+    }
+    setInterval(()=>{if(!document.hidden&&hostHere()&&ytPlayer?.getVideoData)publishWatchTitle(ytPlayer.getVideoData()?.title);},4000);
+    setInterval(()=>{if(!document.hidden&&currentUser&&lastPage==='friends')refreshFriendLists();},10000);
 
     let catalogRevision=0, nextPage=null, catalogQuery='';
     function clearCatalog(){catalogRevision++;nextPage=null;byId('hits').replaceChildren();byId('nextVideos').hidden=true;byId('searchStatus').textContent='';}
@@ -897,7 +922,7 @@
         if(error||!Array.isArray(data?.items))throw Error(data?.message||'Каталог недоступен. Можно открыть видео по ссылке.');
         for(const hit of data.items){const b=document.createElement('button');b.type='button';
           if(hit.image?.startsWith('https://')){const img=document.createElement('img');img.src=hit.image;img.alt='';img.loading='lazy';b.append(img);}
-          b.append(document.createTextNode(hit.title));b.onclick=()=>changeRoomVideo(hit.url);byId('hits').append(b);}
+          b.append(document.createTextNode(hit.title));b.onclick=async()=>{await changeRoomVideo(hit.url);if(roomState?.video===roomMedia(hit.url))publishWatchTitle(hit.title);};byId('hits').append(b);}
         nextPage=data.next;byId('nextVideos').hidden=!nextPage;byId('searchStatus').textContent=data.items.length?'Выбери видео для комнаты':'Ничего не найдено';
       }catch(e){if(revision===catalogRevision)byId('searchStatus').textContent=e.message;}
     }
@@ -1251,6 +1276,12 @@
       status.append(indicator,text);
       detail.append(name,status);
       row.appendChild(detail);
+      if(buttons?.some(x=>x.menu)&&friendActivity[profile.id]){
+        const activity=friendActivity[profile.id];text.textContent=activity.private?'В сети · В приватной комнате':'В сети · Сейчас смотрит';
+        if(!activity.private){const title=document.createElement('div');title.className='watchTitle';title.textContent=activity.title;detail.append(title);}
+        const join=document.createElement('button');join.type='button';join.className='watchJoin';join.textContent=activity.private?'Приватная комната':'Присоединиться';
+        join.onclick=async()=>{if(activity.private){showToast('Друг смотрит в приватной комнате. Войти можно по приглашению');return;}if(roomState&&!confirm('Перейти к просмотру друга?'))return;join.disabled=true;try{const {data,error}=await client.rpc('loopa_activity26',{action:'join',peer:profile.id});if(error)throw error;showPage('rooms');await roomRun('join',{room:data.code});}catch(e){showToast(e.message);}finally{join.disabled=false;}};detail.append(join);
+      }
       for (const action of (buttons || [])) {
         if (action.menu) {
           const wrap=document.createElement('div'); wrap.className='friend-actions';
@@ -1311,7 +1342,8 @@
       },30000);
     }
     function updateRequestBadges(count) {
-      const safeCount=Math.max(0,Number(count)||0);
+      friendNoticeCount=Math.max(0,Number(count)||0);
+      const safeCount=friendNoticeCount;
       const text=safeCount>99?'99+':String(safeCount);
       const header=byId('friends-header-request-count');
       const top=byId('top-request-badge');
@@ -1323,13 +1355,14 @@
         badge.classList.toggle('visible',safeCount>0);
         badge.setAttribute('aria-label',safeCount+' новых заявок');
       });
+      updateUnifiedBadge();
       const trigger=document.querySelector('.requests-trigger');
       if (trigger) trigger.setAttribute('aria-label',safeCount+' новых заявок');
     }
     function openRequestsDialog() {
       if (!currentUser) { showPage('profile'); showToast('Войди в аккаунт, чтобы посмотреть заявки'); return; }
       byId('requests-overlay').hidden=false;
-      if (lastPage!=='friends') showPage('friends');
+      pollInvites();renderRoomNotices();
       refreshFriendLists();
       byId('requests-dialog-close')?.focus();
     }
@@ -1367,6 +1400,8 @@
           presence=await getPublicPresence(ids);
         }
         if (currentUser?.id !== owner) return;
+        const activityResult=await client.rpc('loopa_activity26',{action:'friends'});
+        if(currentUser?.id!==owner)return;friendActivity=Object.fromEntries((activityResult.data||[]).map(x=>[x.id,x]));
         const accepted=friendRelations.filter(rel=>rel.status==='accepted');
         const received=friendRelations.filter(rel=>rel.status==='pending' && rel.receiver_id===owner);
         const sent=friendRelations.filter(rel=>rel.status==='pending' && rel.sender_id===owner);
@@ -1505,7 +1540,7 @@
     });
 
     function displayGuest() {
-      byId('roomInboxButton').hidden=true;byId('roomInviteNotice').hidden=true;byId('inviteSheet').close();inviteInbox=[];inviteSeen.clear();
+      byId('roomInboxButton').hidden=true;byId('roomInviteNotice').hidden=true;byId('inviteSheet').close();inviteInbox=[];inviteSeen.clear();updateUnifiedBadge();
       roomExit();
       byId('settings-home').hidden=true;
       byId('settings-detail').hidden=true;
