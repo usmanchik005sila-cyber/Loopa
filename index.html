@@ -437,7 +437,7 @@
         <div class="eyebrow">СОВМЕСТНЫЙ ПРОСМОТР</div>
         <h1>Твои<br>комнаты.</h1>
         <div id="room-lobby" class="panel glass"><h2>Смотреть вместе</h2><button class="action" data-room="create">Создать комнату</button><label class="friend-search-label" for="join-code">Код от ведущего</label><input id="join-code" class="friend-search-input" autocomplete="off" maxlength="12"><button class="action secondary" data-room="join">Войти по коду</button><h3>Мои комнаты</h3><div id="room-recent"></div></div>
-<div id="room-active" class="panel glass" hidden><p class="panel-note">КОД КОМНАТЫ</p><h2 id="room-code"></h2><button class="friend-small-action" data-room="copy">Скопировать код</button><p id="room-status"></p><iframe id="room-frame" title="Видео комнаты" hidden></iframe><div id="room-host"><label class="friend-search-label" for="room-link">Ссылка на видео</label><input id="room-link" type="url" class="friend-search-input" placeholder="YouTube, VK Видео или RUTUBE"><button class="action" data-room="video">Открыть для всех</button><p>Для общего управления используй кнопки комнаты.</p><input id="room-seconds" class="friend-search-input" type="number" min="0" aria-label="Позиция в секундах" placeholder="Секунды · необязательно"><button class="friend-small-action" data-room="play">▶ Для всех</button> <button class="friend-small-action" data-room="pause">Пауза для всех</button></div><button class="action secondary" data-room="sync">Синхронизировать мой плеер</button><button class="text-link" data-room="exit">К списку комнат</button></div><p id="room-note" role="status"></p>
+<div id="room-active" class="panel glass" hidden><p class="panel-note">КОД КОМНАТЫ</p><h2 id="room-code"></h2><button class="friend-small-action" data-room="copy">Скопировать код</button><p id="room-status"></p><iframe id="room-frame" title="Видео комнаты" hidden></iframe><div id="room-host"><label class="friend-search-label" for="room-link">Ссылка на видео</label><input id="room-link" type="url" class="friend-search-input" placeholder="YouTube, VK Видео или RUTUBE"><button class="action" data-room="video">Открыть для всех</button></div><button class="text-link" data-room="exit">К списку комнат</button></div><p id="room-note" role="status"></p>
       </section>
 
       <section data-page="friends" hidden>
@@ -599,6 +599,7 @@
     let currentUser = null;
     let authMode = 'login';
 
+    let sample=null, observed=null, writing=false, pending=null, mediaChanging=false;
     let roomState=null, roomUser=null, roomEpoch=0, roomClock=0, roomPoll=false, vkPlayer=null, ytPlayer=null;
     const roomBox=()=>byId('room-frame');
     function roomMedia(raw){
@@ -631,20 +632,73 @@
         send('player:setCurrentTime',{time:pos});send(playing?'player:play':'player:pause',{});
       }else if(vkPlayer){vkPlayer.seek(pos);playing?vkPlayer.play():vkPlayer.pause();}
     }
+    function hostHere(){return roomState && roomState.host===currentUser?.id;}
+    function observe(playing,pos){
+      if(!roomState?.video || !Number.isFinite(pos) || pos<0 || typeof playing!=='boolean')return;
+      const now=performance.now(), previous=sample;
+      sample={playing,pos,now};
+      if(!hostHere() || mediaChanging)return;
+      const expected=previous?previous.pos+(previous.playing?(now-previous.now)/1000:0):positionNow();
+      if(playing!==(previous?.playing??roomState.playing) || Math.abs(pos-expected)>1.1){
+        pending={op:playing?'play':'pause',seconds:pos,video:roomState.video,code:roomState.code,epoch:roomEpoch};
+        flushPlayback();
+      }
+    }
+    async function flushPlayback(){
+      if(writing)return;
+      writing=true;
+      try{while(pending){
+        const p=pending;pending=null;
+        if(p.epoch!==roomEpoch||p.code!==roomState?.code||p.video!==roomState.video)continue;
+        await roomRun(p.op,{seconds:p.seconds});
+      }}finally{writing=false;}
+    }
+    function readyPlayer(){if(!hostHere()||roomState.playing||roomState.pos>0)applyRoom();}
     function mountRoomPlayer(url){
-      ytPlayer=null;vkPlayer=null;
+      sample=null;observed={playing:false,pos:0};pending=null;ytPlayer=null;vkPlayer=null;
       const frame=document.createElement('iframe');frame.id='room-frame';frame.title='Видео комнаты';frame.allow='autoplay; encrypted-media; fullscreen; picture-in-picture';frame.allowFullscreen=true;
       roomBox().replaceWith(frame);frame.hidden=!url;if(!url)return;
-      frame.onload=()=>{
-        if(frame!==roomBox())return;
-        if(url.includes('youtube.com/')&&window.YT?.Player)bindRoomYT();
-        else if(url.includes('vkvideo.ru/')&&window.VK?.VideoPlayer){vkPlayer=VK.VideoPlayer(frame);vkPlayer.on('inited',applyRoom);}
-        else applyRoom();
-      };frame.src=url;
+      frame.onload=()=>{if(frame===roomBox())bindRoomPlayers();};frame.src=url;
     }
-    function bindRoomYT(){if(!ytPlayer&&roomBox()?.src.includes('youtube.com/'))ytPlayer=new YT.Player(roomBox(),{events:{onReady:applyRoom}});}
-    window.onYouTubeIframeAPIReady=bindRoomYT;
-    window.addEventListener('message',e=>{if(e.origin!=='https://rutube.ru'||e.source!==roomBox()?.contentWindow)return;try{if(JSON.parse(e.data).type==='player:ready')applyRoom();}catch{}});
+    function bindRoomPlayers(){
+      const frame=roomBox();if(!frame?.src)return;
+      if(frame.src.includes('youtube.com/')&&window.YT?.Player&&!ytPlayer){
+        ytPlayer=new YT.Player(frame,{events:{onReady:readyPlayer,onStateChange:samplePlayers}});
+      }else if(frame.src.includes('vkvideo.ru/')&&window.VK?.VideoPlayer&&!vkPlayer){
+        vkPlayer=VK.VideoPlayer(frame);
+        for(const [name,playing] of [['started',true],['resumed',true],['paused',false],['ended',false]])vkPlayer.on(name,()=>{if(frame===roomBox()){observed.playing=playing;samplePlayers();}});
+        vkPlayer.on('inited',()=>{if(frame===roomBox())readyPlayer();});
+      }
+    }
+    function samplePlayers(){
+      if(!roomState?.video)return;
+      if(ytPlayer?.getPlayerState){
+        const state=ytPlayer.getPlayerState();
+        if([0,1,2].includes(state))observe(state===1,ytPlayer.getCurrentTime());
+        const id=ytPlayer.getVideoData?.().video_id;
+        if(id&&hostHere()&&!mediaChanging&&!roomState.video.includes('/embed/'+id+'?'))changeRoomVideo('https://youtu.be/'+id);
+      }else if(vkPlayer?.getCurrentTime){
+        const state=vkPlayer.getState?.();
+        observe(['playing','started','resumed'].includes(state)?true:['paused','ended'].includes(state)?false:observed.playing,Number(vkPlayer.getCurrentTime()));
+      }
+    }
+    async function changeRoomVideo(raw){
+      if(mediaChanging)return;
+      mediaChanging=true;pending=null;
+      try{while(writing)await new Promise(resolve=>setTimeout(resolve,30));await roomRun('video',{media:roomMedia(raw)});}
+      catch(e){byId('room-note').textContent=e.message;}finally{mediaChanging=false;}
+    }
+    window.onYouTubeIframeAPIReady=bindRoomPlayers;
+    window.addEventListener('message',e=>{
+      if(e.origin!=='https://rutube.ru'||e.source!==roomBox()?.contentWindow)return;
+      let m;try{m=typeof e.data==='string'?JSON.parse(e.data):e.data;}catch{return;}
+      if(m?.type==='player:ready')readyPlayer();
+      if(m?.type==='player:currentTime')observed.pos=Number(m.data?.time);
+      if(m?.type==='player:changeState'&&['playing','paused','stopped'].includes(m.data?.state))observed.playing=m.data.state==='playing';
+      if(['player:currentTime','player:changeState'].includes(m?.type))observe(observed.playing,observed.pos);
+    });
+    setInterval(()=>{if(!roomState?.video||document.hidden)return;bindRoomPlayers();samplePlayers();},350);
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden&&roomState)roomRun('read');});
     function roomExit(){roomEpoch++;roomState=null;roomUser=null;mountRoomPlayer('');byId('room-active').hidden=true;byId('room-lobby').hidden=false;byId('room-recent').replaceChildren();byId('room-note').textContent='';}
     async function roomCall(op,args={}){
       if(!currentUser||!client){showPage('profile');showToast('Войди в аккаунт');return;}
@@ -654,12 +708,12 @@
       if(error){if(op==='read'&&error.message.includes('недоступна'))roomExit();throw Error(error.message);}
       if(op==='list'){const parent=byId('room-recent');parent.replaceChildren();for(const code of data){const b=document.createElement('button');b.className='friend-small-action';b.textContent=code;b.onclick=()=>roomRun('join',{room:code});parent.append(b);}return;}
       const prev=roomState;
-      if(op==='read'&&prev&&Date.parse(data.changed)<Date.parse(prev.changed))return;
+      if(op==='read'&&prev&&data.changed<prev.changed)return;
       roomState=data;roomUser=u;roomClock=performance.now();
       byId('room-active').hidden=false;byId('room-lobby').hidden=true;byId('room-code').textContent=data.code;byId('room-host').hidden=data.host!==u;
       byId('room-status').textContent=!data.video?'Ведущий выбирает видео':data.playing?'Идёт просмотр':'На паузе';
       if(prev?.video!==data.video)mountRoomPlayer(data.video?roomMedia(data.video):'');
-      else if(prev?.changed!==data.changed)applyRoom();
+      else if(!hostHere() && (prev?.changed!==data.changed || (sample && Math.abs(sample.pos-positionNow())>3 && performance.now()-sample.now<2000)))applyRoom();
     }
     async function roomRun(op,args){try{await roomCall(op,args);}catch(e){byId('room-note').textContent=e.message;}}
     document.addEventListener('click',async e=>{
@@ -668,10 +722,9 @@
       if(op==='focus'){byId('join-code').focus();return;}
       if(op==='exit'){roomExit();await roomRun('list');return;}
       if(op==='copy'){try{await navigator.clipboard.writeText(roomState.code);showToast('Код скопирован');}catch{showToast(roomState.code);}return;}
-      if(op==='sync'){applyRoom();return;}
+
       let args={};if(op==='join')args.room=byId('join-code').value.trim();
-      if(op==='video'){try{args.media=roomMedia(byId('room-link').value);}catch(e){byId('room-note').textContent=e.message;return;}}
-      if(op==='play'||op==='pause'){const input=byId('room-seconds');args.seconds=input.value===''?positionNow():Number(input.value);input.value='';}
+      if(op==='video'){b.disabled=true;try{await changeRoomVideo(byId('room-link').value);}finally{b.disabled=false;}return;}
       b.disabled=true;try{await roomRun(op,args);}finally{b.disabled=false;}
     });
     setInterval(async()=>{if(roomPoll||lastPage!=='rooms'||!roomState||document.hidden)return;roomPoll=true;try{await roomRun('read');}finally{roomPoll=false;}},1500);
