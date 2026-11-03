@@ -403,6 +403,8 @@
 #requests-dialog{background:radial-gradient(ellipse at top left,#ffffff0c,transparent 60%),linear-gradient(145deg,#252528f5,#101012fa);border:1px solid #ffffff30;border-radius:24px;box-shadow:0 24px 80px #0009;max-height:85dvh;overflow-y:auto;padding:22px}
 .noticeTabs{display:flex;gap:8px;margin:16px 0 20px}.noticeTabs button{flex:1;min-height:40px;border:1px solid #ffffff25;border-radius:12px;background:#ffffff05;color:#bbb;font:13px system-ui;cursor:pointer}.noticeTabs button[aria-pressed=true]{background:#e5e3e0;color:#171719;border-color:#e5e3e0}
 #unifiedRooms{display:grid;gap:12px;margin-bottom:16px}#unifiedRooms[hidden],#friend-incoming[hidden]{display:none}.roomNotice,#friend-incoming .friend-person{padding:14px;background:linear-gradient(145deg,#1b1b1ee8,#08080bea);border:1px solid #ffffff22;border-radius:18px;box-shadow:inset 0 1px #ffffff08}.roomNotice .inviteRow{padding:0;border:0;background:none}.roomNotice .inviteName small{display:block;color:#aaa;font:12px/1.5 system-ui;margin-top:5px}.noticeActions{display:flex;gap:8px;margin-top:15px}.noticeActions button,.watchJoin{min-height:40px;padding:9px 13px;border:1px solid #ffffff28;border-radius:11px;background:#ffffff08;color:#ddd;font:500 12px system-ui;cursor:pointer}.noticeActions button{flex:1}.noticeActions button:first-child,.watchJoin{background:linear-gradient(#eeedeb,#d4d3d1);color:#171719;border-color:#ffffff55}.noticeActions button:disabled{opacity:.45}.noticeEmpty{color:#a5a5aa;font:13px/1.5 system-ui;margin:8px 0}.watchTitle{font:500 13px/1.5 system-ui;color:#e4e3e6;margin-top:6px;overflow-wrap:anywhere}.watchJoin{margin-top:10px;max-width:100%}#friend-list .friend-person{align-items:flex-start;padding:16px 12px;border:1px solid #ffffff1c;border-radius:17px;background:linear-gradient(145deg,#222225c9,#0c0c0fe8);margin:10px 0}#friend-list .friend-person-status{align-items:flex-start;font-size:11px;line-height:1.5}.presence-dot.online{background:#d2d2d7;box-shadow:0 0 8px #ffffff20}.top-badge,.nav-badge{background:#d8d8db;color:#18181b}.inviteAvatar{background:#343438}.requests-overlay{backdrop-filter:blur(8px)}
+
+.wideJoin{display:flex;align-items:center;gap:10px;box-sizing:border-box;width:100%;padding:9px 10px 9px 17px;margin:18px 0;border:1px solid #ffffff2b;border-radius:18px;background:linear-gradient(135deg,#ffffff0e,#08080bd9);box-shadow:inset 0 1px #ffffff0b;backdrop-filter:blur(16px)}.wideJoin input{flex:1;min-width:0;border:0;background:none;color:#eee;font:16px system-ui;outline:none}.wideJoin:focus-within{border-color:#ffffff80}.wideJoin button{flex-shrink:0;min-width:44px;min-height:44px;border:1px solid #ffffff40;border-radius:12px;background:linear-gradient(#eeedeb,#cdcdcf);color:#19191c;font-size:23px;cursor:pointer}.recentGrid,#room-recent{display:grid;gap:12px;margin-top:14px}.historyCard{display:flex;align-items:center;gap:14px;width:100%;min-width:0;padding:12px;text-align:left;border:1px solid #ffffff26;border-radius:19px;background:radial-gradient(ellipse at top left,#ffffff0c,transparent 65%),linear-gradient(145deg,#27272aca,#0d0d10e8);color:#e9e8eb;cursor:pointer;box-shadow:inset 0 1px #ffffff0b}.historyCard img{width:42%;max-width:180px;aspect-ratio:16/9;object-fit:cover;border-radius:11px}.historyCard>span{flex:1;min-width:0}.historyCard strong{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font:550 14px/1.4 system-ui;margin:5px 0 9px}.historyCard small{color:#a9a8af;font:11px system-ui}.historyCard>span>span{font:11px system-ui;color:#c6c5cb}.historyCard:disabled{opacity:.5}.profileStats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:8px 0 10px}.profileStats>div{padding:14px 12px;border:1px solid #ffffff22;border-radius:15px;background:linear-gradient(145deg,#252528c9,#0d0d10df)}.profileStats strong{display:block;font:600 16px/1.4 system-ui;color:#eee;overflow-wrap:anywhere}.profileStats small{display:block;margin-top:7px;color:#aaa9af;font:11px system-ui}.statsNote{font:11px/1.5 system-ui!important;color:#a6a4aa!important;margin-bottom:20px!important}#noticeEmpty27{text-align:center;padding:28px 6px;margin:0}#noticeEmpty27[hidden]{display:none}
 </style>
 </head>
 <body>
@@ -441,21 +443,14 @@
             <svg><use href="#i-users"/></svg><span><strong>Мои друзья</strong><small>Твой круг</small></span>
           </button>
         </div>
-        <div class="home-shortcuts" aria-label="Быстрые действия">
-          <div class="home-shortcut-cell">
-            <button class="home-shortcut" type="button" data-room="focus">Войти по коду <svg><use href="#i-arrow"/></svg></button>
-          </div>
-          <div class="home-shortcut-cell">
-            <button class="home-shortcut" type="button" data-go="rooms">Недавние комнаты <svg><use href="#i-arrow"/></svg></button>
-          </div>
-        </div>
+        <form id="homeJoin" class="wideJoin"><input id="homeJoinCode" type="text" maxlength="1000" placeholder="Код или ссылка" aria-label="Код или ссылка на комнату"><button type="submit" aria-label="Войти в комнату">→</button></form><div id="homeRecent" class="recentGrid"></div>
 
       </section>
 
       <section data-page="rooms" hidden>
         <div class="eyebrow">СОВМЕСТНЫЙ ПРОСМОТР</div>
         <h1>Твои<br>комнаты.</h1>
-        <div id="room-lobby" class="panel glass"><h2>Смотреть вместе</h2><button class="action" data-room="create">Создать комнату</button><label class="friend-search-label" for="join-code">Код от ведущего</label><input id="join-code" class="friend-search-input" autocomplete="off" maxlength="12"><button class="action secondary" data-room="join">Войти по коду</button><h3>Мои комнаты</h3><div id="room-recent"></div></div>
+        <div id="room-lobby" class="panel glass"><h2>Смотреть вместе</h2><button class="action" data-room="create">Создать комнату</button><label class="friend-search-label" for="join-code">Код или ссылка</label><input id="join-code" class="friend-search-input" autocomplete="off" maxlength="1000" placeholder="Код или ссылка"><button class="action secondary" data-room="join">Войти по коду</button><h3>Вы смотрели</h3><div id="room-recent"></div></div>
 <div id="room-active" class="panel glass" hidden><div class="setupHeader"><p class="panel-note">СОВМЕСТНЫЙ ПРОСМОТР</p><h2 id="setupTitle">Выбери видео</h2></div><div class="roomBar"><button class="text-link" data-room="exit">‹ Комнаты</button><small id="accessBadge"></small><button id="moreRoom" class="friend-small-action" aria-label="Меню комнаты">⋯</button></div><div class="playerCode"><span>Код</span><b id="room-code"></b><button type="button" data-room="copy" aria-label="Скопировать код комнаты"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M15 5V4a1 1 0 0 0-1-1H5a2 2 0 0 0-2 2v10a1 1 0 0 0 1 1h1"/></svg></button></div><iframe id="room-frame" hidden title="Видео комнаты"></iframe><button id="inviteRoom" type="button" class="roomInvite">＋ Пригласить</button><small id="room-status" hidden></small><div id="room-host"><details id="videoEdit"><summary><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="4"/><path d="m10 9 5 3-5 3z"/></svg>Сменить видео</summary><button id="catalogOpen" type="button" class="catalogLaunch" aria-expanded="false">▦ <span>Каталог видео<small>Найди и включи прямо здесь</small></span><span>›</span></button><section id="catalog" hidden><div class="providerTabs" role="group" aria-label="Видеосервис"><button type="button" data-provider="youtube" aria-pressed="true"><span class="ytLogo">▶</span>YouTube</button><button type="button" data-provider="vk" aria-pressed="false"><span class="vkLogo">VK</span>VK Видео</button></div><select hidden class="privacy-select" id="source"><option value="youtube">YouTube</option><option value="vk">VK Видео</option></select><form id="catalogForm"><input class="friend-search-input" maxlength="100" id="queryVideo" placeholder="Название видео или канала" aria-label="Поиск видео"><button class="friend-small-action">Найти</button></form><small role="status" id="searchStatus"></small><div id="hits"></div><button type="button" id="nextVideos" class="text-link" hidden>Ещё видео</button></section><label class="friend-search-label" for="room-link">Ссылка на видео</label><input id="room-link" type="url" class="friend-search-input" placeholder="Ссылка на видео"><button class="action" data-room="video">Открыть видео</button></details></div>
 <section class="roomChat"><h2>Чат комнаты</h2><div id="chatLog"></div><div id="emojiTray" hidden aria-label="Выбор эмодзи"></div><form id="chatForm"><button type="button" id="emojiOpen" aria-label="Выбрать эмодзи" aria-controls="emojiTray" aria-expanded="false">☺</button><input class="friend-search-input" id="chatText" maxlength="1000" aria-label="Сообщение" placeholder="Сообщение…" required><button class="friend-small-action" aria-label="Отправить">↑</button></form></section></div>
 <dialog id="inviteSheet"><header><h2>Пригласить друзей</h2><button type="button" id="closeInvites" aria-label="Закрыть">×</button></header><p id="inviteHint">Выбери друга — приглашение появится у него в LOOPA.</p><div id="inviteList"></div><button type="button" id="shareRoomLink" class="roomInvite">Отправить ссылку</button></dialog><aside id="roomInviteNotice" hidden role="status"><span id="roomInviteNoticeText"></span><button type="button" id="viewRoomInvites">Открыть</button><button type="button" id="hideRoomInvites" aria-label="Скрыть">×</button></aside><dialog id="roomSheet"><button class="text-link" onclick="this.parentElement.close()">Закрыть ×</button><h3>Участники</h3><div id="people" role="list" aria-label="Участники"></div><div id="accessEdit"><h3>Кто может войти</h3><select id="accessMode" class="privacy-select"><option value="code">Любой</option><option value="friends">Только друзья</option><option value="private">Приватная</option></select><div id="pick"></div><small id="accessWarning"></small><button class="action" id="saveAccess">Сохранить доступ</button></div></dialog><p id="room-note" role="status"></p>
@@ -538,7 +533,7 @@
             <label class="field account-name-field">Отображаемое имя
               <input id="profile-name" type="text" maxlength="40" required autocomplete="nickname" placeholder="Твоё имя">
             </label>
-            <p class="account-email" id="account-email"></p>
+            <p class="account-email" id="account-email"></p><div class="profileStats"><div><strong id="usageTime">—</strong><small>В LOOPA</small></div><div><strong id="joinedDate">—</strong><small>Дата регистрации</small></div></div><p class="statsNote">Время считаем с этого обновления, пока LOOPA открыта на экране.</p>
             <button class="action" id="profile-save" type="submit">Сохранить профиль</button>
             <p id="profile-saved" class="profile-saved" role="status" aria-live="polite" hidden><span aria-hidden="true">✓</span> Сохранено</p>
           </form>
@@ -599,7 +594,7 @@
   <div class="requests-overlay" id="requests-overlay" hidden>
     <section class="requests-dialog glass" id="requests-dialog" role="dialog" aria-modal="true" aria-labelledby="requests-dialog-title">
       <div class="friend-head"><div><p class="panel-note">ТВОЙ КРУГ</p><h2 id="requests-dialog-title">Уведомления</h2></div><button class="requests-dialog-close" id="requests-dialog-close" type="button" data-close-requests aria-label="Закрыть">×</button></div>
-      <div class="noticeTabs"><button data-notice-tab="all" aria-pressed="true">Все</button><button data-notice-tab="rooms">Комнаты</button><button data-notice-tab="friends">Друзья</button></div><div id="unifiedRooms"></div><div id="friend-incoming"><div class="friends-empty">Загрузка заявок…</div></div>
+      <div class="noticeTabs"><button data-notice-tab="all" aria-pressed="true">Все</button><button data-notice-tab="rooms">Комнаты</button><button data-notice-tab="friends">Друзья</button></div><p id="noticeEmpty27" class="noticeEmpty" hidden></p><div id="unifiedRooms"></div><div id="friend-incoming"><div class="friends-empty">Загрузка заявок…</div></div>
     </section>
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
@@ -766,7 +761,7 @@
       const {data,error}=await client.rpc('loopa_room16',{op,room:roomState?.code||'',...args});
       if(currentUser?.id!==u||epoch!==roomEpoch)return;
       if(error){if(op==='read'&&error.message.includes('недоступна'))roomExit();throw Error(error.message);}
-      if(op==='list'){const parent=byId('room-recent');parent.replaceChildren();for(const code of data){const b=document.createElement('button');b.className='friend-small-action';b.textContent=code;b.onclick=()=>roomRun('join',{room:code});parent.append(b);}return;}
+      if(op==='list'){await historyCall('read');return;}
       const prev=roomState;
       if(op==='read'&&prev&&data.changed<prev.changed)return;
       if(prev?.code===data.code && data.server_time<prev.server_time)return;
@@ -778,6 +773,7 @@
       byId('inviteRoom').hidden=data.host!==u;
       byId('room-active').hidden=false;byId('room-lobby').hidden=true;byId('room-code').textContent=data.code;byId('room-host').hidden=data.host!==u;
       byId('room-status').textContent=!data.video?'Ведущий выбирает видео':data.playing?'Идёт просмотр':'На паузе';
+      if(data.video&&(!prev||prev.video!==data.video||op==='join'))historyCall('record',{room_code:data.code});
       if(prev?.video!==data.video)mountRoomPlayer(data.video?roomMedia(data.video):'');
       else if(!hostHere() && (prev?.changed!==data.changed || (sample && Math.abs(sample.pos-positionNow())>3 && performance.now()-sample.now<2000)))applyRoom();
     }
@@ -789,7 +785,7 @@
       if(op==='exit'){roomExit();await roomRun('list');return;}
       if(op==='copy'){try{await navigator.clipboard.writeText(roomState.code);showToast('Код скопирован');}catch{showToast(roomState.code);}return;}
 
-      let args={};if(op==='join')args.room=byId('join-code').value.trim();
+      let args={};if(op==='join'){try{args.room=parseRoomCode(byId('join-code').value);}catch(e){showToast(e.message);return;}}
       if(op==='video'){b.disabled=true;try{await changeRoomVideo(byId('room-link').value);}finally{b.disabled=false;}return;}
       b.disabled=true;try{await roomRun(op,args);}finally{b.disabled=false;}
     });
@@ -892,7 +888,15 @@
 
 
     function updateUnifiedBadge(){const count=friendNoticeCount+inviteInbox.length,badge=byId('top-request-badge');badge.textContent=count>99?'99+':String(count);badge.classList.toggle('visible',count>0);byId('top-notifications-button').setAttribute('aria-label','Уведомления: '+count);}
-    function filterNotices(){byId('unifiedRooms').hidden=noticeTab==='friends';byId('friend-incoming').hidden=noticeTab==='rooms';document.querySelectorAll('[data-notice-tab]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.noticeTab===noticeTab)));}
+    function filterNotices(){
+      const rooms=inviteInbox.length,friends=friendNoticeCount;
+      byId('unifiedRooms').hidden=noticeTab==='friends'||!rooms;
+      byId('friend-incoming').hidden=noticeTab==='rooms'||!friends;
+      const empty=noticeTab==='all'?!rooms&&!friends:noticeTab==='rooms'?!rooms:!friends;
+      byId('noticeEmpty27').hidden=!empty;
+      byId('noticeEmpty27').textContent=noticeTab==='all'?'Уведомлений пока нет':noticeTab==='rooms'?'Приглашений в комнат нет':'Заявок пока нет';
+      document.querySelectorAll('[data-notice-tab]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.noticeTab===noticeTab)));
+    }
     document.querySelectorAll('[data-notice-tab]').forEach(b=>b.onclick=()=>{noticeTab=b.dataset.noticeTab;filterNotices();});
     function renderRoomNotices(){
       const list=byId('unifiedRooms');list.replaceChildren();
@@ -904,10 +908,38 @@
     async function publishWatchTitle(title){
       if(!hostHere()||!roomState.video||!title)return;
       const key=roomState.code+roomState.video+title;if(publishedTitle===key)return;
-      const {error}=await client.rpc('loopa_activity26',{action:'title',room_code:roomState.code,media:roomState.video,title:String(title).slice(0,200)});if(!error)publishedTitle=key;
+      const {error}=await client.rpc('loopa_history27',{op:'meta',room_code:roomState.code,media:roomState.video,caption:String(title).slice(0,200)});if(!error){publishedTitle=key;historyCall('read');}
     }
     setInterval(()=>{if(!document.hidden&&hostHere()&&ytPlayer?.getVideoData)publishWatchTitle(ytPlayer.getVideoData()?.title);},4000);
     setInterval(()=>{if(!document.hidden&&currentUser&&lastPage==='friends')refreshFriendLists();},10000);
+
+
+    let historyOwner=null,historyBusy=false,usageLast=performance.now(),usageReady=false;
+    function parseRoomCode(raw){let value=raw.trim();if(/^[a-f0-9]{12}$/i.test(value))return value.toUpperCase();try{const url=new URL(value);const code=url.searchParams.get('room');if(url.origin===new URL(SITE_URL).origin&&/^[a-f0-9]{12}$/i.test(code||''))return code.toUpperCase();}catch{}throw Error('Вставь код комнаты или ссылку-приглашение LOOPA');}
+    function videoCover(item){if(item.image?.startsWith('https://'))return item.image;const id=item.video?.match(/youtube\.com\/embed\/([\w-]{11})/);return id?'https://i.ytimg.com/vi/'+id[1]+'/hqdefault.jpg':'';}
+    function renderHistory(items){
+      for(const [id,limit] of [['room-recent',2],['homeRecent',1]]){const parent=byId(id);parent.replaceChildren();
+        for(const item of items.slice(0,limit)){const button=document.createElement('button');button.type='button';button.className='historyCard';
+          const image=videoCover(item);if(image){const img=document.createElement('img');img.src=image;img.alt='';img.loading='lazy';img.onerror=()=>img.hidden=true;button.append(img);}
+          const text=document.createElement('span'),small=document.createElement('small'),title=document.createElement('strong'),hint=document.createElement('span');small.textContent=id==='homeRecent'?'Вы смотрели':'Недавний просмотр';title.textContent=item.title||'Видео';hint.textContent='Вернуться в комнату →';text.append(small,title,hint);button.append(text);
+          button.onclick=async()=>{button.disabled=true;try{showPage('rooms');await roomCall('join',{room:item.code});}catch(e){showToast('Не удалось войти: комната закрыта или доступ изменился');}finally{button.disabled=false;}};parent.append(button);
+        }
+        if(!items.length&&id==='room-recent'){const empty=document.createElement('p');empty.className='noticeEmpty';empty.textContent='Здесь появятся два последних видео';parent.append(empty);}
+      }
+    }
+    async function historyCall(op,extra={}){
+      const owner=currentUser?.id;if(!owner||!client)return;
+      const {data,error}=await client.rpc('loopa_history27',{op,...extra});
+      if(currentUser?.id!==owner)return;
+      if(error){if(op==='read'){byId('room-recent').textContent='История недоступна. Проверь SQL-обновление.';}return;}
+      historyOwner=owner;renderHistory(data.history||[]);
+      const minutes=Math.floor(Number(data.seconds||0)/60);byId('usageTime').textContent=Math.floor(minutes/60)+' ч '+minutes%60+' мин';
+    }
+    function usageStart(){usageLast=performance.now();usageReady=true;historyCall('start');}
+    function usageTick(){const now=performance.now(),elapsed=Math.min(20,Math.max(0,(now-usageLast)/1000));usageLast=now;if(usageReady&&currentUser)historyCall('tick',{elapsed});}
+    setInterval(()=>{if(!document.hidden){usageTick();if(roomState?.video)historyCall('record',{room_code:roomState.code});}},15000);
+    document.addEventListener('visibilitychange',()=>{if(document.hidden){usageTick();usageReady=false;}else if(currentUser)usageStart();});
+    byId('homeJoin').onsubmit=async e=>{e.preventDefault();try{const code=parseRoomCode(byId('homeJoinCode').value);showPage('rooms');await roomRun('join',{room:code});}catch(err){showToast(err.message);}};
 
     let catalogRevision=0, nextPage=null, catalogQuery='';
     function clearCatalog(){catalogRevision++;nextPage=null;byId('hits').replaceChildren();byId('nextVideos').hidden=true;byId('searchStatus').textContent='';}
@@ -922,7 +954,7 @@
         if(error||!Array.isArray(data?.items))throw Error(data?.message||'Каталог недоступен. Можно открыть видео по ссылке.');
         for(const hit of data.items){const b=document.createElement('button');b.type='button';
           if(hit.image?.startsWith('https://')){const img=document.createElement('img');img.src=hit.image;img.alt='';img.loading='lazy';b.append(img);}
-          b.append(document.createTextNode(hit.title));b.onclick=async()=>{await changeRoomVideo(hit.url);if(roomState?.video===roomMedia(hit.url))publishWatchTitle(hit.title);};byId('hits').append(b);}
+          b.append(document.createTextNode(hit.title));b.onclick=async()=>{await changeRoomVideo(hit.url);if(roomState?.video===roomMedia(hit.url)){publishWatchTitle(hit.title);historyCall('meta',{room_code:roomState.code,media:roomState.video,caption:hit.title.slice(0,200),picture:hit.image||''});}};byId('hits').append(b);}
         nextPage=data.next;byId('nextVideos').hidden=!nextPage;byId('searchStatus').textContent=data.items.length?'Выбери видео для комнаты':'Ничего не найдено';
       }catch(e){if(revision===catalogRevision)byId('searchStatus').textContent=e.message;}
     }
@@ -1430,7 +1462,7 @@
         showRelations('friend-list',accepted,'accepted');
         if (received.length) showRelations('friend-incoming',received,'incoming');
         else friendEmpty(byId('friend-incoming'),'Новых заявок пока нет.');
-        showRelations('friend-outgoing',sent,'outgoing');
+        showRelations('friend-outgoing',sent,'outgoing');filterNotices();
         const term=byId('friend-search').value.trim();
         if (term.length>=2) runFriendSearch();
         feedback('friends-feedback','');
@@ -1540,6 +1572,7 @@
     });
 
     function displayGuest() {
+      historyOwner=null;byId('homeRecent').replaceChildren();byId('room-recent').replaceChildren();byId('usageTime').textContent='—';
       byId('roomInboxButton').hidden=true;byId('roomInviteNotice').hidden=true;byId('inviteSheet').close();inviteInbox=[];inviteSeen.clear();updateUnifiedBadge();
       roomExit();
       byId('settings-home').hidden=true;
@@ -1565,6 +1598,8 @@
       const savedName = (user.user_metadata && user.user_metadata.display_name) || '';
       byId('profile-name').value = savedName;
       byId('account-email').textContent = user.email || '';
+      byId('joinedDate').textContent=user.created_at?new Date(user.created_at).toLocaleDateString('ru-RU',{day:'numeric',month:'short',year:'numeric'}):'—';
+      usageStart();
       renderName(savedName);
       renderAvatar(user);
       refreshSettingsIdentity();
