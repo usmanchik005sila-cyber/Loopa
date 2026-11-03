@@ -394,6 +394,10 @@
 #catalog{padding:14px;margin:12px 0 22px;border:1px solid #ffffff20;border-radius:18px;background:linear-gradient(145deg,#19191ded,#08080bed)}
 .providerTabs{display:grid;grid-template-columns:1fr 1fr;gap:8px}.providerTabs button{display:flex;align-items:center;justify-content:center;gap:8px;min-height:54px;padding:9px 6px;border:1px solid #ffffff20;border-radius:12px;background:#ffffff04;color:#bcb8ba;font:600 13px system-ui;cursor:pointer}.providerTabs button[aria-pressed=true]{border-color:#ddd1c5;background:#ffffff12;color:#fff}.ytLogo,.vkLogo{display:grid;place-items:center;width:31px;height:24px;border-radius:7px;color:white;font:bold 14px system-ui}.ytLogo{background:#ff0033}.vkLogo{background:#0077ff;font-size:12px}
 #catalogForm{margin:16px 0 10px}#catalogForm button{padding:8px 10px}#queryVideo{font-size:16px}#hits{display:grid;gap:9px;margin-top:12px;max-height:58svh}#hits button{padding:10px;border:1px solid #ffffff18;border-radius:13px;font:13px/1.4 system-ui;background:linear-gradient(145deg,#28282d,#141417)}#hits img{width:40%;flex-shrink:0;border-radius:8px}#searchStatus{color:#bdb6b6;font-size:12px}#catalog [hidden]{display:none!important}
+
+#inviteSheet{box-sizing:border-box;width:min(94vw,480px);max-height:80dvh;padding:22px;color:#eee;border:1px solid #ffffff30;border-radius:24px;background:radial-gradient(ellipse at top left,#ffffff0d,transparent 65%),#101013;box-shadow:0 28px 100px #0009;overflow:auto}
+#inviteSheet::backdrop{background:#000a;backdrop-filter:blur(5px)}#inviteSheet header{display:flex;align-items:center;justify-content:space-between;gap:10px}#inviteSheet h2{font:600 20px system-ui;margin:0}#inviteSheet button{cursor:pointer;color:#eee;border:1px solid #ffffff25;background:#ffffff09;border-radius:11px;min-height:40px;padding:8px 10px;font:12px system-ui}#inviteSheet #closeInvites{font-size:22px;border:0}#inviteHint{color:#aaa5aa;font:13px/1.6 system-ui;margin:10px 0 20px}#inviteList{display:grid;gap:10px;margin-bottom:18px;color:#bab5bb;font-size:13px}.inviteRow{display:flex;align-items:center;gap:10px;border:1px solid #ffffff16;border-radius:16px;background:#08080b;padding:12px}.inviteAvatar{flex-shrink:0;display:grid;place-items:center;width:34px;height:34px;background:#373238;color:#eee;border-radius:50%;font:600 17px Georgia}.inviteName{flex:1;min-width:0;overflow-wrap:anywhere;color:#eee;font:500 14px system-ui}.inviteName small{display:block;color:#aaa4ac;font:11px system-ui;margin-top:5px}.inviteActions{display:flex;flex-direction:column;gap:5px}#inviteSheet button:disabled{opacity:.45;cursor:default}#inviteSheet #shareRoomLink{float:none;width:100%}#inviteSheet [hidden]{display:none!important}#roomInboxButton{position:relative;font-size:19px}#roomInboxButton[hidden]{display:none}#roomInboxCount:not(:empty){position:absolute;right:-3px;top:-3px;border-radius:20px;background:#d98673;color:#171419;font:700 10px system-ui;padding:3px 5px}
+#roomInviteNotice{position:fixed;top:max(14px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:9999;box-sizing:border-box;width:min(94vw,450px);display:flex;align-items:center;gap:8px;background:#151518f5;border:1px solid #ffffff35;border-radius:17px;padding:13px;box-shadow:0 10px 40px #0008;color:#eee;font:13px/1.4 system-ui;backdrop-filter:blur(18px)}#roomInviteNotice[hidden]{display:none}#roomInviteNotice span{flex:1}#roomInviteNotice button{border:1px solid #ffffff25;background:#ffffff10;color:#eee;border-radius:9px;padding:9px;font:12px system-ui;cursor:pointer}
 </style>
 </head>
 <body>
@@ -414,7 +418,7 @@
     <header class="top">
       <div class="brand">LOOPA</div>
       <div class="top-actions">
-        <button class="circle" id="top-notifications-button" type="button" data-open-requests aria-label="Новые заявки"><svg><use href="#i-bell"/></svg><span class="top-badge" id="top-request-badge" aria-hidden="true"></span></button>
+        <button class="circle" id="roomInboxButton" type="button" aria-label="Приглашения в комнаты" hidden>✉<span id="roomInboxCount"></span></button><button class="circle" id="top-notifications-button" type="button" data-open-requests aria-label="Новые заявки"><svg><use href="#i-bell"/></svg><span class="top-badge" id="top-request-badge" aria-hidden="true"></span></button>
         <button class="circle" id="top-profile-button" type="button" data-go="profile" aria-label="Профиль"><svg><use href="#i-person"/></svg></button>
       </div>
     </header>
@@ -449,7 +453,7 @@
         <div id="room-lobby" class="panel glass"><h2>Смотреть вместе</h2><button class="action" data-room="create">Создать комнату</button><label class="friend-search-label" for="join-code">Код от ведущего</label><input id="join-code" class="friend-search-input" autocomplete="off" maxlength="12"><button class="action secondary" data-room="join">Войти по коду</button><h3>Мои комнаты</h3><div id="room-recent"></div></div>
 <div id="room-active" class="panel glass" hidden><div class="setupHeader"><p class="panel-note">СОВМЕСТНЫЙ ПРОСМОТР</p><h2 id="setupTitle">Выбери видео</h2></div><div class="roomBar"><button class="text-link" data-room="exit">‹ Комнаты</button><small id="accessBadge"></small><button id="moreRoom" class="friend-small-action" aria-label="Меню комнаты">⋯</button></div><div class="playerCode"><span>Код</span><b id="room-code"></b><button type="button" data-room="copy" aria-label="Скопировать код комнаты"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M15 5V4a1 1 0 0 0-1-1H5a2 2 0 0 0-2 2v10a1 1 0 0 0 1 1h1"/></svg></button></div><iframe id="room-frame" hidden title="Видео комнаты"></iframe><button id="inviteRoom" type="button" class="roomInvite">＋ Пригласить</button><small id="room-status" hidden></small><div id="room-host"><details id="videoEdit"><summary><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="4"/><path d="m10 9 5 3-5 3z"/></svg>Сменить видео</summary><button id="catalogOpen" type="button" class="catalogLaunch" aria-expanded="false">▦ <span>Каталог видео<small>Найди и включи прямо здесь</small></span><span>›</span></button><section id="catalog" hidden><div class="providerTabs" role="group" aria-label="Видеосервис"><button type="button" data-provider="youtube" aria-pressed="true"><span class="ytLogo">▶</span>YouTube</button><button type="button" data-provider="vk" aria-pressed="false"><span class="vkLogo">VK</span>VK Видео</button></div><select hidden class="privacy-select" id="source"><option value="youtube">YouTube</option><option value="vk">VK Видео</option></select><form id="catalogForm"><input class="friend-search-input" maxlength="100" id="queryVideo" placeholder="Название видео или канала" aria-label="Поиск видео"><button class="friend-small-action">Найти</button></form><small role="status" id="searchStatus"></small><div id="hits"></div><button type="button" id="nextVideos" class="text-link" hidden>Ещё видео</button></section><label class="friend-search-label" for="room-link">Ссылка на видео</label><input id="room-link" type="url" class="friend-search-input" placeholder="Ссылка на видео"><button class="action" data-room="video">Открыть видео</button></details></div>
 <section class="roomChat"><h2>Чат комнаты</h2><div id="chatLog"></div><div id="emojiTray" hidden aria-label="Выбор эмодзи"></div><form id="chatForm"><button type="button" id="emojiOpen" aria-label="Выбрать эмодзи" aria-controls="emojiTray" aria-expanded="false">☺</button><input class="friend-search-input" id="chatText" maxlength="1000" aria-label="Сообщение" placeholder="Сообщение…" required><button class="friend-small-action" aria-label="Отправить">↑</button></form></section></div>
-<dialog id="roomSheet"><button class="text-link" onclick="this.parentElement.close()">Закрыть ×</button><h3>Участники</h3><div id="people" role="list" aria-label="Участники"></div><div id="accessEdit"><h3>Кто может войти</h3><select id="accessMode" class="privacy-select"><option value="code">Любой</option><option value="friends">Только друзья</option><option value="private">Приватная</option></select><div id="pick"></div><small id="accessWarning"></small><button class="action" id="saveAccess">Сохранить доступ</button></div></dialog><p id="room-note" role="status"></p>
+<dialog id="inviteSheet"><header><h2>Пригласить друзей</h2><button type="button" id="closeInvites" aria-label="Закрыть">×</button></header><p id="inviteHint">Выбери друга — приглашение появится у него в LOOPA.</p><div id="inviteList"></div><button type="button" id="shareRoomLink" class="roomInvite">Отправить ссылку</button></dialog><aside id="roomInviteNotice" hidden role="status"><span id="roomInviteNoticeText"></span><button type="button" id="viewRoomInvites">Открыть</button><button type="button" id="hideRoomInvites" aria-label="Скрыть">×</button></aside><dialog id="roomSheet"><button class="text-link" onclick="this.parentElement.close()">Закрыть ×</button><h3>Участники</h3><div id="people" role="list" aria-label="Участники"></div><div id="accessEdit"><h3>Кто может войти</h3><select id="accessMode" class="privacy-select"><option value="code">Любой</option><option value="friends">Только друзья</option><option value="private">Приватная</option></select><div id="pick"></div><small id="accessWarning"></small><button class="action" id="saveAccess">Сохранить доступ</button></div></dialog><p id="room-note" role="status"></p>
       </section>
 
       <section data-page="friends" hidden>
@@ -766,6 +770,7 @@
       byId('setupTitle').textContent=data.host===u?'Выбери видео':'Ведущий выбирает видео';
       renderSocial(data,prev);if(!prev||prev.video!==data.video)byId('videoEdit').open=!data.video;
       roomState=data;roomUser=u;roomClock=performance.now();
+      byId('inviteRoom').hidden=data.host!==u;
       byId('room-active').hidden=false;byId('room-lobby').hidden=true;byId('room-code').textContent=data.code;byId('room-host').hidden=data.host!==u;
       byId('room-status').textContent=!data.video?'Ведущий выбирает видео':data.playing?'Идёт просмотр':'На паузе';
       if(prev?.video!==data.video)mountRoomPlayer(data.video?roomMedia(data.video):'');
@@ -794,7 +799,7 @@
       showPage('rooms');await roomRun('join',{room:code});
       const clean=new URL(location.href);clean.searchParams.delete('room');history.replaceState(null,'',clean);invitationBusy=false;
     }
-    byId('inviteRoom').onclick=async()=>{
+    byId('shareRoomLink').onclick=async()=>{
       if(!roomState)return;
       const url=new URL(location.href);url.search='';url.hash='';url.searchParams.set('room',roomState.code);
       const invitation={title:'Комната LOOPA',text:'Посмотрим вместе? Присоединяйся к моей комнате в LOOPA',url:url.href};
@@ -807,6 +812,78 @@
       document.querySelectorAll('[data-provider]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
       byId('source').value=b.dataset.provider;byId('source').onchange();
     });
+
+    let inviteBusy=false,inviteOwner=null,inviteInbox=[],inviteSeen=new Set();
+    const inviteDialog=byId('inviteSheet');
+    function inviteError(e){return /loopa_invite25|schema cache|does not exist/i.test(e.message||'')?'Сначала выполни SQL для приглашений в Supabase.':e.message||'Не удалось загрузить приглашения';}
+    async function inviteRPC(action,extra={}){
+      if(!currentUser)throw Error('Войди в аккаунт');
+      const {data,error}=await client.rpc('loopa_invite25',{action,...extra});
+      if(error)throw error;return data;
+    }
+    function inviteRow(name,online){
+      const row=document.createElement('div');row.className='inviteRow';
+      const avatar=document.createElement('span');avatar.className='inviteAvatar';avatar.textContent=(name||'Д').slice(0,1).toUpperCase();
+      const label=document.createElement('span');label.className='inviteName';label.textContent=name;
+      if(online!==undefined){const small=document.createElement('small');small.textContent=online?'Сейчас в LOOPA':'Не в сети';label.append(small);}
+      row.append(avatar,label);return row;
+    }
+    function openInviteDialog(title,hint){
+      inviteDialog.querySelector('h2').textContent=title;byId('inviteHint').textContent=hint;
+      byId('inviteList').replaceChildren();if(!inviteDialog.open)inviteDialog.showModal();
+    }
+    byId('closeInvites').onclick=()=>inviteDialog.close();
+    inviteDialog.addEventListener('click',e=>{if(e.target===inviteDialog){const r=inviteDialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)inviteDialog.close();}});
+    byId('inviteRoom').onclick=async()=>{
+      if(!hostHere())return;
+      const code=roomState.code,owner=currentUser.id;
+      openInviteDialog('Пригласить друзей','Выбери друга — он получит приглашение внутри LOOPA.');
+      byId('shareRoomLink').hidden=false;byId('inviteList').textContent='Загружаем друзей…';
+      try{
+        const friends=await inviteRPC('friends',{room_code:code});
+        if(currentUser?.id!==owner||roomState?.code!==code)return;
+        const list=byId('inviteList');list.replaceChildren();
+        if(!friends.length)list.textContent='Пока нет друзей, которым можно отправить приглашение.';
+        friends.sort((a,b)=>Number(b.online)-Number(a.online));
+        for(const f of friends){const row=inviteRow(f.name,f.online),button=document.createElement('button');button.type='button';button.textContent=f.invited?'Отправлено':'Пригласить';button.disabled=f.invited;
+          button.onclick=async()=>{button.disabled=true;try{await inviteRPC('send',{room_code:code,peer:f.id});button.textContent='Отправлено';showToast('Приглашение отправлено');}catch(e){button.disabled=false;showToast(inviteError(e));}};
+          row.append(button);list.append(row);
+        }
+      }catch(e){byId('inviteList').textContent=inviteError(e);}
+    };
+    async function showInviteInbox(){
+      openInviteDialog('Приглашения','Друзья зовут тебя посмотреть видео вместе.');byId('shareRoomLink').hidden=true;
+      await pollInvites();const list=byId('inviteList');list.replaceChildren();
+      if(!inviteInbox.length)list.textContent='Новых приглашений пока нет.';
+      for(const item of inviteInbox){const row=inviteRow(item.name),actions=document.createElement('div');actions.className='inviteActions';
+        for(const [action,label] of [['accept','Войти'],['decline','Отклонить']]){const b=document.createElement('button');b.type='button';b.textContent=label;
+          b.onclick=async()=>{if(action==='accept'&&roomState&&roomState.code!==item.code&&!confirm('Перейти в комнату друга?'))return;
+            actions.querySelectorAll('button').forEach(x=>x.disabled=true);
+            try{await inviteRPC(action,{invitation:item.id});if(action==='accept'){inviteDialog.close();showPage('rooms');await roomRun('join',{room:item.code});}await pollInvites();if(inviteDialog.open)showInviteInbox();}
+            catch(e){showToast(inviteError(e));actions.querySelectorAll('button').forEach(x=>x.disabled=false);}
+          };actions.append(b);
+        }row.append(actions);list.append(row);
+      }
+    }
+    async function pollInvites(){
+      const owner=currentUser?.id;byId('roomInboxButton').hidden=!owner;
+      if(!owner||!client){inviteOwner=null;inviteInbox=[];inviteSeen.clear();byId('roomInviteNotice').hidden=true;return;}
+      if(inviteBusy)return;inviteBusy=true;
+      try{const data=await inviteRPC('inbox');if(currentUser?.id!==owner)return;
+        if(inviteOwner!==owner){inviteOwner=owner;inviteSeen.clear();}inviteInbox=data;
+        byId('roomInboxCount').textContent=data.length?String(data.length):'';
+        const fresh=data.find(x=>!inviteSeen.has(x.id+':'+x.sent));
+        data.forEach(x=>inviteSeen.add(x.id+':'+x.sent));
+        if(fresh){byId('roomInviteNoticeText').textContent=fresh.name+' приглашает в комнату';byId('roomInviteNotice').hidden=false;}
+        if(!data.length)byId('roomInviteNotice').hidden=true;
+      }catch(e){if(inviteDialog.open&&byId('shareRoomLink').hidden)byId('inviteHint').textContent=inviteError(e);}
+      finally{inviteBusy=false;}
+    }
+    byId('roomInboxButton').onclick=showInviteInbox;byId('viewRoomInvites').onclick=()=>{byId('roomInviteNotice').hidden=true;showInviteInbox();};
+    byId('hideRoomInvites').onclick=()=>byId('roomInviteNotice').hidden=true;
+    setInterval(()=>{if(!document.hidden)pollInvites();},8000);
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)pollInvites();});
+
     let catalogRevision=0, nextPage=null, catalogQuery='';
     function clearCatalog(){catalogRevision++;nextPage=null;byId('hits').replaceChildren();byId('nextVideos').hidden=true;byId('searchStatus').textContent='';}
     async function searchCatalog(more){
@@ -1428,6 +1505,7 @@
     });
 
     function displayGuest() {
+      byId('roomInboxButton').hidden=true;byId('roomInviteNotice').hidden=true;byId('inviteSheet').close();inviteInbox=[];inviteSeen.clear();
       roomExit();
       byId('settings-home').hidden=true;
       byId('settings-detail').hidden=true;
@@ -1444,6 +1522,7 @@
       startPresence(user);
       syncFriendsSession();
       refreshFriendLists();
+      pollInvites();
       byId('auth-loading').hidden = true;
       byId('auth-guest').hidden = true;
       byId('auth-account').hidden = false;
