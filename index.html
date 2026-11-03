@@ -261,6 +261,8 @@
     .privacy-item strong{display:block;font-size:14px;font-weight:600}
     .privacy-item small{display:block;font-size:12px;line-height:1.5;color:#bcb4b6;margin-top:5px}
     .privacy-coming{font-size:10px;color:#c8bbb0;border:1px solid rgba(255,255,255,.2);padding:5px 8px;border-radius:8px;white-space:nowrap}
+    .privacy-select{display:block;margin-top:7px;max-width:190px;padding:7px 10px;border:1px solid rgba(255,255,255,.2);border-radius:10px;background:#252528;color:#f1ece9;font:inherit;font-size:12px}
+    .blocked-users-list{margin-top:9px}.blocked-users-list .friend-person{padding:9px 0}.privacy-blocks{align-items:flex-start}.privacy-blocks .privacy-item-icon{margin-top:1px}
     .privacy-section-note{font-size:12px;line-height:1.65;color:#b8b0b1;margin:15px 4px}
     .privacy-action{width:100%;text-align:left;border:1px solid rgba(255,255,255,.15);border-radius:16px;padding:17px 18px;color:inherit;background:rgba(255,255,255,.06);font:inherit;margin-bottom:10px;cursor:pointer}
     .privacy-action:disabled{opacity:.55}
@@ -531,16 +533,17 @@
                 <p id="presence-feedback" class="auth-feedback" role="status" aria-live="polite" hidden></p>
               </div>
               <div class="privacy-group"><h3>ОБЩЕНИЕ</h3>
-                <div class="privacy-item"><span class="privacy-item-icon"><svg><use href="#i-person"/></svg></span><span class="privacy-item-body"><strong>Заявки в друзья</strong><small>Другие зарегистрированные пользователи могут отправлять тебе заявки</small></span><span class="privacy-coming">ВКЛЮЧЕНО</span></div>
-                <div class="privacy-item"><span class="privacy-item-icon"><svg><use href="#i-room"/></svg></span><span class="privacy-item-body"><strong>Приглашения в комнаты</strong><small>Кто сможет приглашать на просмотр</small></span><span class="privacy-coming">СКОРО</span></div>
-                <div class="privacy-item"><span class="privacy-item-icon"><svg><use href="#i-lock"/></svg></span><span class="privacy-item-body"><strong>Заблокированные</strong><small>Управление чёрным списком</small></span><span class="privacy-coming">СКОРО</span></div>
+                <div class="privacy-item"><span class="privacy-item-icon"><svg><use href="#i-person"/></svg></span><span class="privacy-item-body"><strong>Заявки в друзья</strong><small id="friend-request-setting-note">Другие пользователи могут отправлять тебе заявки</small></span><label class="presence-switch" aria-label="Разрешить заявки в друзья"><input id="allow-friend-requests" type="checkbox" checked disabled><span class="presence-switch-track"></span></label></div>
+                <div class="privacy-item"><span class="privacy-item-icon"><svg><use href="#i-room"/></svg></span><span class="privacy-item-body"><strong>Приглашения в комнаты</strong><small>Кто сможет присылать приглашения</small><select id="room-invite-policy" class="privacy-select" disabled><option value="everyone">Все пользователи</option><option value="friends" selected>Только друзья</option><option value="nobody">Никто</option></select></span></div>
+                <div class="privacy-item privacy-blocks"><span class="privacy-item-icon"><svg><use href="#i-lock"/></svg></span><span class="privacy-item-body"><strong>Заблокированные</strong><small>Пользователи не смогут отправлять заявки и приглашения</small><div id="blocked-users-list" class="blocked-users-list"><span class="friends-empty">Загрузка списка…</span></div></span></div>
+                <p id="communication-feedback" class="auth-feedback" role="status" aria-live="polite" hidden></p>
               </div>
               <div class="privacy-group"><h3>БЕЗОПАСНОСТЬ</h3>
                 <button class="privacy-action" type="button" id="privacy-reset">Сменить пароль по электронной почте →</button>
                 <p id="privacy-feedback" class="auth-feedback" role="status" aria-live="polite" hidden></p>
                 <button class="privacy-action" type="button" id="privacy-signout">Выйти из аккаунта →</button>
               </div>
-              <p class="privacy-section-note">Настройки со значком «Скоро» пока не действуют: для них нужна дополнительная серверная проверка прав. Статус обновляется, пока LOOPA открыта на активной вкладке; отключение активности скрывает и последнее посещение. Фотографии аватара по-прежнему доступны по публичной ссылке.</p>
+              <p class="privacy-section-note">Статус обновляется, пока LOOPA открыта на активной вкладке; отключение активности скрывает и последнее посещение. Фотографии аватара по-прежнему доступны по публичной ссылке.</p>
             </div>
           </div>
           <div id="settings-theme" hidden>
@@ -652,6 +655,7 @@
       if (/password should be|password must|weak_password/i.test(msg)) return 'Пароль не соответствует требованиям безопасности Supabase.';
       if (/rate limit|too many requests|over_email_send_rate_limit/i.test(msg)) return 'Слишком много попыток. Попробуй позже.';
       if (/failed to fetch|network|fetch failed/i.test(msg)) return 'Не удалось подключиться к Supabase. Проверь интернет.';
+      if (/row-level security|permission denied|new row violates/i.test(msg)) return 'Действие запрещено настройками конфиденциальности или блокировкой пользователя.';
       return msg || 'Не удалось выполнить действие. Попробуй ещё раз.';
     }
     function setBusy(id, busy) {
@@ -752,6 +756,40 @@
       finally{byId('privacy-reset').disabled=false;}
     });
     byId('privacy-signout').addEventListener('click',()=>byId('sign-out').click());
+    async function saveCommunicationSetting(values, control, previous) {
+      if (!client || !currentUser) return;
+      control.disabled=true; feedback('communication-feedback','');
+      try {
+        const {error}=await client.from('profiles').update(values).eq('id',currentUser.id);
+        if (error) throw error;
+        feedback('communication-feedback','Настройка сохранена.');
+      } catch(err) {
+        if (control.type==='checkbox') control.checked=previous;
+        else control.value=previous;
+        feedback('communication-feedback',errorText(err),true);
+      } finally {control.disabled=false;}
+    }
+    byId('allow-friend-requests').addEventListener('change',function(){
+      const el=this, value=el.checked; saveCommunicationSetting({allow_friend_requests:value},el,!value);
+      byId('friend-request-setting-note').textContent=value?'Другие пользователи могут отправлять тебе заявки':'Новые заявки в друзья отключены';
+    });
+    byId('room-invite-policy').addEventListener('change',function(){
+      const el=this, previous=el.dataset.previous||'friends'; el.dataset.previous=el.value;
+      saveCommunicationSetting({room_invite_policy:el.value},el,previous);
+    });
+    async function loadBlockedUsers() {
+      const list=byId('blocked-users-list'); if(!list||!client||!currentUser) return;
+      list.replaceChildren();
+      try {
+        const {data,error}=await client.from('blocked_users').select('blocked_id').eq('blocker_id',currentUser.id);
+        if(error) throw error;
+        const ids=(data||[]).map(row=>row.blocked_id);
+        if(!ids.length){list.textContent='Список пуст';return;}
+        const {data:profiles,error:profileError}=await client.from('profiles').select('id,display_name,avatar_path,updated_at').in('id',ids);
+        if(profileError) throw profileError;
+        for(const profile of profiles||[]) list.appendChild(friendRow(profile,null,[{label:'Разблокировать',action:'unblock',userId:profile.id}]));
+      } catch(err){list.textContent='Не удалось загрузить список: '+errorText(err);}
+    }
 
     // Presence is server-backed. RLS permits reading only visible rows or your own.
     // An inactive/closed tab stops heartbeats; after 90 seconds the user is offline.
@@ -1049,7 +1087,10 @@
           .select('id,display_name,avatar_path,updated_at').ilike('display_name','%'+escaped+'%').limit(15);
         if (error) throw error;
         if (generation!==friendSearchGeneration || currentUser?.id!==owner) return;
-        const matches=(data||[]).filter(profile=>profile.id!==owner);
+        const {data:blockedRows,error:blockError}=await client.from('blocked_users').select('blocked_id').eq('blocker_id',owner);
+        if(blockError) throw blockError;
+        const blockedIds=new Set((blockedRows||[]).map(row=>row.blocked_id));
+        const matches=(data||[]).filter(profile=>profile.id!==owner&&!blockedIds.has(profile.id));
         const presence=await getPublicPresence(matches.map(profile=>profile.id));
         if (generation!==friendSearchGeneration || currentUser?.id!==owner) return;
         if (!matches.length) {friendEmpty(parent,'Никого не нашли. Проверь написание никнейма.');return;}
@@ -1061,6 +1102,7 @@
           else if (relation.status==='accepted') actions=[{label:'Вы друзья',action:'none',disabled:true}];
           else if (relation.sender_id===owner) actions=[{label:'Отправлено',action:'none',disabled:true}];
           else actions=[{label:'Принять',action:'accept',requestId:relation.id,primary:true}];
+          actions.push({label:'Заблокировать',action:'block',userId:profile.id});
           parent.appendChild(friendRow(profile,presence[profile.id],actions));
         }
       } catch(err) {
@@ -1083,6 +1125,16 @@
         let result;
         if (kind==='send') {
           result=await client.from('friend_requests').insert({sender_id:actor,receiver_id:button.dataset.userId,status:'pending'});
+        } else if (kind==='block') {
+          const {error}=await client.rpc('loopa_block_user',{target_user:button.dataset.userId});
+          if(error) throw error;
+          await loadBlockedUsers();
+          result={error:null};
+        } else if (kind==='unblock') {
+          const {error}=await client.rpc('loopa_unblock_user',{target_user:button.dataset.userId});
+          if(error) throw error;
+          await loadBlockedUsers();
+          result={error:null};
         } else if (kind==='accept') {
           result=await client.from('friend_requests').update({status:'accepted'})
             .eq('id',button.dataset.requestId).eq('receiver_id',actor).eq('status','pending');
@@ -1092,7 +1144,7 @@
         if (result.error) throw result.error;
         if (currentUser?.id!==actor) return;
         await refreshFriendLists();
-        showToast(kind==='send'?'Заявка отправлена':kind==='accept'?'Теперь вы друзья!':kind==='remove'?'Пользователь удалён из друзей':kind==='cancel'?'Заявка отменена':'Заявка отклонена');
+        showToast(kind==='block'?'Пользователь заблокирован':kind==='unblock'?'Пользователь разблокирован':kind==='send'?'Заявка отправлена':kind==='accept'?'Теперь вы друзья!':kind==='remove'?'Пользователь удалён из друзей':kind==='cancel'?'Заявка отменена':'Заявка отклонена');
       } catch(err) {
         feedback('friends-feedback',/duplicate key|unique constraint/i.test(err.message||'')
           ? 'Между вами уже есть заявка. Обнови список.' : errorText(err),true);
@@ -1134,7 +1186,7 @@
       refreshSettingsIdentity();
       feedback('profile-feedback','');
       try {
-        const {data, error} = await client.from('profiles').select('display_name,avatar_path').eq('id', user.id).maybeSingle();
+        const {data, error} = await client.from('profiles').select('display_name,avatar_path,allow_friend_requests,room_invite_policy').eq('id', user.id).maybeSingle();
         if (currentUser?.id !== user.id) return;
         if (error) {
           feedback('profile-feedback','Для поиска людей сначала выполни SQL из LOOPA-friends-setup.sql в Supabase. '+errorText(error),true);
@@ -1143,11 +1195,18 @@
             byId('profile-name').value = data.display_name;
             renderName(data.display_name);
           }
+          if (data) {
+            byId('allow-friend-requests').checked=data.allow_friend_requests!==false;
+            byId('room-invite-policy').value=data.room_invite_policy||'friends';
+            byId('allow-friend-requests').disabled=false;
+            byId('room-invite-policy').disabled=false;
+            loadBlockedUsers();
+          }
           const avatarPath = user.user_metadata?.avatar_path;
           const ownedPath = typeof avatarPath==='string' && new RegExp('^'+user.id+'/avatar\\.(jpg|png|webp)$','i').test(avatarPath) ? avatarPath : null;
           const name = (data?.display_name || savedName || 'Пользователь').trim().slice(0,40);
           if (!data) {
-            const {error:insertErr} = await client.from('profiles').insert({id:user.id,display_name:name,avatar_path:ownedPath});
+            const {error:insertErr} = await client.from('profiles').insert({id:user.id,display_name:name,avatar_path:ownedPath,allow_friend_requests:true,room_invite_policy:'friends'});
             if (insertErr && currentUser?.id===user.id) feedback('profile-feedback',errorText(insertErr),true);
           } else if (ownedPath && data.avatar_path!==ownedPath) {
             const {error:avatarErr} = await client.from('profiles').update({avatar_path:ownedPath,updated_at:new Date().toISOString()}).eq('id',user.id);
