@@ -44,4 +44,4 @@ jobs:
       - name: Deploy video-search
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: supabase functions deploy video-search --project-ref wnubqzwsvclvcvozibtc --use-api
+        run: supabase functions deploy video-search --remote=wnubqzwsvclvcvozibtc --use-api --yes
