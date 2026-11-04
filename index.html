@@ -509,47 +509,12 @@ body.roomViewing #chatForm button:last-child{height:38px;width:38px}
 @media(max-width:350px){body.roomViewing #room-active .roomBar{padding-inline:8px;gap:4px}body.roomViewing #inviteRoom{padding-inline:7px}body.roomViewing .roomBar .text-link{font-size:12px}}
 
 
-#loopaKeyboard{display:none}
-body.roomViewing[data-custom-keyboard="on"] #loopaKeyboard{display:block;flex:none;padding:7px 3px max(8px,env(safe-area-inset-bottom));margin:0 -10px;background:linear-gradient(#252527,#161618);border-top:1px solid #ffffff15;user-select:none;-webkit-user-select:none;touch-action:manipulation}
-.loopaKeyTop{display:flex;justify-content:space-between;align-items:center;padding:0 5px 6px;color:#999;font:10px system-ui}
-.loopaKeyTop button{border:0;background:none;color:#ccc;padding:5px;font:11px system-ui;cursor:pointer}
-.loopaKeyRow{display:flex;justify-content:center;gap:4px;margin:0 2px 5px}
-.loopaKeyRow button{min-width:0;flex:1;height:36px;border:1px solid #ffffff0d;border-radius:6px;background:linear-gradient(#49494c,#363639);box-shadow:0 1px 1px #0009;color:#f4f4f5;font:18px system-ui;padding:0;touch-action:manipulation;cursor:pointer}
-.loopaKeyRow button:active{background:#77777c}
-.loopaKeyRow button[data-wide]{flex:1.5;background:#29292d;font-size:15px}
-.loopaKeyRow button[data-space]{flex:4;font-size:12px}
-.loopaKeyRow button[data-send]{flex:2;background:#dedee1;color:#151517;font-size:12px}
-body.roomViewing[data-custom-keyboard="on"] .roomChat #chatText{caret-color:#eee}
-#useLoopaKeyboard{border:1px solid #ffffff25;border-radius:12px;padding:10px;margin-top:14px;background:#ffffff08;color:#eee;width:100%;font:13px system-ui}
-
-#loopaKeyboard,#loopaKeyboard *{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
-.loopaKeyRow button{height:42px;font-size:24px;border-radius:7px;-webkit-appearance:none;appearance:none}
-.loopaKeyRow button[data-wide]{font-size:19px}
-.loopaKeyRow button[data-space],.loopaKeyRow button[data-send]{font-size:14px}
-body.roomViewing #keyboardModeToggle{flex:none;width:44px;min-height:40px;padding:0;border:1px solid #ffffff22;border-radius:12px;background:#ffffff08;color:#ddd;font:600 10px system-ui;cursor:pointer}
-
-body.roomViewing[data-custom-keyboard="on"] #loopaKeyboard{margin:0 -14px;padding:5px 0 max(9px,env(safe-area-inset-bottom));overflow:visible}
-.loopaKeyTop{padding:0 10px 4px;min-height:23px}
-.loopaKeyTop button{font-size:12px;padding:3px 8px}
-.loopaKeyRow{gap:0;margin:0 1px 2px;overflow:visible}
-.loopaKeyRow button{height:49px;border:3px solid transparent;border-radius:9px;background:linear-gradient(#555559,#3b3b3f);background-clip:padding-box;box-shadow:none;font-size:25px;position:relative;overflow:visible;padding:0}
-.loopaKeyRow button[data-wide]{flex:1;font-size:21px;background:linear-gradient(#343438,#29292c);background-clip:padding-box}
-.loopaKeyRow button[data-space]{flex:5.5;font-size:14px}
-.loopaKeyRow button[data-send]{flex:2.5;font-size:13px;background:#dcdcdf;background-clip:padding-box}
-.loopaKeyRow button.keyPressed{background:#828287;background-clip:padding-box}
-.loopaKeyRow button.keyPressed:not([data-wide]):not([data-space]):not([data-send])::after{content:attr(data-key-label);position:absolute;bottom:36px;left:50%;transform:translateX(-50%);min-width:42px;padding:8px 5px;border-radius:9px;background:#67676c;color:#fff;font:30px system-ui;box-shadow:0 -3px 10px #0005;z-index:3;pointer-events:none}
-
-/* Familiar Russian row offsets; the hit area includes the visual key gutters. */
-body.roomViewing[data-custom-keyboard="on"] #loopaKeyboard{padding:5px 0 max(22px,env(safe-area-inset-bottom));touch-action:none}
-#loopaKeyboard .loopaKeyRow,#loopaKeyboard button{touch-action:none}
-#loopaKeyboard .loopaKeyRow{margin:0 1px 4px}
-#loopaKeyboard .loopaKeyRow[data-line="1"]{margin-inline:calc(100% / 24)}
-#loopaKeyboard .loopaKeyRow button{height:48px;font-size:24px;border-width:3px 2px;border-radius:8px;font-weight:400}
-#loopaKeyboard .loopaKeyRow button[data-wide]{font-size:21px;flex:1.25}
-#loopaKeyboard .loopaKeyRow button[data-space]{font-size:14px;flex:7}
-#loopaKeyboard .loopaKeyRow button[data-send]{font-size:13px;flex:2}
-#loopaKeyboard .loopaKeyRow[data-bottom]{margin-top:2px}
-
+/* Native keyboard: reserve conversation space instead of preserving a tall player. */
+body.roomViewing #room-frame{transition:height 160ms ease-out}
+body.roomViewing .roomChat #chatForm{padding:8px 0;min-height:60px}
+body.roomViewing #chatText{font-size:16px;min-height:44px;line-height:22px}
+body.roomViewing #room-active{transition:none}
+@media(prefers-reduced-motion:reduce){body.roomViewing #room-frame{transition:none}}
 </style>
 </head>
 <body>
@@ -886,53 +851,56 @@ body.roomViewing[data-custom-keyboard="on"] #loopaKeyboard{padding:5px 0 max(22p
     byId('roomSheet').insertBefore(document.querySelector('.playerCode'),byId('roomSheet').querySelector('h3'));
     byId('room-active').querySelector('.roomBar').insertBefore(byId('sheetVideoChange'),byId('inviteRoom'));
     byId('sheetVideoChange').onclick=()=>{if(!hostHere())return;byId('roomSheet').close();byId('catalogOpen').click();};
-    let watchPlayerWidth=0;
+    let watchBaseHeight=0,watchWidth=0,watchKeyboardOpen=false,watchViewportFrame=0;
+    let watchKeepBottom=true;
+    const watchLog=byId('chatLog'),watchField=byId('chatText');
+    watchField.readOnly=false;watchField.inputMode='text';
+    watchField.setAttribute('autocorrect','on');watchField.setAttribute('autocapitalize','sentences');
+    watchField.setAttribute('spellcheck','true');watchField.setAttribute('enterkeyhint','send');
+    watchLog.addEventListener('scroll',()=>{watchKeepBottom=watchLog.scrollHeight-watchLog.scrollTop-watchLog.clientHeight<48;},{passive:true});
     function syncWatchViewport(){
-      const viewport=window.visualViewport;
-      const width=Math.min(document.documentElement.clientWidth||window.innerWidth,900);
-      if(width!==watchPlayerWidth){watchPlayerWidth=width;document.documentElement.style.setProperty('--watch-player-height',Math.min(width*9/16,430)+'px');}
-      document.documentElement.style.setProperty('--watch-height',(viewport?.height||window.innerHeight)+'px');
-      const root=document.documentElement;
-      // Safari can retain offsetTop after scrollY has already reset.
-      const top=Math.max(0,window.scrollY||0);
-      root.style.setProperty('--watch-top',top+'px');
+      const viewport=window.visualViewport,root=document.documentElement;
+      const width=Math.min(root.clientWidth||window.innerWidth,900);
+      const height=viewport?.height||window.innerHeight;
+      const focused=document.activeElement===watchField;
+      if(width!==watchWidth){watchWidth=width;watchBaseHeight=Math.max(height,window.innerHeight);}
+      if(!focused&&!watchKeyboardOpen)watchBaseHeight=height;
+      // Retain the open state through blur until the keyboard actually retreats.
+      const reduced=watchBaseHeight-height>120;
+      watchKeyboardOpen=reduced&&(focused||watchKeyboardOpen);
+      if(!watchKeyboardOpen&&!focused)watchBaseHeight=height;
+      document.body.classList.toggle('chatTyping',watchKeyboardOpen);
+      const normal=Math.min(width*9/16,430);
+      const player=watchKeyboardOpen?Math.min(normal,Math.max(76,Math.min(128,height*.30))):normal;
+      const oldHeight=root.style.getPropertyValue('--watch-height');
+      const oldPlayer=root.style.getPropertyValue('--watch-player-height');
+      const keepBottom=watchKeepBottom,position=watchLog.scrollTop;
+      root.style.setProperty('--watch-height',height+'px');
+      root.style.setProperty('--watch-player-height',player+'px');
+      // Fixed elements follow Safari's layout-viewport pan without scrolling
+      // the document or combining offsetTop and scrollY twice.
+      root.style.setProperty('--watch-top',Math.max(0,window.scrollY||0)+'px');
+      if(oldHeight!==height+'px'||oldPlayer!==player+'px'){
+        watchLog.scrollTop=keepBottom?watchLog.scrollHeight:position;
+      }
     }
-    let watchViewportFrame=0;
     function scheduleWatchViewport(){
-      // Safari may pan the layout viewport before resize is delivered.
-      // Correct geometry in this event, not one animation frame later.
-      const log=byId('chatLog'),position=log.scrollTop;
       syncWatchViewport();
-      log.scrollTop=position;
       if(watchViewportFrame)return;
       watchViewportFrame=requestAnimationFrame(()=>{watchViewportFrame=0;syncWatchViewport();});
     }
+    // ResizeObserver follows the compact-player transition and keeps the
+    // newest message beside the composer, unless the reader scrolled back.
+    if(typeof ResizeObserver!=='undefined')new ResizeObserver(()=>{
+      if(document.body.classList.contains('roomViewing')&&watchKeepBottom)watchLog.scrollTop=watchLog.scrollHeight;
+    }).observe(watchLog);
     window.visualViewport?.addEventListener('resize',scheduleWatchViewport);
     window.visualViewport?.addEventListener('scroll',scheduleWatchViewport);
     window.addEventListener('resize',scheduleWatchViewport);
-    window.addEventListener('scroll',scheduleWatchViewport,{passive:true});syncWatchViewport();
-    let watchSettleFrame=0,watchSettleUntil=0;
-    function settleWatchViewport(){
-      watchSettleUntil=performance.now()+800;scheduleWatchViewport();
-      if(watchSettleFrame)return;
-      function tick(){syncWatchViewport();if(performance.now()<watchSettleUntil&&document.body.classList.contains('roomViewing'))watchSettleFrame=requestAnimationFrame(tick);else watchSettleFrame=0;}
-      watchSettleFrame=requestAnimationFrame(tick);
-    }
-    byId('chatText').addEventListener('focus',settleWatchViewport);
-    byId('chatText').addEventListener('blur',settleWatchViewport);
-    const watchIOS=/iP(ad|hone|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
-    let watchTap=null;
-    byId('chatText').addEventListener('touchstart',e=>{
-      if(!watchIOS||e.touches.length!==1||document.activeElement===byId('chatText')){watchTap=null;return;}
-      watchTap={x:e.touches[0].clientX,y:e.touches[0].clientY};
-    },{passive:true});
-    byId('chatText').addEventListener('touchend',e=>{
-      if(!watchTap)return;const start=watchTap;watchTap=null;
-      const touch=e.changedTouches[0];if(!touch||Math.abs(touch.clientX-start.x)>10||Math.abs(touch.clientY-start.y)>10)return;
-      if(!document.body.classList.contains('roomViewing')||document.activeElement===byId('chatText'))return;
-      e.preventDefault();byId('chatText').focus({preventScroll:true});settleWatchViewport();
-    },{passive:false});
-    byId('chatText').addEventListener('touchcancel',()=>{watchTap=null;});
+    window.addEventListener('scroll',scheduleWatchViewport,{passive:true});
+    watchField.addEventListener('focus',scheduleWatchViewport);
+    watchField.addEventListener('blur',scheduleWatchViewport);
+    syncWatchViewport();
     const tray=byId('emojiTray'), emojiOpen=byId('emojiOpen');
     function closeEmoji(){tray.hidden=true;emojiOpen.setAttribute('aria-expanded','false');}
     emojiOpen.onclick=()=>{tray.hidden=!tray.hidden;emojiOpen.setAttribute('aria-expanded',String(!tray.hidden));};
@@ -2180,7 +2148,7 @@ body.roomViewing[data-custom-keyboard="on"] #loopaKeyboard{padding:5px 0 max(22p
  const button=document.createElement('button');button.type='button';button.textContent='Скопировать замеры клавиатуры';button.style.cssText='width:100%;min-height:44px;margin-top:18px;border:1px solid #ffffff30;border-radius:12px;background:#ffffff08;color:#eee;font:13px system-ui';
  button.onclick=async()=>{
   const ancestors=[];for(let el=$('room-active');el&&ancestors.length<7;el=el.parentElement){const c=getComputedStyle(el);ancestors.push({tag:el.tagName,id:el.id,transform:c.transform,filter:c.filter,position:c.position});}
-  const payload=JSON.stringify({build:'v52',screen:[screen.width,screen.height],font:getComputedStyle($('chatText')).fontSize,ancestors,rows});
+  const payload=JSON.stringify({build:'v53',screen:[screen.width,screen.height],font:getComputedStyle($('chatText')).fontSize,ancestors,rows});
   try{await navigator.clipboard.writeText(payload);button.textContent='Замеры скопированы — вставь в чат';}
   catch{$('roomSheet').close();text.value=payload;dialog.showModal();text.focus();text.select();}
  };
@@ -2188,113 +2156,5 @@ body.roomViewing[data-custom-keyboard="on"] #loopaKeyboard{padding:5px 0 max(22p
 })();
 </script>
 
-<script>
-(()=>{
- const field=document.getElementById('chatText'),form=document.getElementById('chatForm');
- const keyboard=document.createElement('div');keyboard.id='loopaKeyboard';keyboard.setAttribute('role','group');keyboard.setAttribute('aria-label','Клавиатура LOOPA');form.after(keyboard);
- const nativeButton=document.createElement('button');nativeButton.type='button';nativeButton.id='useLoopaKeyboard';document.getElementById('roomSheet').append(nativeButton);
- let custom=true;try{custom=localStorage.getItem('loopa-keyboard')!=='native';}catch{}
- const modeToggle=document.createElement('button');modeToggle.type='button';modeToggle.id='keyboardModeToggle';form.insertBefore(modeToggle,field);
- let holdDelay=null,holdRepeat=null;
- function stopKeyHold(){clearTimeout(holdDelay);clearInterval(holdRepeat);holdDelay=null;holdRepeat=null;}
- window.addEventListener('blur',stopKeyHold);
- document.addEventListener('visibilitychange',()=>{if(document.hidden)stopKeyHold();});
- keyboard.addEventListener('contextmenu',e=>e.preventDefault());
- let lang='ru',shift=false,numbers=false;
- function setMode(enabled,focus=false){
-  stopKeyHold();custom=enabled;field.readOnly=enabled;field.inputMode=enabled?'none':'text';document.body.dataset.customKeyboard=enabled?'on':'off';
-  modeToggle.textContent=enabled?'iOS':'LOOPA';modeToggle.setAttribute('aria-label',enabled?'Включить системную клавиатуру':'Включить клавиатуру LOOPA');modeToggle.title=modeToggle.getAttribute('aria-label');
-  nativeButton.textContent=enabled?'Использовать системную клавиатуру':'Использовать клавиатуру LOOPA';
-  try{localStorage.setItem('loopa-keyboard',enabled?'custom':'native');}catch{}
-  if(focus){document.getElementById('roomSheet').close();field.blur();field.focus({preventScroll:true});}
- }
- nativeButton.onclick=()=>setMode(!custom,true);
- modeToggle.addEventListener('pointerdown',e=>e.preventDefault());modeToggle.onclick=()=>setMode(!custom,true);
- function insert(value){
-  const start=field.selectionStart??field.value.length,end=field.selectionEnd??start;
-  if(field.value.length-(end-start)+value.length>field.maxLength)return;
-  field.setRangeText(value,start,end,'end');field.dispatchEvent(new Event('input',{bubbles:true}));
- }
- function erase(){
-  let start=field.selectionStart??field.value.length,end=field.selectionEnd??start;
-  if(start===end&&start>0){
-   const before=field.value.slice(0,start);const parts=typeof Intl.Segmenter==='function'?[...new Intl.Segmenter(undefined,{granularity:'grapheme'}).segment(before)].map(p=>p.segment):Array.from(before);
-   start-=parts.at(-1)?.length||0;
-  }
-  field.setRangeText('',start,end,'end');field.dispatchEvent(new Event('input',{bubbles:true}));
- }
- const actions=new WeakMap(),presses=new Map();
- function key(label,action,attrs={}){
-  const b=document.createElement('button');b.type='button';b.textContent=label;b.dataset.keyLabel=label;
-  for(const [k,v] of Object.entries(attrs))b.setAttribute(k,v);
-  actions.set(b,action);
-  b.onclick=e=>{if(e.detail===0)action();};
-  return b;
- }
- function keyAt(x,y,target){
-  const direct=target?.closest?.('button');
-  return direct&&keyboard.contains(direct)&&actions.has(direct)?direct:null;
- }
- function pressKey(id,b){
-  if(!custom||!b||presses.has(id))return;
-  presses.set(id,b);b.classList.add('keyPressed');actions.get(b)();
-  if(b.dataset.keyLabel==='⌫'){
-   stopKeyHold();holdDelay=setTimeout(()=>{holdRepeat=setInterval(()=>{if(!custom||!b.isConnected||!document.body.classList.contains('roomViewing')){stopKeyHold();return;}erase();},65);},350);
-  }
- }
- function releaseKey(id){
-  const original=presses.get(id);if(!original)return;
-  presses.delete(id);if(![...presses.values()].includes(original))original.classList.remove('keyPressed');
-  if(original.dataset.keyLabel==='⌫')stopKeyHold();
- }
- // Use the earliest available event; the second event for the SAME contact
- // is paired once. Never throttle or debounce consecutive taps on a key.
- let contactSequence=0;
- const contactAliases=new Map();let recentContacts=[];
- function beginContact(source,physicalId,x,y,target){
-  if(!custom)return;
-  const b=keyAt(x,y,target);if(!b)return;
-  const now=performance.now(),alias=source+physicalId;
-  recentContacts=recentContacts.filter(c=>now-c.time<100);
-  const paired=recentContacts.find(c=>c.source!==source&&!c.paired&&!c.ended&&c.button===b&&Math.abs(c.x-x)<5&&Math.abs(c.y-y)<5);
-  if(paired){paired.paired=true;contactAliases.set(alias,paired.id);return;}
-  const old=contactAliases.get(alias);if(old)releaseKey(old);
-  const contact={id:'contact'+(++contactSequence),source,button:b,x,y,time:now,paired:false};
-  recentContacts.push(contact);contactAliases.set(alias,contact.id);pressKey(contact.id,b);
- }
- function endContact(source,id){const alias=source+id,keyId=contactAliases.get(alias);contactAliases.delete(alias);if(keyId){releaseKey(keyId);const c=recentContacts.find(c=>c.id===keyId);if(c)c.ended=true;}}
- keyboard.addEventListener('pointerdown',e=>{
-  if(e.pointerType==='mouse'&&e.button!==0)return;
-  if(!custom)return;e.preventDefault();
-  beginContact('p',e.pointerId,e.clientX,e.clientY,e.target);
- },{capture:true,passive:false});
- // Touch is a fallback, not an exclusive mode selected by device detection.
- keyboard.addEventListener('touchstart',e=>{
-  if(!custom)return;e.preventDefault();
-  for(const t of e.changedTouches)beginContact('t',t.identifier,t.clientX,t.clientY,t.target);
- },{capture:true,passive:false});
- function releaseTouches(e){for(const t of e.changedTouches)endContact('t',t.identifier);}
- keyboard.addEventListener('touchend',releaseTouches,{capture:true});
- keyboard.addEventListener('touchcancel',releaseTouches,{capture:true});
- function releasePointer(e){endContact('p',e.pointerId);}
- window.addEventListener('pointerup',releasePointer,{capture:true});
- window.addEventListener('pointercancel',releasePointer,{capture:true});
- window.addEventListener('blur',()=>{for(const id of [...presses.keys()])releaseKey(id);contactAliases.clear();recentContacts=[];});
- function row(){const r=document.createElement('div');r.className='loopaKeyRow';keyboard.append(r);return r;}
- function render(){
-  stopKeyHold();presses.forEach(b=>b.classList.remove('keyPressed'));presses.clear();keyboard.replaceChildren();
-  const top=document.createElement('div');top.className='loopaKeyTop';const name=document.createElement('span');name.textContent='LOOPA · '+(lang==='ru'?'РУС':'ENG');
-  top.append(name,key(lang==='ru'?'Русский · EN':'English · RU',()=>{lang=lang==='ru'?'en':'ru';render();}));keyboard.append(top);
-  const lines=numbers?['1234567890','-/:;()₽&@"',".,?!'—+=ё"]:lang==='ru'?['йцукенгшщзх','фывапролджэ','ячсмитьбю']:['qwertyuiop','asdfghjkl','zxcvbnm'];
-  lines.forEach((line,i)=>{
-   const r=row();r.dataset.line=String(i);if(i===2)r.append(key('⇧',()=>{shift=!shift;render();},{'data-wide':'','aria-label':'Заглавные буквы','aria-pressed':String(shift)}));
-   for(const char of line){const value=shift?char.toUpperCase():char;r.append(key(value,()=>{insert(value);if(shift){shift=false;render();}}));}
-   if(i===2)r.append(key('⌫',erase,{'data-wide':'','aria-label':'Удалить символ'}));
-  });
-  const r=row();r.dataset.bottom='';r.append(key(numbers?'АБВ':'123',()=>{numbers=!numbers;render();},{'data-wide':''}),key('пробел',()=>insert(' '),{'data-space':''}),key('Отправить',()=>form.requestSubmit(),{'data-send':''}));
- }
- setMode(custom);render();
-})();
-</script>
 </body>
 </html>
