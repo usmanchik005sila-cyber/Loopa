@@ -521,6 +521,12 @@ body.roomViewing[data-custom-keyboard="on"] #loopaKeyboard{display:block;flex:no
 .loopaKeyRow button[data-send]{flex:2;background:#dedee1;color:#151517;font-size:12px}
 body.roomViewing[data-custom-keyboard="on"] .roomChat #chatText{caret-color:#eee}
 #useLoopaKeyboard{border:1px solid #ffffff25;border-radius:12px;padding:10px;margin-top:14px;background:#ffffff08;color:#eee;width:100%;font:13px system-ui}
+
+#loopaKeyboard,#loopaKeyboard *{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.loopaKeyRow button{height:42px;font-size:24px;border-radius:7px;-webkit-appearance:none;appearance:none}
+.loopaKeyRow button[data-wide]{font-size:19px}
+.loopaKeyRow button[data-space],.loopaKeyRow button[data-send]{font-size:14px}
+body.roomViewing #keyboardModeToggle{flex:none;width:44px;min-height:40px;padding:0;border:1px solid #ffffff22;border-radius:12px;background:#ffffff08;color:#ddd;font:600 10px system-ui;cursor:pointer}
 </style>
 </head>
 <body>
@@ -2145,13 +2151,13 @@ body.roomViewing[data-custom-keyboard="on"] .roomChat #chatText{caret-color:#eee
  window.visualViewport?.addEventListener('scroll',()=>sample('vvScroll'));
  window.addEventListener('scroll',()=>sample('winScroll'));
  const dialog=document.createElement('dialog');dialog.style.cssText='width:90%;max-width:450px;max-height:80dvh;padding:20px;border-radius:20px;background:#19191b;color:#eee;border:1px solid #555';
- const title=document.createElement('p');title.textContent='Замеры клавиатуры · v47';
+ const title=document.createElement('p');title.textContent='Замеры клавиатуры · v48';
  const text=document.createElement('textarea');text.readOnly=true;text.setAttribute('aria-label','Технические замеры');text.style.cssText='width:100%;height:45dvh;font:12px monospace;background:#101012;color:#ddd';
  const close=document.createElement('button');close.textContent='Закрыть';close.onclick=()=>dialog.close();dialog.append(title,text,close);document.body.append(dialog);
  const button=document.createElement('button');button.type='button';button.textContent='Скопировать замеры клавиатуры';button.style.cssText='width:100%;min-height:44px;margin-top:18px;border:1px solid #ffffff30;border-radius:12px;background:#ffffff08;color:#eee;font:13px system-ui';
  button.onclick=async()=>{
   const ancestors=[];for(let el=$('room-active');el&&ancestors.length<7;el=el.parentElement){const c=getComputedStyle(el);ancestors.push({tag:el.tagName,id:el.id,transform:c.transform,filter:c.filter,position:c.position});}
-  const payload=JSON.stringify({build:'v47',screen:[screen.width,screen.height],font:getComputedStyle($('chatText')).fontSize,ancestors,rows});
+  const payload=JSON.stringify({build:'v48',screen:[screen.width,screen.height],font:getComputedStyle($('chatText')).fontSize,ancestors,rows});
   try{await navigator.clipboard.writeText(payload);button.textContent='Замеры скопированы — вставь в чат';}
   catch{$('roomSheet').close();text.value=payload;dialog.showModal();text.focus();text.select();}
  };
@@ -2165,14 +2171,22 @@ body.roomViewing[data-custom-keyboard="on"] .roomChat #chatText{caret-color:#eee
  const keyboard=document.createElement('div');keyboard.id='loopaKeyboard';keyboard.setAttribute('role','group');keyboard.setAttribute('aria-label','Клавиатура LOOPA');form.after(keyboard);
  const nativeButton=document.createElement('button');nativeButton.type='button';nativeButton.id='useLoopaKeyboard';document.getElementById('roomSheet').append(nativeButton);
  let custom=true;try{custom=localStorage.getItem('loopa-keyboard')!=='native';}catch{}
+ const modeToggle=document.createElement('button');modeToggle.type='button';modeToggle.id='keyboardModeToggle';form.insertBefore(modeToggle,field);
+ let holdDelay=null,holdRepeat=null;
+ function stopKeyHold(){clearTimeout(holdDelay);clearInterval(holdRepeat);holdDelay=null;holdRepeat=null;}
+ window.addEventListener('pointerup',stopKeyHold);window.addEventListener('pointercancel',stopKeyHold);window.addEventListener('blur',stopKeyHold);
+ document.addEventListener('visibilitychange',()=>{if(document.hidden)stopKeyHold();});
+ keyboard.addEventListener('contextmenu',e=>e.preventDefault());
  let lang='ru',shift=false,numbers=false;
  function setMode(enabled,focus=false){
-  custom=enabled;field.readOnly=enabled;field.inputMode=enabled?'none':'text';document.body.dataset.customKeyboard=enabled?'on':'off';
+  stopKeyHold();custom=enabled;field.readOnly=enabled;field.inputMode=enabled?'none':'text';document.body.dataset.customKeyboard=enabled?'on':'off';
+  modeToggle.textContent=enabled?'iOS':'LOOPA';modeToggle.setAttribute('aria-label',enabled?'Включить системную клавиатуру':'Включить клавиатуру LOOPA');modeToggle.title=modeToggle.getAttribute('aria-label');
   nativeButton.textContent=enabled?'Использовать системную клавиатуру':'Использовать клавиатуру LOOPA';
   try{localStorage.setItem('loopa-keyboard',enabled?'custom':'native');}catch{}
   if(focus){document.getElementById('roomSheet').close();field.blur();field.focus({preventScroll:true});}
  }
  nativeButton.onclick=()=>setMode(!custom,true);
+ modeToggle.addEventListener('pointerdown',e=>e.preventDefault());modeToggle.onclick=()=>setMode(!custom,true);
  function insert(value){
   const start=field.selectionStart??field.value.length,end=field.selectionEnd??start;
   if(field.value.length-(end-start)+value.length>field.maxLength)return;
@@ -2189,11 +2203,21 @@ body.roomViewing[data-custom-keyboard="on"] .roomChat #chatText{caret-color:#eee
  function key(label,action,attrs={}){
   const b=document.createElement('button');b.type='button';b.textContent=label;
   for(const [k,v] of Object.entries(attrs))b.setAttribute(k,v);
-  b.addEventListener('pointerdown',e=>e.preventDefault());b.onclick=action;return b;
+  if(label==='⌫'){
+   let pointerDelete=false;
+   b.addEventListener('pointerdown',e=>{
+    if(e.button!==undefined&&e.button!==0)return;e.preventDefault();stopKeyHold();pointerDelete=true;erase();
+    try{b.setPointerCapture(e.pointerId);}catch{}
+    holdDelay=setTimeout(()=>{holdRepeat=setInterval(()=>{if(!custom||!b.isConnected||!document.body.classList.contains('roomViewing')){stopKeyHold();return;}erase();},65);},350);
+   });
+   b.addEventListener('lostpointercapture',stopKeyHold);
+   b.onclick=()=>{if(pointerDelete){pointerDelete=false;return;}action();};
+  }else{b.addEventListener('pointerdown',e=>e.preventDefault());b.onclick=action;}
+  return b;
  }
  function row(){const r=document.createElement('div');r.className='loopaKeyRow';keyboard.append(r);return r;}
  function render(){
-  keyboard.replaceChildren();
+  stopKeyHold();keyboard.replaceChildren();
   const top=document.createElement('div');top.className='loopaKeyTop';const name=document.createElement('span');name.textContent='LOOPA · '+(lang==='ru'?'РУС':'ENG');
   top.append(name,key('Системная клавиатура',()=>setMode(false,true)));keyboard.append(top);
   const lines=numbers?['1234567890','-/:;()₽&@"',".,?!'—+="]:lang==='ru'?['йцукенгшщзх','фывапролджэ','ячсмитьбю']:['qwertyuiop','asdfghjkl','zxcvbnm'];
