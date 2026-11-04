@@ -6,7 +6,10 @@
   <meta name="theme-color" content="#090a0c">
   <meta name="description" content="LOOPA — ближе, даже на расстоянии. Совместный просмотр с теми, кто важен.">
   <title>LOOPA — Ближе, даже на расстоянии</title>
-  <meta name="loopa-build" content="v31-search-suggestions-2026-11-04">
+  <meta name="loopa-build" content="v32-animated-glass-2026-11-04">
+  <script>
+    try{document.documentElement.dataset.wallpaperMotion=localStorage.getItem('loopa-wallpaper-motion')==='off'?'off':'on';}catch{document.documentElement.dataset.wallpaperMotion='on';}
+  </script>
   <style>
     :root {
       color-scheme:dark;
@@ -436,6 +439,18 @@ html,body{background:#090909;color:var(--ink)}.app{background:radial-gradient(el
 /* LOOPA 31 — three destinations and search-as-you-type */
 .bottom{grid-template-columns:repeat(3,minmax(0,1fr))}
 #searchSuggestions{margin:-9px 0 18px;border:1px solid #ffffff20;border-radius:15px;background:linear-gradient(145deg,#202020f7,#101010fa);padding:5px;box-shadow:0 12px 30px #0005;overflow:hidden}#searchSuggestions[hidden]{display:none!important}#searchSuggestions button{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:45px;padding:11px 12px;border:0;border-radius:10px;background:transparent;color:#e0e0e4;text-align:left;font:14px/1.4 system-ui;cursor:pointer}#searchSuggestions button+button{border-top:1px solid #ffffff07}#searchSuggestions button>span:first-child{overflow-wrap:anywhere}#searchSuggestions button>span:last-child{color:#8c8c98;font-size:17px}#searchSuggestions button[aria-selected=true],#searchSuggestions button:hover{background:#ffffff0b}#searchSuggestions button:active{background:#ffffff14}
+
+/* Slow monochrome light; only transform and opacity animate. */
+.scenery-art{transform-origin:100% 30%}
+html[data-wallpaper-motion="on"] .scenery-art{animation:loopaGlassDrift 32s ease-in-out infinite alternate}
+html[data-wallpaper-motion="on"] .scenery::after{display:block;content:"";position:absolute;top:35px;left:18%;right:auto;bottom:auto;width:85%;height:1150px;border:0;border-radius:0;box-shadow:none;clip-path:polygon(45% 0,100% 0,100% 82%,0 47%);background:linear-gradient(122deg,transparent 26%,#ffffff00 39%,#ffffff05 47%,#ffffff0c 51%,#ffffff03 57%,transparent 70%);transform:translate3d(-14%,0,0);opacity:.25;animation:loopaGlassLight 26s ease-in-out infinite alternate}
+@keyframes loopaGlassDrift{0%{transform:translate3d(0,0,0) scale(1);opacity:.88}100%{transform:translate3d(-5px,-9px,0) scale(1.025);opacity:1}}
+@keyframes loopaGlassLight{0%{transform:translate3d(-14%,-16px,0);opacity:.2}50%{opacity:.65}100%{transform:translate3d(12%,22px,0);opacity:.3}}
+html[data-wallpaper-motion="off"] .scenery-art{animation:none;transform:none;opacity:1}
+html[data-wallpaper-paused="true"] .scenery-art,html[data-wallpaper-paused="true"] .scenery::after{animation-play-state:paused!important}
+html[data-wallpaper-motion="off"] .scenery::after{display:none!important}
+@media(prefers-reduced-motion:reduce){.scenery-art{animation:none!important;transform:none!important;opacity:1!important}.scenery::after{display:none!important}}
+.wallpaperSetting{display:flex;align-items:center;gap:16px;justify-content:space-between;padding:18px 0 0;margin-top:20px;border-top:1px solid #ffffff15}.wallpaperSetting strong{display:block;font:550 14px system-ui}.wallpaperSetting small{display:block;margin-top:6px;color:#9b9ba5;font:12px/1.5 system-ui}.wallpaperSetting .presence-switch input:checked+.presence-switch-track{background:#bfc0c6;border-color:#e1e1e5}.wallpaperSetting .presence-switch-track::before{background:#efeff1}.wallpaperSetting .presence-switch input:checked+.presence-switch-track::before{background:#25252a}
 </style>
 </head>
 <body>
@@ -609,6 +624,7 @@ html,body{background:#090909;color:var(--ink)}.app{background:radial-gradient(el
                 <button class="theme-choice" type="button" data-theme-choice="midnight" aria-pressed="false"><span>Полночь <small>· холодные оттенки</small></span><span class="theme-check">○</span></button>
                 <button class="theme-choice" type="button" data-theme-choice="warm" aria-pressed="false"><span>Какао <small>· тёплые оттенки</small></span><span class="theme-check">○</span></button>
               </div>
+              <div class="wallpaperSetting"><div><strong>Живой фон</strong><small id="wallpaperMotionNote">Медленный свет на стеклянных гранях</small></div><label class="presence-switch" aria-label="Анимированный фон"><input id="wallpaperMotion" type="checkbox" checked><span class="presence-switch-track"></span></label></div>
             </div>
           </div>
         </div>
@@ -1206,6 +1222,20 @@ html,body{background:#090909;color:var(--ink)}.app{background:radial-gradient(el
       else mini.textContent = (name.charAt(0) || 'L').toUpperCase();
       refreshTopProfileAvatar();
     }
+    const wallpaperMedia=window.matchMedia('(prefers-reduced-motion: reduce)');
+    function syncWallpaper(){
+      const on=document.documentElement.dataset.wallpaperMotion!=='off';
+      document.documentElement.dataset.wallpaperPaused=String(document.hidden||wallpaperMedia.matches);
+      byId('wallpaperMotion').checked=on;
+      byId('wallpaperMotionNote').textContent=wallpaperMedia.matches?'Неподвижный фон: включено системное уменьшение движения':on?'Медленный свет на стеклянных гранях':'Анимация отключена на этом устройстве';
+    }
+    byId('wallpaperMotion').addEventListener('change',()=>{
+      const value=byId('wallpaperMotion').checked?'on':'off';document.documentElement.dataset.wallpaperMotion=value;
+      try{localStorage.setItem('loopa-wallpaper-motion',value);}catch{}syncWallpaper();
+    });
+    document.addEventListener('visibilitychange',syncWallpaper);
+    if(wallpaperMedia.addEventListener)wallpaperMedia.addEventListener('change',syncWallpaper);else if(wallpaperMedia.addListener)wallpaperMedia.addListener(syncWallpaper);
+    syncWallpaper();
     function setTheme(theme) {
       if (!['classic','midnight','warm'].includes(theme)) theme='classic';
       document.body.dataset.theme=theme;
