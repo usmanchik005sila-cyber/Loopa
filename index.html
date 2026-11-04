@@ -1006,8 +1006,8 @@ body.roomViewing #videoStage #room-frame{width:100%;height:100%;margin:0;transit
       watchKeyboardOpen=reduced&&(focused||watchKeyboardOpen);
       if(!watchKeyboardOpen&&!focused)watchBaseHeight=height;
       document.body.classList.toggle('chatTyping',watchKeyboardOpen);
-      const normal=Math.min(width*9/16,430);
-      const player=watchKeyboardOpen?Math.min(normal,Math.max(76,Math.min(128,height*.30))):normal;
+      // Keep the video steady; the message list absorbs the smaller keyboard viewport.
+      const player=Math.min(width*9/16,430);
       const oldHeight=root.style.getPropertyValue('--watch-height');
       const oldPlayer=root.style.getPropertyValue('--watch-player-height');
       const keepBottom=watchKeepBottom,position=watchLog.scrollTop;
