@@ -461,7 +461,7 @@ body.roomViewing .roomBar .text-link{font-size:14px;white-space:nowrap}
 body.roomViewing #inviteRoom{position:static;float:none;width:auto;min-height:36px;height:36px;margin:0;padding:0 12px;font-size:12px;border-radius:12px;white-space:nowrap}
 body.roomViewing #accessBadge{font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 body.roomViewing #moreRoom{flex:none;min-width:38px;height:38px}
-body.roomViewing #room-frame{display:block;flex:none;width:100%;height:min(var(--watch-player-height,56.25vw),max(90px,calc(var(--watch-height,100dvh) - 180px)));aspect-ratio:auto;margin:0;border-radius:0;background:#000}
+body.roomViewing #room-frame{display:block;flex:none;width:100%;height:var(--watch-player-height,56.25vw);aspect-ratio:auto;margin:0;border-radius:0;background:#000}
 body.roomViewing #room-host{display:none!important}
 body.roomViewing #room-active .roomChat{flex:1;min-height:0;display:flex;flex-direction:column;clear:none;margin:0;padding:0 14px;border:0;border-radius:0;box-shadow:none;background:transparent;backdrop-filter:none;overflow:hidden}
 body.roomViewing .roomChat h2{flex:none;margin:0;padding:12px 2px 9px;font:500 12px system-ui;color:#99999f;border-bottom:1px solid #ffffff0b}
@@ -492,6 +492,20 @@ body.roomViewing #sheetVideoChange{grid-column:1/3;justify-self:start}
 
 body.roomViewing section[data-page="rooms"]{animation:none!important;transform:none!important;filter:none!important}
 body.roomViewing #chatText{scroll-margin:0;overflow-anchor:none}
+
+html:has(body.roomViewing){overflow:hidden;overscroll-behavior:none}
+body.roomViewing{position:fixed;inset:0;width:100%;height:100%;overflow:hidden;overscroll-behavior:none}
+body.roomViewing #room-active{backdrop-filter:none;-webkit-backdrop-filter:none}
+body.roomViewing.chatTyping #room-active .roomBar{display:flex;min-height:40px;height:40px;padding:2px 12px}
+body.roomViewing.chatTyping #sheetVideoChange{display:none!important}
+body.roomViewing.chatTyping #inviteRoom{margin-left:auto;height:32px;min-height:32px}
+body.roomViewing.chatTyping #moreRoom{height:32px}
+body.roomViewing.chatTyping .roomChat h2{display:none}
+body.roomViewing.chatTyping .roomChat #chatForm{padding:5px 0}
+body.roomViewing.chatTyping #emojiOpen{display:none}
+body.roomViewing.chatTyping #chatText{height:40px}
+body.roomViewing.chatTyping #chatForm button:last-child{height:38px;width:38px}
+body.roomViewing .roomChat #chatLog{overflow-anchor:none}
 </style>
 </head>
 <body>
@@ -836,9 +850,19 @@ body.roomViewing #chatText{scroll-margin:0;overflow-anchor:none}
       document.documentElement.style.setProperty('--watch-height',(viewport?.height||window.innerHeight)+'px');
       document.documentElement.style.setProperty('--watch-top',(viewport?.offsetTop||0)+'px');
     }
-    window.visualViewport?.addEventListener('resize',syncWatchViewport);
-    window.visualViewport?.addEventListener('scroll',syncWatchViewport);
-    window.addEventListener('resize',syncWatchViewport);syncWatchViewport();
+    let watchViewportFrame=0;
+    function scheduleWatchViewport(){
+      if(watchViewportFrame)return;
+      watchViewportFrame=requestAnimationFrame(()=>{watchViewportFrame=0;
+        const log=byId('chatLog'),atEnd=log.scrollHeight-log.scrollTop-log.clientHeight<48;
+        syncWatchViewport();if(atEnd||document.activeElement===byId('chatText'))log.scrollTop=log.scrollHeight;
+      });
+    }
+    window.visualViewport?.addEventListener('resize',scheduleWatchViewport);
+    window.visualViewport?.addEventListener('scroll',scheduleWatchViewport);
+    window.addEventListener('resize',scheduleWatchViewport);syncWatchViewport();
+    byId('chatText').addEventListener('focus',()=>{document.body.classList.add('chatTyping');scheduleWatchViewport();});
+    byId('chatText').addEventListener('blur',()=>{document.body.classList.remove('chatTyping');scheduleWatchViewport();});
     const tray=byId('emojiTray'), emojiOpen=byId('emojiOpen');
     function closeEmoji(){tray.hidden=true;emojiOpen.setAttribute('aria-expanded','false');}
     emojiOpen.onclick=()=>{tray.hidden=!tray.hidden;emojiOpen.setAttribute('aria-expanded',String(!tray.hidden));};
@@ -874,7 +898,7 @@ body.roomViewing #chatText{scroll-margin:0;overflow-anchor:none}
     roomSheet.addEventListener('click',e=>{if(e.target===roomSheet&&outsideSheet(e))roomSheet.close();});
 
     byId('saveAccess').onclick=async function(){this.disabled=true;try{await roomCall('access',{media:JSON.stringify({mode:byId('accessMode').value,ids:[...byId('pick').querySelectorAll('input:checked')].map(c=>c.value)})});byId('roomSheet').close();showToast('Доступ обновлён');}catch(err){showToast(err.message);}finally{this.disabled=false;}};
-    function roomExit(){document.body.classList.remove('roomViewing');closeCatalog(true);closeEmoji();byId("room-link").value="";byId('roomSheet').close();byId('chatText').value='';byId('chatLog').replaceChildren();roomEpoch++;roomState=null;roomUser=null;mountRoomPlayer('');byId('room-active').hidden=true;byId('room-lobby').hidden=false;byId('room-recent').replaceChildren();byId('room-note').textContent='';}
+    function roomExit(){document.body.classList.remove('roomViewing','chatTyping');closeCatalog(true);closeEmoji();byId("room-link").value="";byId('roomSheet').close();byId('chatText').value='';byId('chatLog').replaceChildren();roomEpoch++;roomState=null;roomUser=null;mountRoomPlayer('');byId('room-active').hidden=true;byId('room-lobby').hidden=false;byId('room-recent').replaceChildren();byId('room-note').textContent='';}
     async function roomCall(op,args={}){
       if(!currentUser||!client){showPage('profile');showToast('Войди в аккаунт');return;}
       const u=currentUser.id, epoch=roomEpoch;
