@@ -993,6 +993,31 @@ body.roomViewing #videoStage #room-frame{width:100%;height:100%;margin:0;transit
     watchField.readOnly=false;watchField.inputMode='text';
     watchField.setAttribute('autocorrect','on');watchField.setAttribute('autocapitalize','sentences');
     watchField.setAttribute('spellcheck','true');watchField.setAttribute('enterkeyhint','send');
+    // Scope the iOS focus workaround to this field only. No cloned input,
+    // touch interception, forced refocus, or global scroll prevention.
+    const watchIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||
+      (navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+    let watchFocusTimer=0,watchSavedOpacity=null;
+    function restoreWatchField(){
+      if(watchFocusTimer)clearTimeout(watchFocusTimer);
+      watchFocusTimer=0;
+      if(watchSavedOpacity!==null){
+        if(watchSavedOpacity.value)watchField.style.setProperty('opacity',watchSavedOpacity.value,watchSavedOpacity.priority);
+        else watchField.style.removeProperty('opacity');
+        watchSavedOpacity=null;
+      }
+    }
+    watchField.addEventListener('focus',()=>{
+      if(!watchIOS||!document.body.classList.contains('roomViewing'))return;
+      restoreWatchField();
+      watchSavedOpacity={value:watchField.style.getPropertyValue('opacity'),priority:watchField.style.getPropertyPriority('opacity')};
+      // Safari's focus reveal can pan a fixed page. Briefly suppress painting
+      // during the native focus task; opacity does not disable focus or typing.
+      watchField.style.setProperty('opacity','0','important');
+      watchFocusTimer=setTimeout(restoreWatchField,0);
+    },true);
+    watchField.addEventListener('blur',restoreWatchField);
+
     watchLog.addEventListener('scroll',()=>{watchKeepBottom=watchLog.scrollHeight-watchLog.scrollTop-watchLog.clientHeight<48;},{passive:true});
     function syncWatchViewport(){
       if(!document.body.classList.contains('roomViewing'))return;
@@ -1028,6 +1053,7 @@ body.roomViewing #videoStage #room-frame{width:100%;height:100%;margin:0;transit
       }
     }
     function stopWatchViewport(){
+      restoreWatchField();
       if(watchViewportFrame)cancelAnimationFrame(watchViewportFrame);
       watchViewportFrame=0;watchViewportUntil=0;
     }
@@ -1041,6 +1067,7 @@ body.roomViewing #videoStage #room-frame{width:100%;height:100%;margin:0;transit
       if(!document.body.classList.contains('roomViewing')||document.hidden)return;
       // Safari may update geometry before dispatching its next viewport event.
       // Observe only the short transition; never scroll or refocus the document.
+      syncWatchViewport();
       watchViewportUntil=performance.now()+1200;
       if(!watchViewportFrame)watchViewportFrame=requestAnimationFrame(watchViewportTick);
     }
@@ -2306,13 +2333,13 @@ body.roomViewing #videoStage #room-frame{width:100%;height:100%;margin:0;transit
  window.visualViewport?.addEventListener('scroll',()=>sample('vvScroll'));
  window.addEventListener('scroll',()=>sample('winScroll'));
  const dialog=document.createElement('dialog');dialog.style.cssText='width:90%;max-width:450px;max-height:80dvh;padding:20px;border-radius:20px;background:#19191b;color:#eee;border:1px solid #555';
- const title=document.createElement('p');title.textContent='Замеры клавиатуры · v64';
+ const title=document.createElement('p');title.textContent='Замеры клавиатуры · v65';
  const text=document.createElement('textarea');text.readOnly=true;text.setAttribute('aria-label','Технические замеры');text.style.cssText='width:100%;height:45dvh;font:12px monospace;background:#101012;color:#ddd';
  const close=document.createElement('button');close.textContent='Закрыть';close.onclick=()=>dialog.close();dialog.append(title,text,close);document.body.append(dialog);
  const button=document.createElement('button');button.type='button';button.textContent='Скопировать замеры клавиатуры';button.style.cssText='width:100%;min-height:44px;margin-top:18px;border:1px solid #ffffff30;border-radius:12px;background:#ffffff08;color:#eee;font:13px system-ui';
  button.onclick=async()=>{
   const ancestors=[];for(let el=$('room-active');el&&ancestors.length<7;el=el.parentElement){const c=getComputedStyle(el);ancestors.push({tag:el.tagName,id:el.id,transform:c.transform,filter:c.filter,position:c.position});}
-  const payload=JSON.stringify({build:'v64',screen:[screen.width,screen.height],font:getComputedStyle($('chatText')).fontSize,ancestors,rows});
+  const payload=JSON.stringify({build:'v65',screen:[screen.width,screen.height],font:getComputedStyle($('chatText')).fontSize,focusStrategy:'ios-opacity-task',ancestors,rows});
   try{await navigator.clipboard.writeText(payload);button.textContent='Замеры скопированы — вставь в чат';}
   catch{$('roomSheet').close();text.value=payload;dialog.showModal();text.focus();text.select();}
  };
