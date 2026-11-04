@@ -455,13 +455,13 @@ html[data-wallpaper-motion="off"] .scenery::after{display:none!important}
 /* Watch together: viewport player and independently scrolling conversation. */
 body.roomViewing{overflow:hidden;padding-bottom:0}
 body.roomViewing .bottom{display:none!important}
-body.roomViewing #room-active{position:fixed;inset:auto 0 auto;top:var(--watch-top,0px);height:var(--watch-height,100dvh);width:min(100%,900px);margin:0 auto;padding:0;box-sizing:border-box;z-index:40;display:flex;flex-direction:column;gap:0;border:0;border-radius:0;background:linear-gradient(145deg,#171719f5,#09090bf7);overflow:hidden}
+body.roomViewing #room-active{position:fixed;inset:auto 0 auto;top:0;height:var(--watch-base-height,100svh);width:min(100%,900px);margin:0 auto;padding:0;box-sizing:border-box;z-index:40;display:flex;flex-direction:column;gap:0;border:0;border-radius:0;background:linear-gradient(145deg,#171719f5,#09090bf7);overflow:hidden}
 body.roomViewing #room-active .roomBar{flex:none;min-height:56px;padding:6px 14px;box-sizing:border-box;border-bottom:1px solid #ffffff0d;gap:8px}
 body.roomViewing .roomBar .text-link{font-size:14px;white-space:nowrap}
 body.roomViewing #inviteRoom{position:static;float:none;width:auto;min-height:36px;height:36px;margin:0;padding:0 12px;font-size:12px;border-radius:12px;white-space:nowrap}
 body.roomViewing #accessBadge{font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 body.roomViewing #moreRoom{flex:none;min-width:38px;height:38px}
-body.roomViewing #room-frame{display:block;flex:none;width:100%;height:var(--watch-player-height,56.25vw);aspect-ratio:auto;margin:0;border-radius:0;background:#000}
+body.roomViewing #room-frame{display:block;flex:none;width:100%;height:min(56.25vw,430px);aspect-ratio:auto;margin:0;border-radius:0;background:#000}
 body.roomViewing #room-host{display:none!important}
 body.roomViewing #room-active .roomChat{flex:1;min-height:0;display:flex;flex-direction:column;clear:none;margin:0;padding:0 14px;border:0;border-radius:0;box-shadow:none;background:transparent;backdrop-filter:none;overflow:hidden}
 body.roomViewing .roomChat h2{flex:none;margin:0;padding:12px 2px 9px;font:500 12px system-ui;color:#99999f;border-bottom:1px solid #ffffff0b}
@@ -510,14 +510,14 @@ body.roomViewing #chatForm button:last-child{height:38px;width:38px}
 
 
 /* Native keyboard: reserve conversation space instead of preserving a tall player. */
-body.roomViewing #room-frame{transition:height 160ms ease-out}
+body.roomViewing #room-frame{transition:none}
 body.roomViewing .roomChat #chatForm{padding:8px 0;min-height:60px}
 body.roomViewing #chatText{font-size:16px;min-height:44px;line-height:22px}
 body.roomViewing #room-active{transition:none}
 @media(prefers-reduced-motion:reduce){body.roomViewing #room-frame{transition:none}}
 
 #videoStage{position:relative;background:#000;flex:none;width:100%;overflow:hidden}
-body.roomViewing #videoStage{height:var(--watch-player-height,56.25vw);transition:height 160ms ease-out}
+body.roomViewing #videoStage{height:min(56.25vw,430px);transition:none}
 body.roomViewing #videoStage #room-frame{width:100%;height:100%;margin:0;transition:none}
 #videoStage[hidden],#playbackControls [hidden]{display:none!important}
 #playbackControls{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(transparent 50%,#0007);opacity:0;transition:opacity .18s;pointer-events:none}
@@ -543,6 +543,9 @@ body.roomViewing #videoStage #room-frame{width:100%;height:100%;margin:0;transit
 @media(prefers-reduced-motion:reduce){#playbackControls,body.roomViewing #videoStage{transition:none}}
 @media(max-width:390px){body.roomViewing #sheetVideoChange{font-size:11px;padding-inline:7px}body.roomViewing #inviteRoom{font-size:11px;padding-inline:7px}body.roomViewing #room-active .roomBar{gap:5px;padding-inline:8px}}
 
+
+body.roomViewing #room-active .roomChat{padding-bottom:var(--watch-keyboard-inset,0px);box-sizing:border-box}
+body.roomViewing #room-active,body.roomViewing #videoStage,body.roomViewing #room-frame,body.roomViewing .roomChat{transition:none!important}
 </style>
 </head>
 <body>
@@ -987,64 +990,78 @@ body.roomViewing #videoStage #room-frame{width:100%;height:100%;margin:0;transit
     byId('roomSheet').insertBefore(document.querySelector('.playerCode'),byId('roomSheet').querySelector('h3'));
     byId('room-active').querySelector('.roomBar').insertBefore(byId('sheetVideoChange'),byId('inviteRoom'));
     byId('sheetVideoChange').onclick=()=>{if(!hostHere())return;byId('roomSheet').close();byId('catalogOpen').click();};
+    // One viewport controller. The room top, base height and video never follow keyboard pan.
     let watchBaseHeight=0,watchWidth=0,watchKeyboardOpen=false,watchViewportFrame=0;
-    let watchKeepBottom=true;
+    let watchKeepBottom=true,watchPredicted=false,watchPredictionTimer=0;
     const watchLog=byId('chatLog'),watchField=byId('chatText');
     watchField.readOnly=false;watchField.inputMode='text';
     watchField.setAttribute('autocorrect','on');watchField.setAttribute('autocapitalize','sentences');
     watchField.setAttribute('spellcheck','true');watchField.setAttribute('enterkeyhint','send');
-    watchLog.addEventListener('scroll',()=>{watchKeepBottom=watchLog.scrollHeight-watchLog.scrollTop-watchLog.clientHeight<48;},{passive:true});
+    const keyboardCacheKey=()=> 'loopa-keyboard62-'+Math.round(document.documentElement.clientWidth||innerWidth);
+    function savedKeyboardHeight(){try{return Math.max(0,Math.min(watchBaseHeight*.75,Number(localStorage.getItem(keyboardCacheKey()))||0));}catch{return 0;}}
+    function setKeyboardInset(px){
+      const root=document.documentElement,value=Math.round(Math.max(0,px))+'px';
+      if(root.style.getPropertyValue('--watch-keyboard-inset')!==value)root.style.setProperty('--watch-keyboard-inset',value);
+    }
     function syncWatchViewport(){
+      if(!document.body.classList.contains('roomViewing'))return;
       const viewport=window.visualViewport,root=document.documentElement;
-      const width=Math.min(root.clientWidth||window.innerWidth,900);
-      const height=viewport?.height||window.innerHeight;
+      if(viewport&&Math.abs(viewport.scale-1)>.05)return;
+      const width=root.clientWidth||innerWidth,height=viewport?.height||innerHeight;
       const focused=document.activeElement===watchField;
-      if(width!==watchWidth){watchWidth=width;watchBaseHeight=Math.max(height,window.innerHeight);}
-      if(!focused&&!watchKeyboardOpen)watchBaseHeight=height;
-      // Retain the open state through blur until the keyboard actually retreats.
-      const reduced=watchBaseHeight-height>120;
-      watchKeyboardOpen=reduced&&(focused||watchKeyboardOpen);
-      if(!watchKeyboardOpen&&!focused)watchBaseHeight=height;
-      document.body.classList.toggle('chatTyping',watchKeyboardOpen);
-      const normal=Math.min(width*9/16,430);
-      const player=watchKeyboardOpen?Math.min(normal,Math.max(76,Math.min(128,height*.30))):normal;
-      const oldHeight=root.style.getPropertyValue('--watch-height');
-      const oldPlayer=root.style.getPropertyValue('--watch-player-height');
-      const keepBottom=watchKeepBottom,position=watchLog.scrollTop;
-      root.style.setProperty('--watch-height',height+'px');
-      root.style.setProperty('--watch-player-height',player+'px');
-      // Fixed elements follow Safari's layout-viewport pan without scrolling
-      // the document or combining offsetTop and scrollY twice.
-      root.style.setProperty('--watch-top',Math.max(0,window.scrollY||0)+'px');
-      if(oldHeight!==height+'px'||oldPlayer!==player+'px'){
-        watchLog.scrollTop=keepBottom?watchLog.scrollHeight:position;
+      if(!watchBaseHeight||width!==watchWidth){
+        watchWidth=width;watchBaseHeight=Math.max(height,innerHeight);
+        watchPredicted=false;watchKeyboardOpen=false;
       }
+      const measured=Math.max(0,watchBaseHeight-height);
+      const open=measured>120;
+      if(open){
+        watchKeyboardOpen=true;watchPredicted=false;clearTimeout(watchPredictionTimer);
+        setKeyboardInset(measured);
+        try{localStorage.setItem(keyboardCacheKey(),String(Math.round(measured)));}catch{}
+      }else if(!watchPredicted){
+        watchKeyboardOpen=false;setKeyboardInset(0);
+        // Browser toolbar changes only update the base after the keyboard is gone.
+        if(!focused)watchBaseHeight=height;
+      }
+      const base=Math.round(watchBaseHeight)+'px';
+      if(root.style.getPropertyValue('--watch-base-height')!==base)root.style.setProperty('--watch-base-height',base);
+      document.body.classList.toggle('chatTyping',watchKeyboardOpen||watchPredicted);
     }
     function scheduleWatchViewport(){
-      syncWatchViewport();
       if(watchViewportFrame)return;
       watchViewportFrame=requestAnimationFrame(()=>{watchViewportFrame=0;syncWatchViewport();});
     }
-    // ResizeObserver follows the compact-player transition and keeps the
-    // newest message beside the composer, unless the reader scrolled back.
+    watchField.addEventListener('pointerdown',e=>{
+      if(e.isPrimary===false||(e.button!==undefined&&e.button!==0)||document.activeElement===watchField||!document.body.classList.contains('roomViewing'))return;
+      syncWatchViewport();
+      const saved=savedKeyboardHeight();
+      if(saved&&!watchKeyboardOpen){
+        watchPredicted=true;setKeyboardInset(saved);
+        document.body.classList.add('chatTyping');
+        watchField.getBoundingClientRect(); // Commit the input's visible position before focus.
+        clearTimeout(watchPredictionTimer);
+        watchPredictionTimer=setTimeout(()=>{watchPredicted=false;syncWatchViewport();},900);
+      }
+      e.preventDefault();watchField.focus({preventScroll:true});
+    });
+    watchLog.addEventListener('scroll',()=>{watchKeepBottom=watchLog.scrollHeight-watchLog.scrollTop-watchLog.clientHeight<48;},{passive:true});
     if(typeof ResizeObserver!=='undefined')new ResizeObserver(()=>{
       if(document.body.classList.contains('roomViewing')&&watchKeepBottom)watchLog.scrollTop=watchLog.scrollHeight;
     }).observe(watchLog);
     window.visualViewport?.addEventListener('resize',scheduleWatchViewport);
-    window.visualViewport?.addEventListener('scroll',scheduleWatchViewport);
     window.addEventListener('resize',scheduleWatchViewport);
-    window.addEventListener('scroll',scheduleWatchViewport,{passive:true});
     watchField.addEventListener('focus',scheduleWatchViewport);
-    watchField.addEventListener('blur',scheduleWatchViewport);
-    syncWatchViewport();
+    watchField.addEventListener('blur',()=>{watchPredicted=false;clearTimeout(watchPredictionTimer);scheduleWatchViewport();});
     const tray=byId('emojiTray'), emojiOpen=byId('emojiOpen');
     function closeEmoji(){tray.hidden=true;emojiOpen.setAttribute('aria-expanded','false');}
+    emojiOpen.addEventListener('pointerdown',e=>{if(document.activeElement===watchField)e.preventDefault();});
     emojiOpen.onclick=()=>{tray.hidden=!tray.hidden;emojiOpen.setAttribute('aria-expanded',String(!tray.hidden));};
     for(const emoji of ['❤️','😂','🔥','🍿','👀','🥹','😮','👏','💀','🤍','🤝','🎬']){
       const choice=document.createElement('button');choice.type='button';choice.textContent=emoji;
       choice.onclick=()=>{const field=byId('chatText');const a=field.selectionStart??field.value.length,b=field.selectionEnd??a;
         if(field.value.length-b+a+emoji.length<=field.maxLength)field.setRangeText(emoji,a,b,'end');
-        closeEmoji();field.focus();};tray.append(choice);
+        closeEmoji();field.focus({preventScroll:true});};tray.append(choice);
     }
     let chatSending=false;
     const chatSendButton=byId('chatForm').querySelector('button:last-child');
@@ -2270,21 +2287,24 @@ body.roomViewing #videoStage #room-frame{width:100%;height:100%;margin:0;transit
   if(!document.body.classList.contains('roomViewing'))return;
   const now=performance.now();if(!force&&now-last<80)return;last=now;
   const v=window.visualViewport;
-  rows.push({t:round(now),e:event,focus:document.activeElement===$('chatText'),vh:round(v?.height),vy:round(v?.offsetTop),scale:v?.scale,ih:innerHeight,sy:round(scrollY),room:rect('room-active'),video:rect('room-frame'),field:rect('chatText'),log:rect('chatLog'),logY:round($('chatLog')?.scrollTop)});
-  if(rows.length>90)rows.shift();
+  rows.push({t:round(now),e:event,focus:document.activeElement===$('chatText'),vh:round(v?.height),vy:round(v?.offsetTop),scale:v?.scale,ih:innerHeight,sy:round(scrollY),room:rect('room-active'),video:rect('room-frame'),field:rect('chatText'),log:rect('chatLog'),logY:round($('chatLog')?.scrollTop),base:getComputedStyle(document.documentElement).getPropertyValue('--watch-base-height').trim(),inset:getComputedStyle(document.documentElement).getPropertyValue('--watch-keyboard-inset').trim()});
+  if(rows.length>180)rows.shift();
  }
- ['focus','blur'].forEach(e=>$('chatText').addEventListener(e,()=>{sample(e,true);[100,300,600,1000].forEach(ms=>setTimeout(()=>sample(e+'+'+ms,true),ms));}));
+ let traceUntil=0,traceFrame=0;
+ function trace(){sample('transition');if(performance.now()<traceUntil)traceFrame=requestAnimationFrame(trace);else traceFrame=0;}
+ $('chatText').addEventListener('pointerdown',()=>sample('beforeFocus',true));
+ ['focus','blur'].forEach(e=>$('chatText').addEventListener(e,()=>{sample(e,true);traceUntil=performance.now()+1200;if(!traceFrame)traceFrame=requestAnimationFrame(trace);[100,300,600,1000].forEach(ms=>setTimeout(()=>sample(e+'+'+ms,true),ms));}));
  window.visualViewport?.addEventListener('resize',()=>sample('vvResize'));
  window.visualViewport?.addEventListener('scroll',()=>sample('vvScroll'));
  window.addEventListener('scroll',()=>sample('winScroll'));
  const dialog=document.createElement('dialog');dialog.style.cssText='width:90%;max-width:450px;max-height:80dvh;padding:20px;border-radius:20px;background:#19191b;color:#eee;border:1px solid #555';
- const title=document.createElement('p');title.textContent='Замеры клавиатуры · v49';
+ const title=document.createElement('p');title.textContent='Замеры клавиатуры · v62';
  const text=document.createElement('textarea');text.readOnly=true;text.setAttribute('aria-label','Технические замеры');text.style.cssText='width:100%;height:45dvh;font:12px monospace;background:#101012;color:#ddd';
  const close=document.createElement('button');close.textContent='Закрыть';close.onclick=()=>dialog.close();dialog.append(title,text,close);document.body.append(dialog);
  const button=document.createElement('button');button.type='button';button.textContent='Скопировать замеры клавиатуры';button.style.cssText='width:100%;min-height:44px;margin-top:18px;border:1px solid #ffffff30;border-radius:12px;background:#ffffff08;color:#eee;font:13px system-ui';
  button.onclick=async()=>{
   const ancestors=[];for(let el=$('room-active');el&&ancestors.length<7;el=el.parentElement){const c=getComputedStyle(el);ancestors.push({tag:el.tagName,id:el.id,transform:c.transform,filter:c.filter,position:c.position});}
-  const payload=JSON.stringify({build:'v61',screen:[screen.width,screen.height],font:getComputedStyle($('chatText')).fontSize,ancestors,rows});
+  const payload=JSON.stringify({build:'v62',screen:[screen.width,screen.height],font:getComputedStyle($('chatText')).fontSize,ancestors,rows});
   try{await navigator.clipboard.writeText(payload);button.textContent='Замеры скопированы — вставь в чат';}
   catch{$('roomSheet').close();text.value=payload;dialog.showModal();text.focus();text.select();}
  };
