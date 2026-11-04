@@ -543,8 +543,13 @@ body.roomViewing #videoStage #room-frame{width:100%;height:100%;margin:0;transit
 @media(prefers-reduced-motion:reduce){#playbackControls,body.roomViewing #videoStage{transition:none}}
 @media(max-width:390px){body.roomViewing #sheetVideoChange{font-size:11px;padding-inline:7px}body.roomViewing #inviteRoom{font-size:11px;padding-inline:7px}body.roomViewing #room-active .roomBar{gap:5px;padding-inline:8px}}
 
-/* v67: apply the measured viewport immediately, without a trailing animation. */
-body.roomViewing #room-active,body.roomViewing #videoStage{transition:none}
+/* v66: animate only the two heights together; never animate the room's top. */
+body.roomViewing #room-active,body.roomViewing #videoStage{
+  transition:height 180ms cubic-bezier(.2,.7,.2,1);
+}
+@media(prefers-reduced-motion:reduce){
+  body.roomViewing #room-active,body.roomViewing #videoStage{transition:none}
+}
 </style>
 </head>
 <body>
@@ -1036,11 +1041,11 @@ body.roomViewing #room-active,body.roomViewing #videoStage{transition:none}
       if(!watchKeyboardOpen&&!focused)watchBaseHeight=height;
       document.body.classList.toggle('chatTyping',watchKeyboardOpen);
       const normal=Math.min(width*9/16,430);
-      // Keep the video stable. Shrink only if the viewport cannot fit the
-      // actual header, composer and at least 60px of conversation (e.g. landscape).
-      const barHeight=byId('room-active').querySelector('.roomBar').offsetHeight||48;
-      const formHeight=byId('chatForm').offsetHeight||61;
-      const player=Math.round(Math.min(normal,Math.max(0,height-barHeight-formHeight-60))*100)/100;
+      // Follow measured keyboard travel, without a size jump at the 120px threshold.
+      const travel=(focused||watchKeyboardOpen)?Math.max(0,watchBaseHeight-height):0;
+      const fraction=Math.min(1,travel/Math.max(1,watchBaseHeight*.48));
+      const compact=Math.min(normal,Math.max(76,Math.min(128,height*.30)));
+      const player=Math.round((normal+(compact-normal)*fraction)*100)/100;
       const oldHeight=root.style.getPropertyValue('--watch-height');
       const oldPlayer=root.style.getPropertyValue('--watch-player-height');
       const keepBottom=watchKeepBottom,position=watchLog.scrollTop;
@@ -2336,13 +2341,13 @@ body.roomViewing #room-active,body.roomViewing #videoStage{transition:none}
  window.visualViewport?.addEventListener('scroll',()=>sample('vvScroll'));
  window.addEventListener('scroll',()=>sample('winScroll'));
  const dialog=document.createElement('dialog');dialog.style.cssText='width:90%;max-width:450px;max-height:80dvh;padding:20px;border-radius:20px;background:#19191b;color:#eee;border:1px solid #555';
- const title=document.createElement('p');title.textContent='Замеры клавиатуры · v67';
+ const title=document.createElement('p');title.textContent='Замеры клавиатуры · v66';
  const text=document.createElement('textarea');text.readOnly=true;text.setAttribute('aria-label','Технические замеры');text.style.cssText='width:100%;height:45dvh;font:12px monospace;background:#101012;color:#ddd';
  const close=document.createElement('button');close.textContent='Закрыть';close.onclick=()=>dialog.close();dialog.append(title,text,close);document.body.append(dialog);
  const button=document.createElement('button');button.type='button';button.textContent='Скопировать замеры клавиатуры';button.style.cssText='width:100%;min-height:44px;margin-top:18px;border:1px solid #ffffff30;border-radius:12px;background:#ffffff08;color:#eee;font:13px system-ui';
  button.onclick=async()=>{
   const ancestors=[];for(let el=$('room-active');el&&ancestors.length<7;el=el.parentElement){const c=getComputedStyle(el);ancestors.push({tag:el.tagName,id:el.id,transform:c.transform,filter:c.filter,position:c.position});}
-  const payload=JSON.stringify({build:'v67',screen:[screen.width,screen.height],font:getComputedStyle($('chatText')).fontSize,focusStrategy:'ios-opacity-task',ancestors,rows});
+  const payload=JSON.stringify({build:'v66',screen:[screen.width,screen.height],font:getComputedStyle($('chatText')).fontSize,focusStrategy:'ios-opacity-task',ancestors,rows});
   try{await navigator.clipboard.writeText(payload);button.textContent='Замеры скопированы — вставь в чат';}
   catch{$('roomSheet').close();text.value=payload;dialog.showModal();text.focus();text.select();}
  };
