@@ -461,7 +461,7 @@ body.roomViewing .roomBar .text-link{font-size:14px;white-space:nowrap}
 body.roomViewing #inviteRoom{position:static;float:none;width:auto;min-height:36px;height:36px;margin:0;padding:0 12px;font-size:12px;border-radius:12px;white-space:nowrap}
 body.roomViewing #accessBadge{font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 body.roomViewing #moreRoom{flex:none;min-width:38px;height:38px}
-body.roomViewing #room-frame{display:block;flex:none;width:100%;height:min(56.25vw,calc(var(--watch-height,100dvh) * .36),430px);aspect-ratio:auto;margin:0;border-radius:0;background:#000}
+body.roomViewing #room-frame{display:block;flex:none;width:100%;height:min(var(--watch-player-height,56.25vw),max(90px,calc(var(--watch-height,100dvh) - 180px)));aspect-ratio:auto;margin:0;border-radius:0;background:#000}
 body.roomViewing #room-host{display:none!important}
 body.roomViewing #room-active .roomChat{flex:1;min-height:0;display:flex;flex-direction:column;clear:none;margin:0;padding:0 14px;border:0;border-radius:0;box-shadow:none;background:transparent;backdrop-filter:none;overflow:hidden}
 body.roomViewing .roomChat h2{flex:none;margin:0;padding:12px 2px 9px;font:500 12px system-ui;color:#99999f;border-bottom:1px solid #ffffff0b}
@@ -489,6 +489,9 @@ body.roomViewing #sheetVideoChange{grid-column:2/4;grid-row:2;justify-self:end;w
 
 #accessBadge{display:none!important}
 body.roomViewing #sheetVideoChange{grid-column:1/3;justify-self:start}
+
+body.roomViewing section[data-page="rooms"]{animation:none!important;transform:none!important;filter:none!important}
+body.roomViewing #chatText{scroll-margin:0;overflow-anchor:none}
 </style>
 </head>
 <body>
@@ -825,8 +828,11 @@ body.roomViewing #sheetVideoChange{grid-column:1/3;justify-self:start}
     byId('roomSheet').insertBefore(document.querySelector('.playerCode'),byId('roomSheet').querySelector('h3'));
     byId('room-active').querySelector('.roomBar').insertBefore(byId('sheetVideoChange'),byId('inviteRoom'));
     byId('sheetVideoChange').onclick=()=>{if(!hostHere())return;byId('roomSheet').close();byId('catalogOpen').click();};
+    let watchPlayerWidth=0;
     function syncWatchViewport(){
       const viewport=window.visualViewport;
+      const width=Math.min(document.documentElement.clientWidth||window.innerWidth,900);
+      if(width!==watchPlayerWidth){watchPlayerWidth=width;document.documentElement.style.setProperty('--watch-player-height',Math.min(width*9/16,430)+'px');}
       document.documentElement.style.setProperty('--watch-height',(viewport?.height||window.innerHeight)+'px');
       document.documentElement.style.setProperty('--watch-top',(viewport?.offsetTop||0)+'px');
     }
@@ -842,7 +848,19 @@ body.roomViewing #sheetVideoChange{grid-column:1/3;justify-self:start}
         if(field.value.length-b+a+emoji.length<=field.maxLength)field.setRangeText(emoji,a,b,'end');
         closeEmoji();field.focus();};tray.append(choice);
     }
-    byId('chatForm').onsubmit=async e=>{e.preventDefault();const input=byId('chatText'),value=input.value.trim();if(!value||input.disabled)return;input.disabled=true;try{await roomCall('chat',{media:value});input.value='';}catch(err){showToast(err.message);}finally{input.disabled=false;input.focus();}};
+    let chatSending=false;
+    const chatSendButton=byId('chatForm').querySelector('button:last-child');
+    byId('chatForm').noValidate=true;
+    chatSendButton.addEventListener('pointerdown',e=>{if(document.activeElement===byId('chatText'))e.preventDefault();});
+    byId('chatForm').onsubmit=async e=>{
+      e.preventDefault();const input=byId('chatText'),raw=input.value,value=raw.trim();
+      if(!value||chatSending||!roomState)return;
+      const sendingRoom=roomState.code,epoch=roomEpoch;
+      chatSending=true;input.value='';chatSendButton.setAttribute('aria-busy','true');
+      try{await roomCall('chat',{media:value});}
+      catch(err){if(roomEpoch===epoch&&roomState?.code===sendingRoom){if(!input.value)input.value=raw;showToast(err.message);}}
+      finally{chatSending=false;chatSendButton.removeAttribute('aria-busy');}
+    };
     byId('moreRoom').onclick=()=>{const d=roomState;byId('accessEdit').hidden=!hostHere();byId('accessMode').value=d.access_mode;const pick=byId('pick');pick.replaceChildren();
       for(const m of d.members.filter(m=>m.id!==d.host)){const l=document.createElement('label'),c=document.createElement('input');c.type='checkbox';c.value=m.id;c.checked=d.allowed.includes(m.id);l.append(c,document.createTextNode(' '+m.name));pick.append(l);}
       byId('accessMode').onchange();byId('roomSheet').showModal();};
