@@ -549,6 +549,11 @@ body.roomViewing[data-custom-keyboard="on"] #loopaKeyboard{padding:5px 0 max(22p
 #loopaKeyboard .loopaKeyRow button[data-space]{font-size:14px;flex:7}
 #loopaKeyboard .loopaKeyRow button[data-send]{font-size:13px;flex:2}
 #loopaKeyboard .loopaKeyRow[data-bottom]{margin-top:2px}
+
+/* Continuous touch surface, including the gaps and the area below Space. */
+#loopaKeyboard .loopaKeyRow{margin-block:0}
+#loopaKeyboard .loopaKeyRow button{height:52px;border-block-width:5px}
+#loopaKeyboard .loopaKeyRow[data-bottom] button{height:56px}
 </style>
 </head>
 <body>
@@ -2179,7 +2184,7 @@ body.roomViewing[data-custom-keyboard="on"] #loopaKeyboard{padding:5px 0 max(22p
  const button=document.createElement('button');button.type='button';button.textContent='Скопировать замеры клавиатуры';button.style.cssText='width:100%;min-height:44px;margin-top:18px;border:1px solid #ffffff30;border-radius:12px;background:#ffffff08;color:#eee;font:13px system-ui';
  button.onclick=async()=>{
   const ancestors=[];for(let el=$('room-active');el&&ancestors.length<7;el=el.parentElement){const c=getComputedStyle(el);ancestors.push({tag:el.tagName,id:el.id,transform:c.transform,filter:c.filter,position:c.position});}
-  const payload=JSON.stringify({build:'v50',screen:[screen.width,screen.height],font:getComputedStyle($('chatText')).fontSize,ancestors,rows});
+  const payload=JSON.stringify({build:'v51',screen:[screen.width,screen.height],font:getComputedStyle($('chatText')).fontSize,ancestors,rows});
   try{await navigator.clipboard.writeText(payload);button.textContent='Замеры скопированы — вставь в чат';}
   catch{$('roomSheet').close();text.value=payload;dialog.showModal();text.focus();text.select();}
  };
@@ -2196,7 +2201,7 @@ body.roomViewing[data-custom-keyboard="on"] #loopaKeyboard{padding:5px 0 max(22p
  const modeToggle=document.createElement('button');modeToggle.type='button';modeToggle.id='keyboardModeToggle';form.insertBefore(modeToggle,field);
  let holdDelay=null,holdRepeat=null;
  function stopKeyHold(){clearTimeout(holdDelay);clearInterval(holdRepeat);holdDelay=null;holdRepeat=null;}
- window.addEventListener('pointerup',stopKeyHold);window.addEventListener('pointercancel',stopKeyHold);window.addEventListener('blur',stopKeyHold);
+ window.addEventListener('blur',stopKeyHold);
  document.addEventListener('visibilitychange',()=>{if(document.hidden)stopKeyHold();});
  keyboard.addEventListener('contextmenu',e=>e.preventDefault());
  let lang='ru',shift=false,numbers=false;
@@ -2230,24 +2235,57 @@ body.roomViewing[data-custom-keyboard="on"] #loopaKeyboard{padding:5px 0 max(22p
   b.onclick=e=>{if(e.detail===0)action();};
   return b;
  }
- // Commit on contact: fast overlapping taps must not depend on lift position.
- keyboard.addEventListener('pointerdown',e=>{
-  const b=e.target.closest('button');if(!b||!actions.has(b)||(e.pointerType==='mouse'&&e.button!==0))return;
-  e.preventDefault();presses.set(e.pointerId,b);b.classList.add('keyPressed');
-  try{keyboard.setPointerCapture(e.pointerId);}catch{}
-  actions.get(b)();
+ // Resolve visual gutters too: a tap between keys must not disappear.
+ const useTouchEvents='ontouchstart' in window||navigator.maxTouchPoints>0;
+ function keyAt(x,y,target){
+  const direct=target?.closest?.('button');if(direct&&keyboard.contains(direct)&&actions.has(direct))return direct;
+  let nearest=null,distance=Infinity;
+  for(const button of keyboard.querySelectorAll('.loopaKeyRow button')){
+   const r=button.getBoundingClientRect();if(!r.width||!r.height)continue;
+   const dx=Math.max(r.left-x,0,x-r.right),dy=Math.max(r.top-y,0,y-r.bottom);
+   const belowSpace=button.hasAttribute('data-space')&&x>=r.left&&x<=r.right&&y>=r.bottom&&y<=r.bottom+22;
+   if(!belowSpace&&(dx>10||dy>8))continue;
+   const score=dx*dx+dy*dy;if(score<distance){distance=score;nearest=button;}
+  }
+  return nearest;
+ }
+ function pressKey(id,b){
+  if(!custom||!b||presses.has(id))return;
+  presses.set(id,b);b.classList.add('keyPressed');actions.get(b)();
   if(b.dataset.keyLabel==='⌫'){
    stopKeyHold();holdDelay=setTimeout(()=>{holdRepeat=setInterval(()=>{if(!custom||!b.isConnected||!document.body.classList.contains('roomViewing')){stopKeyHold();return;}erase();},65);},350);
   }
- });
- function releaseKey(e){
-  const original=presses.get(e.pointerId);if(!original)return;
-  e.preventDefault();presses.delete(e.pointerId);original.classList.remove('keyPressed');
+ }
+ function releaseKey(id){
+  const original=presses.get(id);if(!original)return;
+  presses.delete(id);if(![...presses.values()].includes(original))original.classList.remove('keyPressed');
   if(original.dataset.keyLabel==='⌫')stopKeyHold();
  }
- keyboard.addEventListener('pointerup',releaseKey);
- keyboard.addEventListener('pointercancel',releaseKey);
- keyboard.addEventListener('lostpointercapture',releaseKey);
+ // On touch devices process every changed contact, including overlapping fingers.
+ keyboard.addEventListener('touchstart',e=>{
+  if(!useTouchEvents||!custom)return;e.preventDefault();
+  for(const t of e.changedTouches)pressKey('t'+t.identifier,keyAt(t.clientX,t.clientY,t.target));
+ },{passive:false});
+ function releaseTouches(e){
+  if(!useTouchEvents)return;e.preventDefault();for(const t of e.changedTouches)releaseKey('t'+t.identifier);
+ }
+ keyboard.addEventListener('touchend',releaseTouches,{passive:false});
+ keyboard.addEventListener('touchcancel',releaseTouches,{passive:false});
+ keyboard.addEventListener('pointerdown',e=>{
+  if(useTouchEvents&&e.pointerType==='touch')return;
+  if(e.pointerType==='mouse'&&e.button!==0)return;
+  const b=keyAt(e.clientX,e.clientY,e.target);if(!b)return;
+  e.preventDefault();pressKey('p'+e.pointerId,b);
+  try{keyboard.setPointerCapture(e.pointerId);}catch{}
+ });
+ function releasePointer(e){
+  if(useTouchEvents&&e.pointerType==='touch')return;
+  releaseKey('p'+e.pointerId);
+ }
+ keyboard.addEventListener('pointerup',releasePointer);
+ keyboard.addEventListener('pointercancel',releasePointer);
+ keyboard.addEventListener('lostpointercapture',releasePointer);
+ window.addEventListener('blur',()=>{for(const id of [...presses.keys()])releaseKey(id);});
  function row(){const r=document.createElement('div');r.className='loopaKeyRow';keyboard.append(r);return r;}
  function render(){
   stopKeyHold();presses.forEach(b=>b.classList.remove('keyPressed'));presses.clear();keyboard.replaceChildren();
