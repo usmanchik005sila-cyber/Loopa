@@ -2087,5 +2087,36 @@ body.roomViewing #chatForm button:last-child{height:38px;width:38px}
     resetFriends();
     init();
   </script>
-<script async src="https://www.youtube.com/iframe_api"></script><script async src="https://vk.com/js/api/videoplayer.js"></script></body>
+<script async src="https://www.youtube.com/iframe_api"></script><script async src="https://vk.com/js/api/videoplayer.js"></script>
+<script>
+(()=>{
+ const rows=[];let last=0;
+ const $=id=>document.getElementById(id),round=n=>Math.round(Number(n)||0);
+ function rect(id){const r=$(id)?.getBoundingClientRect();return r?[round(r.top),round(r.height),round(r.bottom)]:null;}
+ function sample(event,force=false){
+  if(!document.body.classList.contains('roomViewing'))return;
+  const now=performance.now();if(!force&&now-last<80)return;last=now;
+  const v=window.visualViewport;
+  rows.push({t:round(now),e:event,focus:document.activeElement===$('chatText'),vh:round(v?.height),vy:round(v?.offsetTop),scale:v?.scale,ih:innerHeight,sy:round(scrollY),room:rect('room-active'),video:rect('room-frame'),field:rect('chatText'),log:rect('chatLog'),logY:round($('chatLog')?.scrollTop)});
+  if(rows.length>90)rows.shift();
+ }
+ ['focus','blur'].forEach(e=>$('chatText').addEventListener(e,()=>{sample(e,true);[100,300,600,1000].forEach(ms=>setTimeout(()=>sample(e+'+'+ms,true),ms));}));
+ window.visualViewport?.addEventListener('resize',()=>sample('vvResize'));
+ window.visualViewport?.addEventListener('scroll',()=>sample('vvScroll'));
+ window.addEventListener('scroll',()=>sample('winScroll'));
+ const dialog=document.createElement('dialog');dialog.style.cssText='width:90%;max-width:450px;max-height:80dvh;padding:20px;border-radius:20px;background:#19191b;color:#eee;border:1px solid #555';
+ const title=document.createElement('p');title.textContent='Замеры клавиатуры · v42';
+ const text=document.createElement('textarea');text.readOnly=true;text.setAttribute('aria-label','Технические замеры');text.style.cssText='width:100%;height:45dvh;font:12px monospace;background:#101012;color:#ddd';
+ const close=document.createElement('button');close.textContent='Закрыть';close.onclick=()=>dialog.close();dialog.append(title,text,close);document.body.append(dialog);
+ const button=document.createElement('button');button.type='button';button.textContent='Скопировать замеры клавиатуры';button.style.cssText='width:100%;min-height:44px;margin-top:18px;border:1px solid #ffffff30;border-radius:12px;background:#ffffff08;color:#eee;font:13px system-ui';
+ button.onclick=async()=>{
+  const ancestors=[];for(let el=$('room-active');el&&ancestors.length<7;el=el.parentElement){const c=getComputedStyle(el);ancestors.push({tag:el.tagName,id:el.id,transform:c.transform,filter:c.filter,position:c.position});}
+  const payload=JSON.stringify({build:'v42',screen:[screen.width,screen.height],font:getComputedStyle($('chatText')).fontSize,ancestors,rows});
+  try{await navigator.clipboard.writeText(payload);button.textContent='Замеры скопированы — вставь в чат';}
+  catch{$('roomSheet').close();text.value=payload;dialog.showModal();text.focus();text.select();}
+ };
+ $('roomSheet').append(button);
+})();
+</script>
+</body>
 </html>
