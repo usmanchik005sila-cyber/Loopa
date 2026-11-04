@@ -853,15 +853,18 @@ body.roomViewing #chatForm button:last-child{height:38px;width:38px}
     }
     let watchViewportFrame=0;
     function scheduleWatchViewport(){
+      // Safari may pan the layout viewport before resize is delivered.
+      // Correct geometry in this event, not one animation frame later.
+      const log=byId('chatLog'),atEnd=log.scrollHeight-log.scrollTop-log.clientHeight<48;
+      syncWatchViewport();
+      if(atEnd||document.activeElement===byId('chatText'))log.scrollTop=log.scrollHeight;
       if(watchViewportFrame)return;
-      watchViewportFrame=requestAnimationFrame(()=>{watchViewportFrame=0;
-        const log=byId('chatLog'),atEnd=log.scrollHeight-log.scrollTop-log.clientHeight<48;
-        syncWatchViewport();if(atEnd||document.activeElement===byId('chatText'))log.scrollTop=log.scrollHeight;
-      });
+      watchViewportFrame=requestAnimationFrame(()=>{watchViewportFrame=0;syncWatchViewport();});
     }
     window.visualViewport?.addEventListener('resize',scheduleWatchViewport);
     window.visualViewport?.addEventListener('scroll',scheduleWatchViewport);
-    window.addEventListener('resize',scheduleWatchViewport);syncWatchViewport();
+    window.addEventListener('resize',scheduleWatchViewport);
+    window.addEventListener('scroll',scheduleWatchViewport,{passive:true});syncWatchViewport();
     byId('chatText').addEventListener('focus',scheduleWatchViewport);
     byId('chatText').addEventListener('blur',scheduleWatchViewport);
     const tray=byId('emojiTray'), emojiOpen=byId('emojiOpen');
@@ -2105,13 +2108,13 @@ body.roomViewing #chatForm button:last-child{height:38px;width:38px}
  window.visualViewport?.addEventListener('scroll',()=>sample('vvScroll'));
  window.addEventListener('scroll',()=>sample('winScroll'));
  const dialog=document.createElement('dialog');dialog.style.cssText='width:90%;max-width:450px;max-height:80dvh;padding:20px;border-radius:20px;background:#19191b;color:#eee;border:1px solid #555';
- const title=document.createElement('p');title.textContent='Замеры клавиатуры · v42';
+ const title=document.createElement('p');title.textContent='Замеры клавиатуры · v43';
  const text=document.createElement('textarea');text.readOnly=true;text.setAttribute('aria-label','Технические замеры');text.style.cssText='width:100%;height:45dvh;font:12px monospace;background:#101012;color:#ddd';
  const close=document.createElement('button');close.textContent='Закрыть';close.onclick=()=>dialog.close();dialog.append(title,text,close);document.body.append(dialog);
  const button=document.createElement('button');button.type='button';button.textContent='Скопировать замеры клавиатуры';button.style.cssText='width:100%;min-height:44px;margin-top:18px;border:1px solid #ffffff30;border-radius:12px;background:#ffffff08;color:#eee;font:13px system-ui';
  button.onclick=async()=>{
   const ancestors=[];for(let el=$('room-active');el&&ancestors.length<7;el=el.parentElement){const c=getComputedStyle(el);ancestors.push({tag:el.tagName,id:el.id,transform:c.transform,filter:c.filter,position:c.position});}
-  const payload=JSON.stringify({build:'v42',screen:[screen.width,screen.height],font:getComputedStyle($('chatText')).fontSize,ancestors,rows});
+  const payload=JSON.stringify({build:'v43',screen:[screen.width,screen.height],font:getComputedStyle($('chatText')).fontSize,ancestors,rows});
   try{await navigator.clipboard.writeText(payload);button.textContent='Замеры скопированы — вставь в чат';}
   catch{$('roomSheet').close();text.value=payload;dialog.showModal();text.focus();text.select();}
  };
