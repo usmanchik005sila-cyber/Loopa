@@ -852,12 +852,8 @@ body.roomViewing #chatForm button:last-child{height:38px;width:38px}
       document.documentElement.style.setProperty('--watch-height',(viewport?.height||window.innerHeight)+'px');
       const root=document.documentElement;
       // Safari can retain offsetTop after scrollY has already reset.
-      let top=Math.min(Math.max(0,viewport?.offsetTop||0),Math.max(0,window.scrollY||0));
+      const top=Math.max(0,window.scrollY||0);
       root.style.setProperty('--watch-top',top+'px');
-      if(document.body.classList.contains('roomViewing')){
-        const actual=byId('room-active').getBoundingClientRect().top;
-        if(Math.abs(actual)>.5){top-=actual;root.style.setProperty('--watch-top',top+'px');}
-      }
     }
     let watchViewportFrame=0;
     function scheduleWatchViewport(){
@@ -882,6 +878,19 @@ body.roomViewing #chatForm button:last-child{height:38px;width:38px}
     }
     byId('chatText').addEventListener('focus',settleWatchViewport);
     byId('chatText').addEventListener('blur',settleWatchViewport);
+    const watchIOS=/iP(ad|hone|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+    let watchTap=null;
+    byId('chatText').addEventListener('touchstart',e=>{
+      if(!watchIOS||e.touches.length!==1||document.activeElement===byId('chatText')){watchTap=null;return;}
+      watchTap={x:e.touches[0].clientX,y:e.touches[0].clientY};
+    },{passive:true});
+    byId('chatText').addEventListener('touchend',e=>{
+      if(!watchTap)return;const start=watchTap;watchTap=null;
+      const touch=e.changedTouches[0];if(!touch||Math.abs(touch.clientX-start.x)>10||Math.abs(touch.clientY-start.y)>10)return;
+      if(!document.body.classList.contains('roomViewing')||document.activeElement===byId('chatText'))return;
+      e.preventDefault();byId('chatText').focus({preventScroll:true});settleWatchViewport();
+    },{passive:false});
+    byId('chatText').addEventListener('touchcancel',()=>{watchTap=null;});
     const tray=byId('emojiTray'), emojiOpen=byId('emojiOpen');
     function closeEmoji(){tray.hidden=true;emojiOpen.setAttribute('aria-expanded','false');}
     emojiOpen.onclick=()=>{tray.hidden=!tray.hidden;emojiOpen.setAttribute('aria-expanded',String(!tray.hidden));};
@@ -2123,13 +2132,13 @@ body.roomViewing #chatForm button:last-child{height:38px;width:38px}
  window.visualViewport?.addEventListener('scroll',()=>sample('vvScroll'));
  window.addEventListener('scroll',()=>sample('winScroll'));
  const dialog=document.createElement('dialog');dialog.style.cssText='width:90%;max-width:450px;max-height:80dvh;padding:20px;border-radius:20px;background:#19191b;color:#eee;border:1px solid #555';
- const title=document.createElement('p');title.textContent='Замеры клавиатуры · v45';
+ const title=document.createElement('p');title.textContent='Замеры клавиатуры · v46';
  const text=document.createElement('textarea');text.readOnly=true;text.setAttribute('aria-label','Технические замеры');text.style.cssText='width:100%;height:45dvh;font:12px monospace;background:#101012;color:#ddd';
  const close=document.createElement('button');close.textContent='Закрыть';close.onclick=()=>dialog.close();dialog.append(title,text,close);document.body.append(dialog);
  const button=document.createElement('button');button.type='button';button.textContent='Скопировать замеры клавиатуры';button.style.cssText='width:100%;min-height:44px;margin-top:18px;border:1px solid #ffffff30;border-radius:12px;background:#ffffff08;color:#eee;font:13px system-ui';
  button.onclick=async()=>{
   const ancestors=[];for(let el=$('room-active');el&&ancestors.length<7;el=el.parentElement){const c=getComputedStyle(el);ancestors.push({tag:el.tagName,id:el.id,transform:c.transform,filter:c.filter,position:c.position});}
-  const payload=JSON.stringify({build:'v45',screen:[screen.width,screen.height],font:getComputedStyle($('chatText')).fontSize,ancestors,rows});
+  const payload=JSON.stringify({build:'v46',screen:[screen.width,screen.height],font:getComputedStyle($('chatText')).fontSize,ancestors,rows});
   try{await navigator.clipboard.writeText(payload);button.textContent='Замеры скопированы — вставь в чат';}
   catch{$('roomSheet').close();text.value=payload;dialog.showModal();text.focus();text.select();}
  };
