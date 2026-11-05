@@ -713,6 +713,111 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
 #inviteList .inviteRow .inviteAvatar img{height:100%;width:100%;object-fit:cover}
 @media(prefers-reduced-motion:reduce){#roomParticipantsFlash{transition:none}}
 
+
+/* LOOPA v79 — single-layer page transitions, reliable player controls, compact settings */
+/* Safari may preserve old snapshots when a second tab is tapped mid-transition. */
+main{view-transition-name:none!important}
+::view-transition-old(loopa-main),::view-transition-new(loopa-main),
+::view-transition-old(root),::view-transition-new(root){animation:none!important}
+[data-page],#settings-home,#settings-detail,#settings-account,#settings-privacy,
+#settings-theme,#privacy-main-panel,#privacy-linked-panel{transform:none!important}
+/* Keep YouTube/VK/RUTUBE native controls inside the frame; our transport does not
+   float across the picture or react to iframe focus and player polling. */
+#videoStage{display:flex;flex-direction:column;overflow:visible}
+#videoStage #room-frame{flex:none;width:100%;margin:0;border-radius:0;aspect-ratio:16/9}
+#playbackControls,#videoStage.nativeAccess #playbackControls{
+ position:relative!important;inset:auto!important;z-index:2;flex:none;width:100%;height:44px;
+ display:flex;align-items:center;justify-content:center;
+ opacity:1!important;visibility:visible!important;pointer-events:auto!important;
+ background:linear-gradient(180deg,#171719,#0d0d0f)!important;
+ border-top:1px solid #ffffff12;border-bottom:1px solid #ffffff17;
+ box-sizing:border-box;transition:none!important
+}
+#playbackControls button,#videoStage.nativeAccess #playbackControls button{
+ pointer-events:auto!important;touch-action:manipulation;border:1px solid #ffffff2b!important;
+ box-shadow:none!important;text-shadow:none!important;
+ background:#ffffff08!important;color:#ececf0!important
+}
+#playbackControls button:disabled{opacity:.27;cursor:not-allowed}
+#playbackControls .transport57{display:grid;grid-template-columns:repeat(3,36px);gap:20px;align-items:center}
+#playbackControls .transport57[hidden]{display:none!important}
+#playbackControls .transport57 button{
+ width:36px!important;height:33px!important;min-width:36px!important;
+ padding:3px!important;border-radius:11px!important;
+ font-size:17px!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important
+}
+#playbackControls .transport57 svg{width:15px;height:15px;filter:none}
+#playbackControls .transport57 button small{font-size:8px;line-height:8px}
+#playbackControls #guestResync{position:absolute;right:8px;left:auto;bottom:auto;top:8px;
+ height:27px!important;font-size:10px!important;min-width:0;border-radius:9px;padding:0 9px}
+#playbackHint{position:absolute;left:9px;top:50%;transform:translateY(-50%);
+ max-width:calc((100% - 190px)/2 + 18px);font:10px/1.3 system-ui;color:#a6a6aa;
+ text-shadow:none;overflow:hidden;text-overflow:ellipsis}
+#playbackHint:empty{display:none}
+body.roomViewing #videoStage{height:calc(var(--watch-player-height,56.25vw) + 44px)!important;
+ transition:none!important}
+body.roomViewing #videoStage #room-frame{height:var(--watch-player-height,56.25vw)!important;
+ aspect-ratio:auto;transition:none!important}
+#room-active.choosing #videoStage{display:none!important}
+/* Six-second announcement does not cover the video afterwards. */
+#roomParticipantsFlash{transition:opacity .25s ease,transform .25s ease}
+/* Larger actions in the watch header, while respecting small iPhone widths. */
+body.roomViewing #room-active .roomBar{min-height:56px;height:56px;padding:5px 9px;gap:6px}
+body.roomViewing #sheetVideoChange{height:44px;min-height:44px;margin:0 auto 0 0;
+ padding:0 10px;font-size:12px;border-radius:12px}
+body.roomViewing #inviteRoom{height:44px;min-height:44px;padding:0 12px;
+ font-size:12px;font-weight:600;border-radius:12px}
+body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
+ padding:0;display:grid;place-items:center;border-radius:12px;
+ font-size:27px;line-height:1}
+@media(max-width:375px){body.roomViewing #room-active .roomBar{gap:4px;padding-inline:7px}
+ body.roomViewing #sheetVideoChange{padding-inline:7px;font-size:11px}
+ body.roomViewing #inviteRoom{padding-inline:8px;font-size:11px}
+ body.roomViewing #moreRoom{width:42px;min-width:42px}}
+/* Wider, calmer and shorter dialog; avoid the bottom-sheet covering the whole video. */
+#roomSheet{position:fixed;left:50%;right:auto;top:50%;bottom:auto;
+ margin:0;transform:translate(-50%,-50%);box-sizing:border-box;
+ width:min(calc(100vw - 20px),560px);max-height:min(76dvh,700px);
+ padding:16px 19px max(18px,env(safe-area-inset-bottom));
+ border-radius:22px;overscroll-behavior:contain;overflow-y:auto;
+ box-shadow:0 24px 85px #000b}
+#roomSheet::backdrop{background:#000b;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+#roomSheet .roomSheetHeading{display:flex;align-items:center;justify-content:space-between;
+ gap:12px;padding-bottom:9px;border-bottom:1px solid #ffffff1b}
+#roomSheet .roomSheetHeading strong{color:#ececef;font:600 15px/1.3 system-ui}
+#roomSheet .roomSheetClose{width:36px;height:36px;flex:none;display:grid;place-items:center;
+ padding:0;border:0;background:transparent;color:#b7b7bc;
+ border-radius:10px;box-shadow:none;font:normal 25px/1 system-ui;cursor:pointer}
+#roomSheet .roomSheetClose:active{background:#ffffff08}
+#roomSheet .playerCode{padding:8px 0;margin:0;gap:6px}
+#roomSheet .playerCode button{width:34px;height:34px}
+#roomSheet h3{font:600 15px/1.35 system-ui;margin:13px 0 9px}
+#roomSheet #people{gap:6px;margin:7px 0 9px}
+#roomSheet #people .roomMemberChip{padding:5px 10px 5px 6px}
+#roomSheet #sharedControlEdit{margin:12px 0 0;padding:12px 0 0}
+#roomSheet #sharedControlEdit h3{margin:0 0 9px}
+#roomSheet #sharedControlEdit small{font-size:11px;line-height:1.4}
+#roomSheet #sharedControlStatus{margin-top:6px;font-size:10px}
+#roomSheet .roomAccessOptions{gap:4px;padding:4px;border-radius:14px}
+#roomSheet .roomAccessOptions button{min-height:40px;padding:7px 3px;font:500 12px system-ui}
+/* Selected room privacy must be clear, not a glaring filled capsule. */
+#roomSheet .roomAccessOptions button[aria-pressed="true"]{background:#ffffff0a;
+ box-shadow:none;border-color:#ffffff50;color:#f6f6f8}
+#roomSheet #accessWarning{margin:10px 2px 0;font-size:11px;line-height:1.45}
+#roomSheet #saveAccess{margin-top:13px;min-height:44px;border-radius:13px;font-size:14px}
+@media(max-height:650px){#roomSheet{max-height:83dvh;padding-top:12px;padding-bottom:12px}}
+/* Allow the dialog to actually use the extra screen width: Safari/Chromium give
+   dialog a UA max-width of calc(100% - 2em) otherwise. */
+#roomSheet{max-width:calc(100vw - 12px)!important}
+@media(max-width:350px){
+ body.roomViewing #room-active .roomBar{gap:3px;padding:4px 5px}
+ body.roomViewing .roomBar .text-link{font-size:11px}
+ body.roomViewing #sheetVideoChange{padding-inline:6px;font-size:10px;letter-spacing:-.25px}
+ body.roomViewing #inviteRoom{padding-inline:6px;font-size:10px;letter-spacing:-.25px}
+ body.roomViewing #moreRoom{width:40px;min-width:40px}
+}
+@media(prefers-reduced-motion:reduce){#roomParticipantsFlash{transition:none!important}}
+
 </style>
 </head>
 <body>
@@ -761,7 +866,7 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
         <div id="room-lobby" class="panel glass"><h2>Смотреть вместе</h2><button class="action" data-room="create">Создать комнату</button><label class="friend-search-label" for="join-code">Код или ссылка</label><input id="join-code" class="friend-search-input" autocomplete="off" maxlength="1000" placeholder="Код или ссылка"><button class="action secondary" data-room="join">Войти по коду</button><h3>Вы смотрели</h3><div id="room-recent"></div></div>
 <div id="room-active" class="panel glass" hidden><div class="setupHeader"><p class="panel-note">СОВМЕСТНЫЙ ПРОСМОТР</p><h2 id="setupTitle">Выбери видео</h2></div><div class="roomBar"><button class="text-link" data-room="exit">‹ Назад</button><small id="accessBadge"></small><button id="moreRoom" class="friend-small-action" aria-label="Меню комнаты">⋯</button></div><div class="playerCode"><span>Код</span><b id="room-code"></b><button type="button" data-room="copy" aria-label="Скопировать код комнаты"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M15 5V4a1 1 0 0 0-1-1H5a2 2 0 0 0-2 2v10a1 1 0 0 0 1 1h1"/></svg></button></div><iframe id="room-frame" hidden title="Видео комнаты"></iframe><button id="inviteRoom" type="button" class="roomInvite">＋ Пригласить</button><small id="room-status" hidden></small><div id="room-host"><details id="videoEdit"><summary><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="4"/><path d="m10 9 5 3-5 3z"/></svg>Сменить видео</summary><button id="catalogOpen" type="button" class="catalogLaunch" aria-haspopup="dialog" aria-expanded="false"><span class="launchIcon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg></span><span>Каталог видео<small>YouTube, VK Видео и RUTUBE</small></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button></details></div>
 <section class="roomChat"><h2>Чат комнаты</h2><div id="chatLog"></div><div id="emojiTray" hidden aria-label="Выбор эмодзи"></div><form id="chatForm"><button type="button" id="emojiOpen" aria-label="Выбрать эмодзи" aria-controls="emojiTray" aria-expanded="false">☺</button><input class="friend-search-input" id="chatText" maxlength="1000" aria-label="Сообщение" placeholder="Сообщение…" required><button class="friend-small-action" aria-label="Отправить">↑</button></form></section></div>
-<dialog id="catalog" aria-labelledby="catalogTitle"><div class="catalogInner"><header class="catalogTop"><button type="button" id="catalogBack" hidden>‹ Все сервисы</button><span id="catalogWordmark">LOOPA</span><button type="button" id="catalogClose" aria-label="Закрыть каталог">×</button></header><div id="providerStage"><p class="catalogEyebrow">СМОТРИМ ВМЕСТЕ</p><h2 id="catalogTitle">Что посмотрим?</h2><p class="catalogIntro">Выбери сервис. Найди видео. Смотри вместе.</p><div class="providerGrid"><button type="button" class="providerTile" data-provider="youtube"><span class="serviceIcon"><svg viewBox="0 0 32 24" aria-hidden="true"><rect width="32" height="24" rx="7" fill="#ff0033"/><path d="m13 6 10 6-10 6z" fill="white"/></svg></span><span class="tileArrow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></span><span class="tileName">YouTube</span><span class="tileCaption">Найти видео</span></button><button type="button" class="providerTile" data-provider="vk"><span class="serviceIcon"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#0077ff"/><path d="M7 10h4c.2 5 2.1 7.1 3.6 7.6V10h3.7v4.3c1.5-.2 3.1-2.2 3.7-4.3h3.7c-.5 2.7-2.4 4.8-3.8 5.7 1.5.7 3.6 2.6 4.4 5.3h-4.1c-.7-2-2.2-3.5-3.9-3.7V21h-.6C10.9 21 7.4 17 7 10" fill="white"/></svg></span><span class="tileArrow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></span><span class="tileName">VK Видео</span><span class="tileCaption">Найти видео</span></button><button type="button" class="providerTile" id="rutubeOpen" data-provider="rutube"><span class="serviceIcon"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#17191f"/><circle cx="25" cy="7" r="4" fill="#ed143b"/><path d="M8 9h10a6 6 0 0 1 1 12l6 6h-7l-6-6v6H8zm4 4v4h6a2 2 0 0 0 0-4z" fill="white"/></svg></span><span class="tileArrow">↗</span><span class="tileName">RUTUBE</span><span class="tileCaption">Найти видео</span></button></div><button id="catalogLink" type="button" class="catalogLink"><span class="linkGlyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M21 3 3 10l7 3 3 7 8-17Z" stroke="#29A9EB" stroke-width="1.7" stroke-linejoin="round"/><path d="m10 13 6-6" stroke="#29A9EB" stroke-width="1.7" stroke-linecap="round"/></svg></span><span><strong>Есть ссылка?</strong><small>YouTube, VK Видео, RUTUBE</small></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button><p class="catalogFoot" id="catalogFoot">Видео откроется у всех участников комнаты</p></div><section id="searchStage" hidden aria-label="Поиск видео"><div class="catalogService"><span id="activeServiceIcon" class="serviceIcon"></span><div><p class="catalogEyebrow">КАТАЛОГ ВИДЕО</p><h2 id="activeServiceName">YouTube</h2></div></div><select hidden id="source"><option value="youtube">YouTube</option><option value="vk">VK Видео</option><option value="rutube">RUTUBE</option></select><form id="catalogForm"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input id="queryVideo" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="searchSuggestions" maxlength="100" placeholder="Видео или канал" aria-label="Название видео или канала" autocomplete="off" enterkeyhint="search"><button type="submit" id="catalogSearchButton">Найти</button></form><div id="searchSuggestions" role="listbox" aria-label="Подсказки поиска" hidden></div><p id="searchStatus" role="status" aria-live="polite">Найди то, что хочется посмотреть вместе</p><div id="catalogSkeleton" hidden aria-hidden="true"><div></div><div></div></div><div id="hits" aria-busy="false"></div><button type="button" id="nextVideos" hidden>Ещё видео</button></section><section id="linkStage" hidden><p class="catalogEyebrow">ПРЯМОЙ ВХОД К ВИДЕО</p><h2 class="linkStageTitle">Открыть по ссылке</h2><p class="catalogIntro">YouTube, VK Видео или RUTUBE</p><div id="linkEdit"><label class="friend-search-label" for="room-link">Ссылка на видео</label><input id="room-link" type="url" class="friend-search-input" placeholder="Ссылка на видео"><button class="action" data-room="video">Открыть видео</button></div></section></div></dialog><dialog id="inviteSheet"><header><h2>Пригласить друзей</h2><button type="button" id="closeInvites" aria-label="Закрыть">×</button></header><p id="inviteHint">Выбери друга — приглашение появится у него в LOOPA.</p><div id="inviteList"></div><button type="button" id="shareRoomLink" class="roomInvite">Отправить ссылку</button></dialog><aside id="roomInviteNotice" hidden role="status"><span id="roomInviteNoticeText"></span><button type="button" id="viewRoomInvites">Открыть</button><button type="button" id="hideRoomInvites" aria-label="Скрыть">×</button></aside><dialog id="roomSheet"><button class="text-link" onclick="this.parentElement.close()">Закрыть ×</button><button type="button" id="sheetVideoChange" aria-label="Сменить видео" title="Сменить видео">Сменить видео</button><h3>Участники</h3><div id="people" role="list" aria-label="Участники"></div><div id="sharedControlEdit" hidden><h3>Настройки комнаты</h3><div class="sharedControlLine"><div class="sharedControlCopy"><strong>Совместное управление</strong><small>Разрешить участникам ставить видео на паузу, включать и перематывать</small></div><label class="presence-switch" aria-label="Совместное управление"><input type="checkbox" id="roomSharedControl"><span class="presence-switch-track"></span></label></div><p id="sharedControlStatus" role="status">По умолчанию видео управляет создатель комнаты</p></div><div id="accessEdit"><h3>Комната</h3><div class="roomAccessOptions" role="group" aria-label="Доступ в комнату"><button type="button" data-access="code" aria-pressed="true">Открытая</button><button type="button" data-access="private" aria-pressed="false">Закрытая</button><button type="button" data-access="friends" aria-pressed="false">Для друзей</button></div><select hidden id="accessMode" class="privacy-select"><option value="code">Любой</option><option value="friends">Только друзья</option><option value="private">Приватная</option></select><div id="pick"></div><small id="accessWarning"></small><button class="action" id="saveAccess">Сохранить доступ</button></div></dialog><p id="room-note" role="status"></p>
+<dialog id="catalog" aria-labelledby="catalogTitle"><div class="catalogInner"><header class="catalogTop"><button type="button" id="catalogBack" hidden>‹ Все сервисы</button><span id="catalogWordmark">LOOPA</span><button type="button" id="catalogClose" aria-label="Закрыть каталог">×</button></header><div id="providerStage"><p class="catalogEyebrow">СМОТРИМ ВМЕСТЕ</p><h2 id="catalogTitle">Что посмотрим?</h2><p class="catalogIntro">Выбери сервис. Найди видео. Смотри вместе.</p><div class="providerGrid"><button type="button" class="providerTile" data-provider="youtube"><span class="serviceIcon"><svg viewBox="0 0 32 24" aria-hidden="true"><rect width="32" height="24" rx="7" fill="#ff0033"/><path d="m13 6 10 6-10 6z" fill="white"/></svg></span><span class="tileArrow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></span><span class="tileName">YouTube</span><span class="tileCaption">Найти видео</span></button><button type="button" class="providerTile" data-provider="vk"><span class="serviceIcon"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#0077ff"/><path d="M7 10h4c.2 5 2.1 7.1 3.6 7.6V10h3.7v4.3c1.5-.2 3.1-2.2 3.7-4.3h3.7c-.5 2.7-2.4 4.8-3.8 5.7 1.5.7 3.6 2.6 4.4 5.3h-4.1c-.7-2-2.2-3.5-3.9-3.7V21h-.6C10.9 21 7.4 17 7 10" fill="white"/></svg></span><span class="tileArrow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></span><span class="tileName">VK Видео</span><span class="tileCaption">Найти видео</span></button><button type="button" class="providerTile" id="rutubeOpen" data-provider="rutube"><span class="serviceIcon"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#17191f"/><circle cx="25" cy="7" r="4" fill="#ed143b"/><path d="M8 9h10a6 6 0 0 1 1 12l6 6h-7l-6-6v6H8zm4 4v4h6a2 2 0 0 0 0-4z" fill="white"/></svg></span><span class="tileArrow">↗</span><span class="tileName">RUTUBE</span><span class="tileCaption">Найти видео</span></button></div><button id="catalogLink" type="button" class="catalogLink"><span class="linkGlyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M21 3 3 10l7 3 3 7 8-17Z" stroke="#29A9EB" stroke-width="1.7" stroke-linejoin="round"/><path d="m10 13 6-6" stroke="#29A9EB" stroke-width="1.7" stroke-linecap="round"/></svg></span><span><strong>Есть ссылка?</strong><small>YouTube, VK Видео, RUTUBE</small></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button><p class="catalogFoot" id="catalogFoot">Видео откроется у всех участников комнаты</p></div><section id="searchStage" hidden aria-label="Поиск видео"><div class="catalogService"><span id="activeServiceIcon" class="serviceIcon"></span><div><p class="catalogEyebrow">КАТАЛОГ ВИДЕО</p><h2 id="activeServiceName">YouTube</h2></div></div><select hidden id="source"><option value="youtube">YouTube</option><option value="vk">VK Видео</option><option value="rutube">RUTUBE</option></select><form id="catalogForm"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input id="queryVideo" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="searchSuggestions" maxlength="100" placeholder="Видео или канал" aria-label="Название видео или канала" autocomplete="off" enterkeyhint="search"><button type="submit" id="catalogSearchButton">Найти</button></form><div id="searchSuggestions" role="listbox" aria-label="Подсказки поиска" hidden></div><p id="searchStatus" role="status" aria-live="polite">Найди то, что хочется посмотреть вместе</p><div id="catalogSkeleton" hidden aria-hidden="true"><div></div><div></div></div><div id="hits" aria-busy="false"></div><button type="button" id="nextVideos" hidden>Ещё видео</button></section><section id="linkStage" hidden><p class="catalogEyebrow">ПРЯМОЙ ВХОД К ВИДЕО</p><h2 class="linkStageTitle">Открыть по ссылке</h2><p class="catalogIntro">YouTube, VK Видео или RUTUBE</p><div id="linkEdit"><label class="friend-search-label" for="room-link">Ссылка на видео</label><input id="room-link" type="url" class="friend-search-input" placeholder="Ссылка на видео"><button class="action" data-room="video">Открыть видео</button></div></section></div></dialog><dialog id="inviteSheet"><header><h2>Пригласить друзей</h2><button type="button" id="closeInvites" aria-label="Закрыть">×</button></header><p id="inviteHint">Выбери друга — приглашение появится у него в LOOPA.</p><div id="inviteList"></div><button type="button" id="shareRoomLink" class="roomInvite">Отправить ссылку</button></dialog><aside id="roomInviteNotice" hidden role="status"><span id="roomInviteNoticeText"></span><button type="button" id="viewRoomInvites">Открыть</button><button type="button" id="hideRoomInvites" aria-label="Скрыть">×</button></aside><dialog id="roomSheet"><div class="roomSheetHeading"><strong>Настройки комнаты</strong><button class="roomSheetClose" type="button" onclick="this.closest('dialog').close()" aria-label="Закрыть настройки">×</button></div><button type="button" id="sheetVideoChange" aria-label="Сменить видео" title="Сменить видео">Сменить видео</button><h3>Участники</h3><div id="people" role="list" aria-label="Участники"></div><div id="sharedControlEdit" hidden><h3>Настройки комнаты</h3><div class="sharedControlLine"><div class="sharedControlCopy"><strong>Совместное управление</strong><small>Разрешить участникам ставить видео на паузу, включать и перематывать</small></div><label class="presence-switch" aria-label="Совместное управление"><input type="checkbox" id="roomSharedControl"><span class="presence-switch-track"></span></label></div><p id="sharedControlStatus" role="status">По умолчанию видео управляет создатель комнаты</p></div><div id="accessEdit"><h3>Доступ в комнату</h3><div class="roomAccessOptions" role="group" aria-label="Доступ в комнату"><button type="button" data-access="code" aria-pressed="true">Открытая</button><button type="button" data-access="private" aria-pressed="false">Закрытая</button><button type="button" data-access="friends" aria-pressed="false">Для друзей</button></div><select hidden id="accessMode" class="privacy-select"><option value="code">Любой</option><option value="friends">Только друзья</option><option value="private">Приватная</option></select><div id="pick"></div><small id="accessWarning"></small><button class="action" id="saveAccess">Сохранить доступ</button></div></dialog><p id="room-note" role="status"></p>
       </section>
 
       <section data-page="friends" hidden>
@@ -1093,12 +1198,9 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
     playbackControls.innerHTML='<div class="transport57"><button type="button" data-step="-10" aria-label="Назад на 10 секунд"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 4.8c0-1-1.1-1.6-2-1L4.6 10.9a1.3 1.3 0 0 0 0 2.2L15 20.2c.9.6 2 0 2-1z"/></svg><small>10</small></button><button type="button" id="roomToggle" aria-label="Воспроизведение или пауза">▶</button><button type="button" data-step="10" aria-label="Вперёд на 10 секунд"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.8c0-1 1.1-1.6 2-1l10.4 7.1a1.3 1.3 0 0 1 0 2.2L9 20.2c-.9.6-2 0-2-1z"/></svg><small>10</small></button></div><button type="button" id="guestResync">К ведущему</button><span id="playbackHint" role="status"></span>';
     videoStage.append(playbackControls);
     function revealControls(){
-      videoStage.classList.add('controlsVisible');clearTimeout(overlayTimer);
-      if(sample?.playing)overlayTimer=setTimeout(()=>{if(!playbackControls.contains(document.activeElement))videoStage.classList.remove('controlsVisible');},2400);
+      // Controls live in a persistent strip BELOW the video. Nothing to time out.
+      videoStage.classList.add('controlsVisible');
     }
-    videoStage.addEventListener('pointerdown',e=>{if(!e.target.closest('button'))revealControls();});
-    videoStage.addEventListener('keydown',revealControls);
-    window.addEventListener('blur',()=>{setTimeout(()=>{if(document.activeElement===roomBox())revealControls();},0);});
 
     // Room-wide collaborative controls. This session signal rides over Supabase Broadcast;
     // the host remains the only writer to the existing playback RPC. For a production
@@ -1213,16 +1315,20 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
       const active=!!roomState.video,host=hostHere();
       videoStage.hidden=!active;
       playbackControls.querySelector('.transport57').hidden=rutubeAd;
-      byId('roomToggle').hidden=!(host||sharedMode);
+      byId('roomToggle').hidden=false;
       byId('guestResync').hidden=host||rutubeAd;
-      playbackControls.querySelectorAll('[data-step],#roomToggle').forEach(b=>{b.disabled=rutubeAd||(!host&&!sharedMode);if(b.hasAttribute('data-step'))b.hidden=!host&&!sharedMode;});
+      playbackControls.querySelectorAll('[data-step],#roomToggle').forEach(b=>{
+        b.hidden=false;
+        b.disabled=rutubeAd||(!host&&!sharedMode);
+        b.title=(!host&&!sharedMode)?'Управление доступно создателю комнаты':b.getAttribute('aria-label');
+      });
       byId('roomToggle').innerHTML=sample?.playing?'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="5" height="18" rx="1.4"/><rect x="14" y="3" width="5" height="18" rx="1.4"/></svg>':'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.8c0-1 1.1-1.6 2-1l10.4 7.1a1.3 1.3 0 0 1 0 2.2L9 20.2c-.9.6-2 0-2-1z"/></svg>';
       byId('roomToggle').setAttribute('aria-label',sample?.playing?'Пауза':'Воспроизвести');
       byId('playbackHint').textContent=syncProblem||(rutubeAd?'Реклама RUTUBE':host?'':sharedMode?'Совместное управление':'Управляет создатель');
       const frame=roomBox();if(frame){frame.style.pointerEvents='';frame.tabIndex=0;}
       videoStage.classList.toggle('nativeAccess',rutubeAd);
       videoStage.classList.toggle('guestVideo',!host);
-      if(!sample?.playing)videoStage.classList.add('controlsVisible');
+      videoStage.classList.add('controlsVisible');
     }
     playbackControls.addEventListener('click',async e=>{
       const b=e.target.closest('button');if(!b||!roomState?.video||rutubeAd)return;
@@ -1371,7 +1477,7 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
       const label=document.createElement('span');label.className='roomFlashLabel';label.textContent=caption;
       const detail=document.createElement('small');detail.textContent=online.length===1?'Один участник в комнате':online.length+' участника в комнате';label.append(detail);
       peopleFlash.replaceChildren(photos,label);peopleFlash.classList.add('is-visible');
-      clearTimeout(roomPeopleTimer);roomPeopleTimer=setTimeout(()=>peopleFlash.classList.remove('is-visible'),30000);
+      clearTimeout(roomPeopleTimer);roomPeopleTimer=setTimeout(()=>peopleFlash.classList.remove('is-visible'),6000);
     }
     function watchFrequencyKey(){return 'loopa-watch-pairs-v1-'+currentUser?.id;}
     function readWatchFrequency(){try{return JSON.parse(localStorage.getItem(watchFrequencyKey())||'{}')||{};}catch{return {};}}
@@ -2012,36 +2118,21 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
     const navigationReducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)');
     let nativeNavigationUpdating=false;
     function navigateSmoothly(update){
-      if(typeof document.startViewTransition!=='function' || navigationReducedMotion.matches || document.body.classList.contains('roomViewing')){
-        update();
-        return;
-      }
-      const transition=document.startViewTransition(()=>{
-        nativeNavigationUpdating=true;
-        try{ update(); }
-        finally{ nativeNavigationUpdating=false; }
-      });
-      // A newer click may cancel a previous view transition; there is nothing to recover.
-      transition.finished.catch(()=>{});
+      // One state change per tap. Safari View Transitions used to snapshot old and
+      // new pages over each other on rapid navigation, so do not snapshot the DOM.
+      update();
     }
     function animateContent(element) {
-      if (!element || nativeNavigationUpdating || navigationReducedMotion.matches) return;
-      // Web Animations start reliably on Safari even when a section was hidden a moment ago.
-      if (element._loopaAnimation) element._loopaAnimation.cancel();
+      if (!element || element.hidden || navigationReducedMotion.matches) return;
+      // Fade only the *new* content in place: no translated duplicates or ghost layers.
+      if(element._loopaAnimation){element._loopaAnimation.cancel();element._loopaAnimation=null;}
       if (typeof element.animate === 'function') {
-        element._loopaAnimation = element.animate([
-          {opacity:0,transform:'translate3d(0,12px,0) scale(.995)'},
-          {opacity:1,transform:'translate3d(0,0,0) scale(1)'}
-        ],{duration:320,easing:'cubic-bezier(.18,.82,.23,1)',fill:'both'});
-        element._loopaAnimation.onfinish = () => {
-          // Clear fill so interactive controls are never left in an animated stacking context.
-          if (element._loopaAnimation) element._loopaAnimation.cancel();
-          element._loopaAnimation = null;
-        };
-      } else {
-        element.classList.remove('page-enter');
-        void element.offsetWidth;
-        element.classList.add('page-enter');
+        const animation=element.animate([{opacity:0},{opacity:1}],{
+          duration:185,easing:'ease-out',fill:'none'
+        });
+        element._loopaAnimation=animation;
+        animation.onfinish=()=>{if(element._loopaAnimation===animation)element._loopaAnimation=null;};
+        animation.oncancel=()=>{if(element._loopaAnimation===animation)element._loopaAnimation=null;};
       }
     }
     function showPage(destination) {
@@ -2050,9 +2141,10 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
       const changed = destination !== lastPage;
       pages.forEach(page => {
         const active = page.dataset.page === destination;
+        if(!active && page._loopaAnimation){page._loopaAnimation.cancel();page._loopaAnimation=null;}
         page.hidden = !active;
         page.classList.remove('page-enter');
-        if (active && changed) animateContent(page);
+        if (active && changed && destination!=='profile') animateContent(page);
       });
       lastPage = destination;
       tabs.forEach(tab => {
@@ -2152,7 +2244,6 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
       ['account','privacy','theme'].forEach(id => byId('settings-' + id).hidden = which !== id);
       if(signed){
         window.scrollTo({top:0,behavior:'instant'});
-        // The overview also needs an entrance, especially when returning via Back.
         const pane=which==='home'?byId('settings-home'):byId('settings-'+which);
         if(pane)animateContent(pane);
       }
@@ -3224,36 +3315,7 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
     init();
   </script>
 <script async src="https://www.youtube.com/iframe_api"></script><script async src="https://vk.com/js/api/videoplayer.js"></script>
-<script>
-(()=>{
- const rows=[];let last=0;
- const $=id=>document.getElementById(id),round=n=>Math.round(Number(n)||0);
- function rect(id){const r=$(id)?.getBoundingClientRect();return r?[round(r.top),round(r.height),round(r.bottom)]:null;}
- function sample(event,force=false){
-  if(!document.body.classList.contains('roomViewing'))return;
-  const now=performance.now();if(!force&&now-last<80)return;last=now;
-  const v=window.visualViewport;
-  rows.push({t:round(now),e:event,focus:document.activeElement===$('chatText'),vh:round(v?.height),vy:round(v?.offsetTop),scale:v?.scale,ih:innerHeight,sy:round(scrollY),room:rect('room-active'),video:rect('room-frame'),field:rect('chatText'),log:rect('chatLog'),logY:round($('chatLog')?.scrollTop)});
-  if(rows.length>90)rows.shift();
- }
- ['focus','blur'].forEach(e=>$('chatText').addEventListener(e,()=>{sample(e,true);[100,300,600,1000].forEach(ms=>setTimeout(()=>sample(e+'+'+ms,true),ms));}));
- window.visualViewport?.addEventListener('resize',()=>sample('vvResize'));
- window.visualViewport?.addEventListener('scroll',()=>sample('vvScroll'));
- window.addEventListener('scroll',()=>sample('winScroll'));
- const dialog=document.createElement('dialog');dialog.style.cssText='width:90%;max-width:450px;max-height:80dvh;padding:20px;border-radius:20px;background:#19191b;color:#eee;border:1px solid #555';
- const title=document.createElement('p');title.textContent='Замеры клавиатуры · v69';
- const text=document.createElement('textarea');text.readOnly=true;text.setAttribute('aria-label','Технические замеры');text.style.cssText='width:100%;height:45dvh;font:12px monospace;background:#101012;color:#ddd';
- const close=document.createElement('button');close.textContent='Закрыть';close.onclick=()=>dialog.close();dialog.append(title,text,close);document.body.append(dialog);
- const button=document.createElement('button');button.type='button';button.textContent='Скопировать замеры клавиатуры';button.style.cssText='width:100%;min-height:44px;margin-top:18px;border:1px solid #ffffff30;border-radius:12px;background:#ffffff08;color:#eee;font:13px system-ui';
- button.onclick=async()=>{
-  const ancestors=[];for(let el=$('room-active');el&&ancestors.length<7;el=el.parentElement){const c=getComputedStyle(el);ancestors.push({tag:el.tagName,id:el.id,transform:c.transform,filter:c.filter,position:c.position});}
-  const payload=JSON.stringify({build:'v69',screen:[screen.width,screen.height],font:getComputedStyle($('chatText')).fontSize,focusStrategy:'ios-opacity-task',ancestors,rows});
-  try{await navigator.clipboard.writeText(payload);button.textContent='Замеры скопированы — вставь в чат';}
-  catch{$('roomSheet').close();text.value=payload;dialog.showModal();text.focus();text.select();}
- };
- $('roomSheet').append(button);
-})();
-</script>
+
 
 </body>
 </html>
