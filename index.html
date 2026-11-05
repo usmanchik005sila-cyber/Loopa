@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#090a0c">
   <meta name="description" content="LOOPA — ближе, даже на расстоянии. Совместный просмотр с теми, кто важен.">
   <title>LOOPA — Ближе, даже на расстоянии</title>
-  <meta name="loopa-build" content="v32-animated-glass-2026-11-04">
+  <meta name="loopa-build" content="v70-fast-suggestions-2026-11-05">
   <script>
     try{const m=localStorage.getItem('loopa-wallpaper-motion');document.documentElement.dataset.wallpaperExplicit=String(m==='on');document.documentElement.dataset.wallpaperMotion=m==='off'?'off':'on';}catch{document.documentElement.dataset.wallpaperExplicit='false';document.documentElement.dataset.wallpaperMotion='on';}
   </script>
@@ -1385,10 +1385,43 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
     document.addEventListener('visibilitychange',()=>{if(document.hidden){usageTick();usageReady=false;}else if(currentUser)usageStart();});
     byId('homeJoin').onsubmit=async e=>{e.preventDefault();try{const code=parseRoomCode(byId('homeJoinCode').value);showPage('rooms');await roomRun('join',{room:code});}catch(err){showToast(err.message);}};
 
+    // LOOPA v70 — low-latency suggestions, shared by every video provider.
     let suggestionTimer=null,suggestionRevision=0,suggestionIndex=-1,suggestionValues=[];
-    const suggestionMemo=new Map(),suggestionField=byId('queryVideo'),suggestionList=byId('searchSuggestions');
-    function dismissSuggestions(){clearTimeout(suggestionTimer);suggestionRevision++;suggestionIndex=-1;suggestionValues=[];suggestionList.replaceChildren();suggestionList.hidden=true;suggestionField.setAttribute('aria-expanded','false');suggestionField.removeAttribute('aria-activedescendant');}
-    function chooseSuggestion(value){suggestionField.value=value.slice(0,100);dismissSuggestions();suggestionField.blur();searchCatalog(false);}
+    const suggestionMemo=new Map(),suggestionHistory=new Map(),suggestionField=byId('queryVideo'),suggestionList=byId('searchSuggestions');
+    const suggestionProvider=()=>byId('source').value;
+    const suggestionKey=(provider,q)=>provider+'::'+q.toLocaleLowerCase('ru');
+    function memoSuggestions(provider,q,values){
+      const key=suggestionKey(provider,q);
+      if(suggestionMemo.has(key))suggestionMemo.delete(key);
+      suggestionMemo.set(key,values);
+      if(suggestionMemo.size>100)suggestionMemo.delete(suggestionMemo.keys().next().value);
+    }
+    function rememberVideoTitles(provider,items){
+      const existing=suggestionHistory.get(provider)||[];
+      const titles=items.map(item=>item?.title).filter(x=>typeof x==='string'&&x.trim().length>1);
+      suggestionHistory.set(provider,[...new Set([...titles,...existing])].slice(0,100));
+    }
+    function immediateSuggestions(provider,q){
+      const key=suggestionKey(provider,q),normalized=q.toLocaleLowerCase('ru');
+      const exact=suggestionMemo.get(key);
+      const prefixEntries=[...suggestionMemo.entries()].filter(([k])=>k.startsWith(provider+'::')&&k!==key&&k.slice(provider.length+2).startsWith(normalized));
+      const candidates=[...(exact||[]),...(suggestionHistory.get(provider)||[]),...prefixEntries.flatMap(([,values])=>values)];
+      // Prefix matches first, then whole-word matches; never show unrelated titles.
+      const matches=[...new Set(candidates)].filter(x=>typeof x==='string'&&x.toLocaleLowerCase('ru').includes(normalized));
+      matches.sort((a,b)=>Number(b.toLocaleLowerCase('ru').startsWith(normalized))-Number(a.toLocaleLowerCase('ru').startsWith(normalized)));
+      return matches.slice(0,6);
+    }
+    function dismissSuggestions(){
+      clearTimeout(suggestionTimer);suggestionRevision++;suggestionIndex=-1;suggestionValues=[];
+      suggestionList.replaceChildren();suggestionList.hidden=true;
+      suggestionField.setAttribute('aria-expanded','false');suggestionField.removeAttribute('aria-activedescendant');
+    }
+    function chooseSuggestion(value){
+      const provider=suggestionProvider();suggestionField.value=value.slice(0,100);
+      const list=suggestionHistory.get(provider)||[];
+      suggestionHistory.set(provider,[value,...list.filter(x=>x!==value)].slice(0,100));
+      dismissSuggestions();suggestionField.blur();searchCatalog(false);
+    }
     function showSuggestions(values){
       suggestionValues=values;suggestionIndex=-1;suggestionList.replaceChildren();
       values.forEach((value,i)=>{const b=document.createElement('button');b.type='button';b.id='ytSuggestion'+i;b.setAttribute('role','option');b.setAttribute('aria-selected','false');b.tabIndex=-1;
@@ -1397,18 +1430,26 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
       });suggestionList.hidden=!values.length;suggestionField.setAttribute('aria-expanded',String(!!values.length));
     }
     function requestSuggestions(){
-      dismissSuggestions();const q=suggestionField.value.trim();
-      if(q.length<2||byId('source').value!=='youtube'||!catalogDialog.open||byId('searchStage').hidden||!hostHere())return;
-      const revision=suggestionRevision,owner=currentUser.id,code=roomState.code,key=q.toLocaleLowerCase('ru');
-      if(suggestionMemo.has(key)){showSuggestions(suggestionMemo.get(key));return;}
+      clearTimeout(suggestionTimer);const revision=++suggestionRevision;
+      const q=suggestionField.value.trim(),provider=suggestionProvider();
+      suggestionIndex=-1;
+      if(q.length<2||!catalogDialog.open||byId('searchStage').hidden||!hostHere()){
+        showSuggestions([]);return;
+      }
+      // Reuse cached suggestions before any network round trip.
+      const cached=immediateSuggestions(provider,q);showSuggestions(cached);
+      if(suggestionMemo.has(suggestionKey(provider,q)))return;
+      const owner=currentUser.id,code=roomState.code;
       suggestionTimer=setTimeout(async()=>{
-        try{const {data,error}=await client.functions.invoke('video-search',{body:{mode:'suggest',provider:'youtube',q}});
-          if(revision!==suggestionRevision||currentUser?.id!==owner||roomState?.code!==code||!catalogDialog.open||suggestionField.value.trim()!==q||byId('source').value!=='youtube')return;
+        try{
+          const {data,error}=await client.functions.invoke('video-search',{body:{mode:'suggest',provider,q}});
+          if(revision!==suggestionRevision||currentUser?.id!==owner||roomState?.code!==code||!catalogDialog.open||byId('searchStage').hidden||suggestionProvider()!==provider||suggestionField.value.trim()!==q)return;
           if(error||!Array.isArray(data?.suggestions))return;
-          const values=[...new Set(data.suggestions.filter(x=>typeof x==='string'&&x.length>0&&x.length<=150))].slice(0,6);
-          if(values.length){if(suggestionMemo.size>=30)suggestionMemo.delete(suggestionMemo.keys().next().value);suggestionMemo.set(key,values);showSuggestions(values);}
-        }catch{} // Suggestion outages never disable ordinary search.
-      },400);
+          const remote=[...new Set(data.suggestions.filter(x=>typeof x==='string'&&x.length>1&&x.length<=150))].slice(0,10);
+          memoSuggestions(provider,q,remote);
+          showSuggestions([...new Set([...remote,...immediateSuggestions(provider,q)])].slice(0,6));
+        }catch{} // If the provider has no suggestion backend, local recent titles still work.
+      },120);
     }
     suggestionField.addEventListener('input',e=>{if(!e.isComposing)requestSuggestions();});
     suggestionField.addEventListener('compositionend',requestSuggestions);
@@ -1445,6 +1486,7 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
             button.disabled=true;try{await changeRoomVideo(hit.url);if(roomState?.code===code&&roomState.video===roomMedia(hit.url)){publishWatchTitle(hit.title);historyCall('meta',{room_code:code,media:roomState.video,caption:hit.title.slice(0,200),picture:hit.image||''});closeCatalog();byId('videoEdit').open=false;}else showToast('Не удалось открыть видео. Попробуй ещё раз');}catch(e){showToast(e.message);}finally{button.disabled=false;}
           };byId('hits').append(button);
         }
+        rememberVideoTitles(provider,data.items);
         nextPage=data.next;byId('nextVideos').hidden=!nextPage;byId('searchStatus').textContent=data.items.length?'Результаты поиска':'Ничего не нашли. Попробуй другое название';
       }catch(e){if(revision===catalogRevision)byId('searchStatus').textContent=e.message;}
       finally{if(revision===catalogRevision){byId('catalogSkeleton').hidden=true;byId('catalogSearchButton').disabled=false;byId('hits').setAttribute('aria-busy','false');}}
