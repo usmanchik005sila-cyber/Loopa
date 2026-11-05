@@ -543,7 +543,7 @@ body.roomViewing #videoStage #room-frame{width:100%;height:100%;margin:0;transit
 @media(prefers-reduced-motion:reduce){#playbackControls,body.roomViewing #videoStage{transition:none}}
 @media(max-width:390px){body.roomViewing #sheetVideoChange{font-size:11px;padding-inline:7px}body.roomViewing #inviteRoom{font-size:11px;padding-inline:7px}body.roomViewing #room-active .roomBar{gap:5px;padding-inline:8px}}
 
-/* v68: animate only the two heights together; never animate the room's top. */
+/* v69: animate only the two heights together; never animate the room's top. */
 body.roomViewing #room-active,body.roomViewing #videoStage{
   transition:height 180ms cubic-bezier(.2,.7,.2,1);
 }
@@ -552,6 +552,23 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
 }
 
 .auth-methods{display:grid;gap:12px;margin:24px 0}.auth-method{width:100%;display:flex;align-items:center;gap:15px;text-align:left;padding:18px;border:1px solid #ffffff29;border-radius:18px;background:linear-gradient(135deg,#ffffff0c,#ffffff03);color:#eee;font:inherit;cursor:pointer}.auth-method small{display:block;font-size:12px;color:#aaa;line-height:1.5;margin-top:5px}.auth-method.telegram{background:linear-gradient(135deg,#eeeeee,#bdbdbd);color:#171717;opacity:1;cursor:default}.auth-method.telegram small{color:#505050}.auth-mark{display:grid;place-items:center;width:30px;flex:0 0 30px;font-size:26px}.auth-method:not(:disabled):hover{border-color:#ffffff70}.auth-method:disabled:not(.telegram){opacity:.55}.auth-email-fallback{margin-top:24px}.auth-email-fallback summary{cursor:pointer;color:#aaa;font-size:14px;padding:12px 0}.auth-email-fallback[open] summary{margin-bottom:14px}.auth-methods form{padding:8px 4px}
+
+#auth-guest{max-width:440px;margin-left:auto;margin-right:auto;padding:25px 22px}
+#auth-guest h2{font-size:26px;line-height:1.2;letter-spacing:-.6px}.auth-intro{font-size:14px!important;margin:10px 0 22px!important;color:#999!important}
+#auth-guest .auth-switch{margin-bottom:18px;border-radius:13px;gap:4px;padding:4px}
+#auth-guest .auth-switch button{padding:10px 8px;font-size:14px;border-radius:9px}
+#auth-guest .auth-methods{gap:9px;margin:0}
+#auth-guest .auth-method{min-height:54px;padding:13px 15px;border-radius:13px;gap:12px;font-size:14px;line-height:1.3;background:#ffffff05;color:#eee;box-shadow:none;border-color:#ffffff25}
+#auth-guest .auth-method.telegram{background:#29a9eb09;border-color:#29a9eb50;color:#eee}
+#auth-guest .auth-method small{font-size:11px;color:#999;margin-top:3px}
+#auth-guest .auth-mark{width:23px;flex-basis:23px;height:24px;display:grid;place-items:center}
+#auth-guest .auth-mark svg{width:23px;height:23px;display:block}
+#auth-guest .auth-email-fallback{margin-top:9px}
+#auth-guest .auth-email-fallback summary{list-style:none;display:flex;align-items:center;gap:12px;border:1px solid #ffffff25;border-radius:13px;padding:14px 15px;color:#eee;font-size:14px;min-height:54px;box-sizing:border-box}
+#auth-guest .auth-email-fallback summary::-webkit-details-marker{display:none}
+#auth-guest .auth-email-fallback summary svg{width:23px;height:23px;flex:none}
+.auth-chevron{margin-left:auto;color:#999;font-size:20px}
+#auth-guest [hidden]{display:none!important}
 </style>
 </head>
 <body>
@@ -600,7 +617,7 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
         <div id="room-lobby" class="panel glass"><h2>Смотреть вместе</h2><button class="action" data-room="create">Создать комнату</button><label class="friend-search-label" for="join-code">Код или ссылка</label><input id="join-code" class="friend-search-input" autocomplete="off" maxlength="1000" placeholder="Код или ссылка"><button class="action secondary" data-room="join">Войти по коду</button><h3>Вы смотрели</h3><div id="room-recent"></div></div>
 <div id="room-active" class="panel glass" hidden><div class="setupHeader"><p class="panel-note">СОВМЕСТНЫЙ ПРОСМОТР</p><h2 id="setupTitle">Выбери видео</h2></div><div class="roomBar"><button class="text-link" data-room="exit">‹ Назад</button><small id="accessBadge"></small><button id="moreRoom" class="friend-small-action" aria-label="Меню комнаты">⋯</button></div><div class="playerCode"><span>Код</span><b id="room-code"></b><button type="button" data-room="copy" aria-label="Скопировать код комнаты"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M15 5V4a1 1 0 0 0-1-1H5a2 2 0 0 0-2 2v10a1 1 0 0 0 1 1h1"/></svg></button></div><iframe id="room-frame" hidden title="Видео комнаты"></iframe><button id="inviteRoom" type="button" class="roomInvite">＋ Пригласить</button><small id="room-status" hidden></small><div id="room-host"><details id="videoEdit"><summary><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="4"/><path d="m10 9 5 3-5 3z"/></svg>Сменить видео</summary><button id="catalogOpen" type="button" class="catalogLaunch" aria-haspopup="dialog" aria-expanded="false"><span class="launchIcon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg></span><span>Каталог видео<small>YouTube, VK Видео и RUTUBE</small></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button></details></div>
 <section class="roomChat"><h2>Чат комнаты</h2><div id="chatLog"></div><div id="emojiTray" hidden aria-label="Выбор эмодзи"></div><form id="chatForm"><button type="button" id="emojiOpen" aria-label="Выбрать эмодзи" aria-controls="emojiTray" aria-expanded="false">☺</button><input class="friend-search-input" id="chatText" maxlength="1000" aria-label="Сообщение" placeholder="Сообщение…" required><button class="friend-small-action" aria-label="Отправить">↑</button></form></section></div>
-<dialog id="catalog" aria-labelledby="catalogTitle"><div class="catalogInner"><header class="catalogTop"><button type="button" id="catalogBack" hidden>‹ Все сервисы</button><span id="catalogWordmark">LOOPA</span><button type="button" id="catalogClose" aria-label="Закрыть каталог">×</button></header><div id="providerStage"><p class="catalogEyebrow">СМОТРИМ ВМЕСТЕ</p><h2 id="catalogTitle">Что посмотрим?</h2><p class="catalogIntro">Выбери сервис. Найди видео. Смотри вместе.</p><div class="providerGrid"><button type="button" class="providerTile" data-provider="youtube"><span class="serviceIcon"><svg viewBox="0 0 32 24" aria-hidden="true"><rect width="32" height="24" rx="7" fill="#ff0033"/><path d="m13 6 10 6-10 6z" fill="white"/></svg></span><span class="tileArrow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></span><span class="tileName">YouTube</span><span class="tileCaption">Найти видео</span></button><button type="button" class="providerTile" data-provider="vk"><span class="serviceIcon"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#0077ff"/><path d="M7 10h4c.2 5 2.1 7.1 3.6 7.6V10h3.7v4.3c1.5-.2 3.1-2.2 3.7-4.3h3.7c-.5 2.7-2.4 4.8-3.8 5.7 1.5.7 3.6 2.6 4.4 5.3h-4.1c-.7-2-2.2-3.5-3.9-3.7V21h-.6C10.9 21 7.4 17 7 10" fill="white"/></svg></span><span class="tileArrow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></span><span class="tileName">VK Видео</span><span class="tileCaption">Найти видео</span></button><button type="button" class="providerTile" id="rutubeOpen" data-provider="rutube"><span class="serviceIcon"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#17191f"/><circle cx="25" cy="7" r="4" fill="#ed143b"/><path d="M8 9h10a6 6 0 0 1 1 12l6 6h-7l-6-6v6H8zm4 4v4h6a2 2 0 0 0 0-4z" fill="white"/></svg></span><span class="tileArrow">↗</span><span class="tileName">RUTUBE</span><span class="tileCaption">Найти видео</span></button></div><button id="catalogLink" type="button" class="catalogLink"><span class="linkGlyph" aria-hidden="true">↗</span><span><strong>Есть ссылка?</strong><small>YouTube, VK Видео, RUTUBE</small></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button><p class="catalogFoot" id="catalogFoot">Видео откроется у всех участников комнаты</p></div><section id="searchStage" hidden aria-label="Поиск видео"><div class="catalogService"><span id="activeServiceIcon" class="serviceIcon"></span><div><p class="catalogEyebrow">КАТАЛОГ ВИДЕО</p><h2 id="activeServiceName">YouTube</h2></div></div><select hidden id="source"><option value="youtube">YouTube</option><option value="vk">VK Видео</option><option value="rutube">RUTUBE</option></select><form id="catalogForm"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input id="queryVideo" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="searchSuggestions" maxlength="100" placeholder="Видео или канал" aria-label="Название видео или канала" autocomplete="off" enterkeyhint="search"><button type="submit" id="catalogSearchButton">Найти</button></form><div id="searchSuggestions" role="listbox" aria-label="Подсказки поиска" hidden></div><p id="searchStatus" role="status" aria-live="polite">Найди то, что хочется посмотреть вместе</p><div id="catalogSkeleton" hidden aria-hidden="true"><div></div><div></div></div><div id="hits" aria-busy="false"></div><button type="button" id="nextVideos" hidden>Ещё видео</button></section><section id="linkStage" hidden><p class="catalogEyebrow">ПРЯМОЙ ВХОД К ВИДЕО</p><h2 class="linkStageTitle">Открыть по ссылке</h2><p class="catalogIntro">YouTube, VK Видео или RUTUBE</p><div id="linkEdit"><label class="friend-search-label" for="room-link">Ссылка на видео</label><input id="room-link" type="url" class="friend-search-input" placeholder="Ссылка на видео"><button class="action" data-room="video">Открыть видео</button></div></section></div></dialog><dialog id="inviteSheet"><header><h2>Пригласить друзей</h2><button type="button" id="closeInvites" aria-label="Закрыть">×</button></header><p id="inviteHint">Выбери друга — приглашение появится у него в LOOPA.</p><div id="inviteList"></div><button type="button" id="shareRoomLink" class="roomInvite">Отправить ссылку</button></dialog><aside id="roomInviteNotice" hidden role="status"><span id="roomInviteNoticeText"></span><button type="button" id="viewRoomInvites">Открыть</button><button type="button" id="hideRoomInvites" aria-label="Скрыть">×</button></aside><dialog id="roomSheet"><button class="text-link" onclick="this.parentElement.close()">Закрыть ×</button><button type="button" id="sheetVideoChange" aria-label="Сменить видео" title="Сменить видео">Сменить видео</button><h3>Участники</h3><div id="people" role="list" aria-label="Участники"></div><div id="accessEdit"><h3>Комната</h3><div class="roomAccessOptions" role="group" aria-label="Доступ в комнату"><button type="button" data-access="code" aria-pressed="true">Открытая</button><button type="button" data-access="private" aria-pressed="false">Закрытая</button><button type="button" data-access="friends" aria-pressed="false">Для друзей</button></div><select hidden id="accessMode" class="privacy-select"><option value="code">Любой</option><option value="friends">Только друзья</option><option value="private">Приватная</option></select><div id="pick"></div><small id="accessWarning"></small><button class="action" id="saveAccess">Сохранить доступ</button></div></dialog><p id="room-note" role="status"></p>
+<dialog id="catalog" aria-labelledby="catalogTitle"><div class="catalogInner"><header class="catalogTop"><button type="button" id="catalogBack" hidden>‹ Все сервисы</button><span id="catalogWordmark">LOOPA</span><button type="button" id="catalogClose" aria-label="Закрыть каталог">×</button></header><div id="providerStage"><p class="catalogEyebrow">СМОТРИМ ВМЕСТЕ</p><h2 id="catalogTitle">Что посмотрим?</h2><p class="catalogIntro">Выбери сервис. Найди видео. Смотри вместе.</p><div class="providerGrid"><button type="button" class="providerTile" data-provider="youtube"><span class="serviceIcon"><svg viewBox="0 0 32 24" aria-hidden="true"><rect width="32" height="24" rx="7" fill="#ff0033"/><path d="m13 6 10 6-10 6z" fill="white"/></svg></span><span class="tileArrow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></span><span class="tileName">YouTube</span><span class="tileCaption">Найти видео</span></button><button type="button" class="providerTile" data-provider="vk"><span class="serviceIcon"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#0077ff"/><path d="M7 10h4c.2 5 2.1 7.1 3.6 7.6V10h3.7v4.3c1.5-.2 3.1-2.2 3.7-4.3h3.7c-.5 2.7-2.4 4.8-3.8 5.7 1.5.7 3.6 2.6 4.4 5.3h-4.1c-.7-2-2.2-3.5-3.9-3.7V21h-.6C10.9 21 7.4 17 7 10" fill="white"/></svg></span><span class="tileArrow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></span><span class="tileName">VK Видео</span><span class="tileCaption">Найти видео</span></button><button type="button" class="providerTile" id="rutubeOpen" data-provider="rutube"><span class="serviceIcon"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#17191f"/><circle cx="25" cy="7" r="4" fill="#ed143b"/><path d="M8 9h10a6 6 0 0 1 1 12l6 6h-7l-6-6v6H8zm4 4v4h6a2 2 0 0 0 0-4z" fill="white"/></svg></span><span class="tileArrow">↗</span><span class="tileName">RUTUBE</span><span class="tileCaption">Найти видео</span></button></div><button id="catalogLink" type="button" class="catalogLink"><span class="linkGlyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M21 3 3 10l7 3 3 7 8-17Z" stroke="#29A9EB" stroke-width="1.7" stroke-linejoin="round"/><path d="m10 13 6-6" stroke="#29A9EB" stroke-width="1.7" stroke-linecap="round"/></svg></span><span><strong>Есть ссылка?</strong><small>YouTube, VK Видео, RUTUBE</small></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button><p class="catalogFoot" id="catalogFoot">Видео откроется у всех участников комнаты</p></div><section id="searchStage" hidden aria-label="Поиск видео"><div class="catalogService"><span id="activeServiceIcon" class="serviceIcon"></span><div><p class="catalogEyebrow">КАТАЛОГ ВИДЕО</p><h2 id="activeServiceName">YouTube</h2></div></div><select hidden id="source"><option value="youtube">YouTube</option><option value="vk">VK Видео</option><option value="rutube">RUTUBE</option></select><form id="catalogForm"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input id="queryVideo" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="searchSuggestions" maxlength="100" placeholder="Видео или канал" aria-label="Название видео или канала" autocomplete="off" enterkeyhint="search"><button type="submit" id="catalogSearchButton">Найти</button></form><div id="searchSuggestions" role="listbox" aria-label="Подсказки поиска" hidden></div><p id="searchStatus" role="status" aria-live="polite">Найди то, что хочется посмотреть вместе</p><div id="catalogSkeleton" hidden aria-hidden="true"><div></div><div></div></div><div id="hits" aria-busy="false"></div><button type="button" id="nextVideos" hidden>Ещё видео</button></section><section id="linkStage" hidden><p class="catalogEyebrow">ПРЯМОЙ ВХОД К ВИДЕО</p><h2 class="linkStageTitle">Открыть по ссылке</h2><p class="catalogIntro">YouTube, VK Видео или RUTUBE</p><div id="linkEdit"><label class="friend-search-label" for="room-link">Ссылка на видео</label><input id="room-link" type="url" class="friend-search-input" placeholder="Ссылка на видео"><button class="action" data-room="video">Открыть видео</button></div></section></div></dialog><dialog id="inviteSheet"><header><h2>Пригласить друзей</h2><button type="button" id="closeInvites" aria-label="Закрыть">×</button></header><p id="inviteHint">Выбери друга — приглашение появится у него в LOOPA.</p><div id="inviteList"></div><button type="button" id="shareRoomLink" class="roomInvite">Отправить ссылку</button></dialog><aside id="roomInviteNotice" hidden role="status"><span id="roomInviteNoticeText"></span><button type="button" id="viewRoomInvites">Открыть</button><button type="button" id="hideRoomInvites" aria-label="Скрыть">×</button></aside><dialog id="roomSheet"><button class="text-link" onclick="this.parentElement.close()">Закрыть ×</button><button type="button" id="sheetVideoChange" aria-label="Сменить видео" title="Сменить видео">Сменить видео</button><h3>Участники</h3><div id="people" role="list" aria-label="Участники"></div><div id="accessEdit"><h3>Комната</h3><div class="roomAccessOptions" role="group" aria-label="Доступ в комнату"><button type="button" data-access="code" aria-pressed="true">Открытая</button><button type="button" data-access="private" aria-pressed="false">Закрытая</button><button type="button" data-access="friends" aria-pressed="false">Для друзей</button></div><select hidden id="accessMode" class="privacy-select"><option value="code">Любой</option><option value="friends">Только друзья</option><option value="private">Приватная</option></select><div id="pick"></div><small id="accessWarning"></small><button class="action" id="saveAccess">Сохранить доступ</button></div></dialog><p id="room-note" role="status"></p>
       </section>
 
       <section data-page="friends" hidden>
@@ -634,25 +651,26 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
         <div class="panel glass" id="auth-loading"><p class="panel-note">АККАУНТ LOOPA</p><h2>Подключаемся…</h2><p>Проверяем авторизацию.</p></div>
         <div class="panel glass" id="auth-guest" hidden>
           <p class="panel-note">АККАУНТ LOOPA</p>
-          <h2>Твоя история начинается здесь.</h2>
-          <p style="margin:12px 0 20px">Выбери удобный способ входа.</p>
+          <h2>Добро пожаловать в LOOPA.</h2>
+          <p class="auth-intro">Смотри и общайся вместе.</p>
+          <div class="auth-switch" aria-label="Режим авторизации">
+            <button type="button" data-auth-mode="login" aria-pressed="false">Вход</button>
+            <button type="button" data-auth-mode="signup" class="selected" aria-pressed="true">Регистрация</button>
+          </div>
           <div class="auth-methods">
-            <button class="auth-method telegram" type="button" disabled><span class="auth-mark" aria-hidden="true">↗</span><span>Регистрация через Telegram<small>(скоро появится)</small></span></button>
-            <button class="auth-method" id="auth-google" type="button"><span class="auth-mark" aria-hidden="true">G</span><span>Регистрация через Google<small>Вход в существующий аккаунт — здесь же</small></span></button>
-            <button class="auth-method" id="auth-phone-open" type="button" aria-expanded="false" aria-controls="auth-phone-form"><span class="auth-mark" aria-hidden="true">＋</span><span>Регистрация по номеру телефона<small>Без пароля · код из SMS</small></span></button>
+            <button class="auth-method telegram" type="button" disabled><span class="auth-mark" aria-hidden="true">↗</span><span>Через Telegram<small>(скоро появится)</small></span></button>
+            <button class="auth-method" id="auth-google" type="button"><span class="auth-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path fill="#4285F4" d="M21.6 12.23c0-.71-.06-1.39-.18-2.05H12v3.88h5.38a4.6 4.6 0 0 1-2 3.02v2.51h3.23c1.89-1.74 2.99-4.3 2.99-7.36Z"/><path fill="#34A853" d="M12 22c2.7 0 4.96-.9 6.61-2.41l-3.23-2.51c-.9.6-2.04.97-3.38.97-2.6 0-4.8-1.76-5.59-4.12H3.07v2.59A10 10 0 0 0 12 22Z"/><path fill="#FBBC05" d="M6.41 13.93A6 6 0 0 1 6.1 12c0-.67.11-1.32.31-1.93V7.48H3.07A10 10 0 0 0 2 12c0 1.61.39 3.14 1.07 4.52l3.34-2.59Z"/><path fill="#EA4335" d="M12 5.95c1.47 0 2.79.5 3.82 1.49l2.87-2.87A9.6 9.6 0 0 0 12 2a10 10 0 0 0-8.93 5.48l3.34 2.59C7.2 7.71 9.4 5.95 12 5.95Z"/></svg></span><span>Через Google</span></button>
+            <button class="auth-method" id="auth-phone-open" type="button" aria-expanded="false" aria-controls="auth-phone-form"><span class="auth-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10 5h4M11 18.5h2" stroke-linecap="round"/></svg></span><span>По номеру телефона</span></button>
             <form id="auth-phone-form" hidden>
               <label class="field">Номер телефона<input id="auth-phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="+7 999 123-45-67" required maxlength="24"></label>
               <button class="action secondary" id="auth-sms-send" type="button">Получить код</button>
               <div id="auth-code-panel" hidden><label class="field">Код из SMS<input id="auth-code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="000000"></label><button class="action" id="auth-sms-verify" type="submit">Подтвердить и войти</button></div>
             </form>
-            <button class="auth-method" id="auth-guest-open" type="button" aria-expanded="false" aria-controls="auth-guest-form"><span class="auth-mark" aria-hidden="true">○</span><span>Регистрация как гость<small>Только имя, без почты и пароля</small></span></button>
+            <button class="auth-method" id="auth-guest-open" type="button" aria-expanded="false" aria-controls="auth-guest-form"><span class="auth-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8" r="3.5"/><path d="M5 21v-2a7 7 0 0 1 14 0v2" stroke-linecap="round"/></svg></span><span>Как гость</span></button>
             <form id="auth-guest-form" hidden><label class="field">Твоё имя<input id="auth-guest-name" autocomplete="nickname" maxlength="40" required placeholder="Как к тебе обращаться"></label><p class="field-note">Гостевой профиль доступен в этом браузере. После выхода или очистки данных восстановить его не получится.</p><button class="action" id="auth-guest-submit" type="submit">Продолжить как гость</button></form>
           </div>
-          <details class="auth-email-fallback"><summary>Вход и регистрация по почте</summary>
-          <div class="auth-switch" aria-label="Режим авторизации">
-            <button type="button" data-auth-mode="login" class="selected" aria-pressed="true">Войти</button>
-            <button type="button" data-auth-mode="signup" aria-pressed="false">Регистрация</button>
-          </div>
+          <details class="auth-email-fallback"><summary><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m4 7 8 6 8-6"/></svg><span>По почте</span><span class="auth-chevron" aria-hidden="true">›</span></summary>
+
           <form id="auth-form">
             <label class="field" id="signup-name-field" hidden>Твоё имя
               <input id="auth-name" type="text" maxlength="40" autocomplete="nickname" placeholder="Как к тебе обращаться">
@@ -774,7 +792,7 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
     let toastTimer;
     let client = null;
     let currentUser = null;
-    let authMode = 'login';
+    let authMode = 'signup';
 
     let sample=null, observed=null, writing=false, pending=null, mediaChanging=false;
     let roomState=null, roomUser=null, roomEpoch=0, roomClock=0, roomPoll=false, vkPlayer=null, ytPlayer=null;
@@ -1510,6 +1528,16 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
     }
     function selectAuthMode(mode) {
       authMode = mode;
+      const signup=mode==='signup';
+      byId('auth-guest').querySelector('.telegram').hidden=!signup;
+      byId('auth-google').hidden=!signup;
+      byId('auth-guest-open').hidden=!signup;
+      for(const kind of ['phone','guest']){
+        byId('auth-'+kind+'-form').hidden=true;
+        byId('auth-'+kind+'-open').setAttribute('aria-expanded','false');
+      }
+      byId('auth-guest').querySelector('.auth-email-fallback').open=false;
+
       document.querySelectorAll('[data-auth-mode]').forEach(button => {
         const selected = button.dataset.authMode === mode;
         button.classList.toggle('selected', selected);
@@ -2194,7 +2222,7 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
       if (button.dataset.message) showToast(button.dataset.message);
       if (button.dataset.authMode) selectAuthMode(button.dataset.authMode);
     });
-    // v68: real Supabase sessions only; never simulate a guest locally.
+    // v69: real Supabase sessions only; never simulate a guest locally.
     let authMethodBusy=false, smsPhone='', smsNextSend=0;
     async function checkAuthProvider(provider){
       if(!client)throw new Error('Подключение недоступно. Обнови страницу.');
@@ -2232,7 +2260,7 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
       if(!/^\+[1-9]\d{7,14}$/.test(phone))throw new Error('Укажи номер с кодом страны, например +7 999 123-45-67.');
       if(Date.now()<smsNextSend)throw new Error('Повторный код можно запросить через '+Math.ceil((smsNextSend-Date.now())/1000)+' сек.');
       await checkAuthProvider('phone');
-      const {error}=await client.auth.signInWithOtp({phone,options:{channel:'sms'}});if(error)throw error;
+      const {error}=await client.auth.signInWithOtp({phone,options:{channel:'sms',shouldCreateUser:authMode==='signup'}});if(error)throw error;
       smsPhone=phone;smsNextSend=Date.now()+60000;byId('auth-code-panel').hidden=false;byId('auth-code').required=true;
       feedback('auth-feedback','Код отправлен. Введи его ниже.');byId('auth-code').focus();
     });
@@ -2392,6 +2420,7 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
         feedback('auth-feedback',errorText(err),true);
       }
     }
+    selectAuthMode('signup');
     resetFriends();
     init();
   </script>
@@ -2413,13 +2442,13 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
  window.visualViewport?.addEventListener('scroll',()=>sample('vvScroll'));
  window.addEventListener('scroll',()=>sample('winScroll'));
  const dialog=document.createElement('dialog');dialog.style.cssText='width:90%;max-width:450px;max-height:80dvh;padding:20px;border-radius:20px;background:#19191b;color:#eee;border:1px solid #555';
- const title=document.createElement('p');title.textContent='Замеры клавиатуры · v68';
+ const title=document.createElement('p');title.textContent='Замеры клавиатуры · v69';
  const text=document.createElement('textarea');text.readOnly=true;text.setAttribute('aria-label','Технические замеры');text.style.cssText='width:100%;height:45dvh;font:12px monospace;background:#101012;color:#ddd';
  const close=document.createElement('button');close.textContent='Закрыть';close.onclick=()=>dialog.close();dialog.append(title,text,close);document.body.append(dialog);
  const button=document.createElement('button');button.type='button';button.textContent='Скопировать замеры клавиатуры';button.style.cssText='width:100%;min-height:44px;margin-top:18px;border:1px solid #ffffff30;border-radius:12px;background:#ffffff08;color:#eee;font:13px system-ui';
  button.onclick=async()=>{
   const ancestors=[];for(let el=$('room-active');el&&ancestors.length<7;el=el.parentElement){const c=getComputedStyle(el);ancestors.push({tag:el.tagName,id:el.id,transform:c.transform,filter:c.filter,position:c.position});}
-  const payload=JSON.stringify({build:'v68',screen:[screen.width,screen.height],font:getComputedStyle($('chatText')).fontSize,focusStrategy:'ios-opacity-task',ancestors,rows});
+  const payload=JSON.stringify({build:'v69',screen:[screen.width,screen.height],font:getComputedStyle($('chatText')).fontSize,focusStrategy:'ios-opacity-task',ancestors,rows});
   try{await navigator.clipboard.writeText(payload);button.textContent='Замеры скопированы — вставь в чат';}
   catch{$('roomSheet').close();text.value=payload;dialog.showModal();text.focus();text.select();}
  };
