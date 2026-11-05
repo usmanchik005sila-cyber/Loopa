@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#090a0c">
   <meta name="description" content="LOOPA — ближе, даже на расстоянии. Совместный просмотр с теми, кто важен.">
   <title>LOOPA — Ближе, даже на расстоянии</title>
-  <meta name="loopa-build" content="v72-verified-auth-2026-11-05">
+  <meta name="loopa-build" content="v74-telegram-oidc-2026-11-05">
   <script>
     try{const m=localStorage.getItem('loopa-wallpaper-motion');document.documentElement.dataset.wallpaperExplicit=String(m==='on');document.documentElement.dataset.wallpaperMotion=m==='off'?'off':'on';}catch{document.documentElement.dataset.wallpaperExplicit='false';document.documentElement.dataset.wallpaperMotion='on';}
   </script>
@@ -569,7 +569,7 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
 #auth-guest .auth-email-fallback summary svg{width:23px;height:23px;flex:none}
 .auth-chevron{margin-left:auto;color:#999;font-size:20px}
 #auth-guest [hidden]{display:none!important}
-/* LOOPA v72 — iCloud mail links and legacy-account compatibility. */
+/* LOOPA v73 — iCloud six-digit email OTP and legacy-account compatibility. */
 #auth-icloud-form{padding:2px 4px 13px}
 #auth-icloud-form .action{margin-top:16px}
 #auth-icloud-form .field-note{margin-top:10px!important;line-height:1.55!important}
@@ -580,12 +580,48 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
 .auth-legacy-email[open]>summary{color:#eee}
 .auth-legacy-email #auth-form{padding:4px 0}
 #auth-icloud-details[open]>summary{border-color:#ffffff4d}
+/* One visible, autofill-compatible input is used for all six digits. */
+#auth-icloud-code-panel{padding:8px 3px 2px}
+#auth-icloud-code-panel .field{margin-top:15px}
+#auth-icloud-code{height:62px;font-size:26px;font-weight:650;letter-spacing:.49em;text-align:center;padding-left:calc(14px + .49em);font-variant-numeric:tabular-nums;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}
+#auth-icloud-code-panel .action{margin-top:12px}
+#auth-icloud-resend{display:block;min-height:40px;margin:8px auto 0;padding:7px 11px;border:0;border-radius:10px;background:transparent;color:#cac5c9;font-size:12px;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+#auth-icloud-resend:disabled{opacity:.6;cursor:default;text-decoration:none}
+#auth-icloud-code-panel[hidden]{display:none!important}
 #auth-guest [hidden]{display:none!important}
 
 /* LOOPA v71: clearly distinguish the instant search action from real suggestions. */
 #searchSuggestions button.suggestSearchNow{color:#bdbdc6;border-top:1px solid #ffffff16;background:#ffffff04;font-size:13px}
 #searchSuggestions button.suggestSearchNow:first-child{border-top:0}
 #searchSuggestions button.suggestSearchNow>span:last-child{color:#c7c7d2;font-size:21px;line-height:1}
+
+/* LOOPA v74: Telegram OIDC login, signup and optional existing-account linking. */
+#auth-guest .auth-method.telegram{cursor:pointer;background:linear-gradient(130deg,#34a9dc19,#ffffff04);border-color:#36aee258}
+#auth-guest .auth-method.telegram:not(:disabled):active{background:#36aee22c}
+#auth-guest .auth-method.telegram .auth-mark svg{width:23px;height:23px;stroke:none}
+.telegram-auth-dialog{box-sizing:border-box;width:min(calc(100vw - 30px),430px);max-height:min(88dvh,680px);overflow:auto;padding:27px 23px 23px;border:1px solid #ffffff36;border-radius:25px;background:radial-gradient(ellipse at 100% 0%,#36aee21a,transparent 60%),linear-gradient(155deg,#252529,#0f1013 75%);color:#f4f1f0;box-shadow:0 30px 80px #000a}
+.telegram-auth-dialog::backdrop{background:rgba(0,0,0,.72);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px)}
+.telegram-auth-dialog:not([open]){display:none}
+.telegram-dialog-head{display:flex;align-items:center;justify-content:space-between}
+.telegram-dialog-icon{display:grid;place-items:center;width:56px;height:56px;border-radius:18px;background:#36aee216;border:1px solid #36aee24d}
+.telegram-dialog-icon svg{width:31px;height:31px}
+#telegramAuthClose{display:grid;place-items:center;width:39px;height:39px;border:1px solid #ffffff28;border-radius:50%;background:#ffffff08;color:#d9d6d8;font:24px/1 system-ui;cursor:pointer}
+.telegram-dialog-eyebrow{margin:28px 0 12px;color:#b5afb8;font:600 10px system-ui;letter-spacing:2px}
+.telegram-auth-dialog h2{font:normal 32px/1.15 Georgia,serif;letter-spacing:-.5px;margin:0 0 14px}
+#telegramAuthDescription{font:14px/1.7 system-ui;color:#bab5bb;margin:0 0 17px}
+.telegram-dialog-points{display:grid;gap:11px;margin:15px 0 23px;padding:16px;border:1px solid #ffffff1c;border-radius:15px;background:#ffffff05;color:#d4d1d7;font:12px/1.45 system-ui}
+.telegram-auth-dialog .action{margin:0}
+.telegram-dialog-cancel{display:block;margin:12px auto 0;padding:9px 14px;min-height:38px;border:0;background:transparent;color:#aba5ad;font:13px system-ui;cursor:pointer}
+.telegram-auth-dialog .auth-feedback{margin-top:8px!important}
+.telegram-connect{display:flex;align-items:center;gap:10px;margin:20px 0 5px;padding:14px 12px;border:1px solid #ffffff23;border-radius:15px;background:linear-gradient(135deg,#36aee20d,#ffffff02)}
+.telegram-connect-icon{display:grid;place-items:center;width:35px;height:35px;flex-shrink:0;border:1px solid #36aee23d;border-radius:12px;background:#36aee213}
+.telegram-connect-icon svg{width:20px;height:20px}
+.telegram-connect-copy{min-width:0;flex:1}
+.telegram-connect-copy strong{display:block;font-size:13px;font-weight:600}
+.telegram-connect-copy small{display:block;color:#aaa4ad;font-size:11px;line-height:1.4;margin-top:4px}
+#telegram-connect-button{flex-shrink:0;padding:8px 10px;border:1px solid #ffffff35;border-radius:10px;background:#ffffff0c;color:#ece9ec;font:12px system-ui;cursor:pointer}
+#telegram-connect-button:disabled{opacity:.65;cursor:default}
+@media(max-width:360px){.telegram-auth-dialog{padding:22px 16px}.telegram-connect{gap:7px;padding:11px 9px}#telegram-connect-button{padding:8px;font-size:11px}}
 </style>
 </head>
 <body>
@@ -675,7 +711,7 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
             <button type="button" data-auth-mode="signup" class="selected" aria-pressed="true">Регистрация</button>
           </div>
           <div class="auth-methods">
-            <button class="auth-method telegram" type="button" disabled><span class="auth-mark" aria-hidden="true">↗</span><span>Через Telegram<small>(скоро появится)</small></span></button>
+            <button class="auth-method telegram" id="auth-telegram" type="button"><span class="auth-mark" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3 2.9 10.5c-.7.3-.7 1.2.1 1.5l4.6 1.5 1.8 5.4c.2.7 1 .9 1.5.3l2.7-2.8 4.6 3.4c.6.4 1.4.1 1.5-.6L22 4.2c.1-.8-.3-1.4-1-1.2Z" fill="#36aee2" stroke="none"/><path d="m8 13.5 10.8-7.1-8.4 9.8" fill="none" stroke="#fff" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Через Telegram<small>Без пароля и SMS</small></span></button>
             <button class="auth-method" id="auth-google" type="button"><span class="auth-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path fill="#4285F4" d="M21.6 12.23c0-.71-.06-1.39-.18-2.05H12v3.88h5.38a4.6 4.6 0 0 1-2 3.02v2.51h3.23c1.89-1.74 2.99-4.3 2.99-7.36Z"/><path fill="#34A853" d="M12 22c2.7 0 4.96-.9 6.61-2.41l-3.23-2.51c-.9.6-2.04.97-3.38.97-2.6 0-4.8-1.76-5.59-4.12H3.07v2.59A10 10 0 0 0 12 22Z"/><path fill="#FBBC05" d="M6.41 13.93A6 6 0 0 1 6.1 12c0-.67.11-1.32.31-1.93V7.48H3.07A10 10 0 0 0 2 12c0 1.61.39 3.14 1.07 4.52l3.34-2.59Z"/><path fill="#EA4335" d="M12 5.95c1.47 0 2.79.5 3.82 1.49l2.87-2.87A9.6 9.6 0 0 0 12 2a10 10 0 0 0-8.93 5.48l3.34 2.59C7.2 7.71 9.4 5.95 12 5.95Z"/></svg></span><span>Через Google</span></button>
             <button class="auth-method" id="auth-phone-open" type="button" aria-expanded="false" aria-controls="auth-phone-form"><span class="auth-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10 5h4M11 18.5h2" stroke-linecap="round"/></svg></span><span>По номеру телефона</span></button>
             <form id="auth-phone-form" hidden>
@@ -691,9 +727,16 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
               <label class="field">Твоя iCloud-почта
                 <input id="auth-icloud-email" type="email" autocomplete="email" inputmode="email" required placeholder="name@icloud.com" maxlength="254">
               </label>
-              <p class="field-note">Отправим одноразовую ссылку для входа. Пароль от Apple ID вводить не нужно.</p>
-              <button class="action" id="auth-icloud-send" type="submit">Отправить ссылку на почту</button>
+              <p class="field-note">Пришлём одноразовый 6-значный код на эту почту. Пароль от Apple ID не нужен.</p>
+              <button class="action" id="auth-icloud-send" type="button">Получить код</button>
               <p class="icloud-delivery" id="auth-icloud-status" role="status" aria-live="polite" hidden></p>
+              <div id="auth-icloud-code-panel" hidden>
+                <label class="field" for="auth-icloud-code">Код из письма
+                  <input id="auth-icloud-code" type="text" inputmode="numeric" autocomplete="one-time-code" enterkeyhint="done" maxlength="6" pattern="[0-9]{6}" placeholder="000000" spellcheck="false" aria-describedby="auth-icloud-status">
+                </label>
+                <button class="action" id="auth-icloud-verify" type="button">Подтвердить и войти</button>
+                <button id="auth-icloud-resend" type="button">Отправить код повторно</button>
+              </div>
             </form>
             <details class="auth-legacy-email" id="auth-legacy-email">
               <summary>Уже есть аккаунт с email и паролем?</summary>
@@ -744,6 +787,11 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
             <p id="profile-saved" class="profile-saved" role="status" aria-live="polite" hidden><span aria-hidden="true">✓</span> Сохранено</p>
           </form>
           <p id="profile-feedback" class="auth-feedback" role="status" aria-live="polite" hidden></p>
+          <div class="telegram-connect" id="telegram-connect">
+            <span class="telegram-connect-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 3 2.9 10.5c-.7.3-.7 1.2.1 1.5l4.6 1.5 1.8 5.4c.2.7 1 .9 1.5.3l2.7-2.8 4.6 3.4c.6.4 1.4.1 1.5-.6L22 4.2c.1-.8-.3-1.4-1-1.2Z" fill="#36aee2" stroke="none"/><path d="m8 13.5 10.8-7.1-8.4 9.8" fill="none" stroke="#fff" stroke-width="1.2" stroke-linecap="round"/></svg></span>
+            <div class="telegram-connect-copy"><strong>Telegram</strong><small id="telegram-connect-status">Подключи Telegram как дополнительный способ входа.</small></div>
+            <button type="button" id="telegram-connect-button">Привязать</button>
+          </div>
           <form id="recovery-form" hidden>
             <p class="field-note">Восстановление доступа: введи новый пароль.</p>
             <label class="field">Новый пароль
@@ -805,6 +853,16 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
+  <dialog id="telegramAuthDialog" class="telegram-auth-dialog" aria-labelledby="telegramAuthTitle" aria-describedby="telegramAuthDescription">
+    <div class="telegram-dialog-head"><span class="telegram-dialog-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 3 2.9 10.5c-.7.3-.7 1.2.1 1.5l4.6 1.5 1.8 5.4c.2.7 1 .9 1.5.3l2.7-2.8 4.6 3.4c.6.4 1.4.1 1.5-.6L22 4.2c.1-.8-.3-1.4-1-1.2Z" fill="#36aee2" stroke="none"/><path d="m8 13.5 10.8-7.1-8.4 9.8" fill="none" stroke="#fff" stroke-width="1.2" stroke-linecap="round"/></svg></span><button id="telegramAuthClose" type="button" aria-label="Закрыть">×</button></div>
+    <p class="telegram-dialog-eyebrow">LOOPA · БЫСТРЫЙ ДОСТУП</p>
+    <h2 id="telegramAuthTitle">Войти через Telegram</h2>
+    <p id="telegramAuthDescription">Подтверди свой Telegram-аккаунт — LOOPA создаст профиль автоматически. Никаких паролей и SMS.</p>
+    <div class="telegram-dialog-points"><span>✓ Подтверждение в Telegram</span><span>✓ Твой профиль сохранится для следующих входов</span></div>
+    <button id="telegramAuthContinue" class="action" type="button">Продолжить через Telegram</button>
+    <button id="telegramAuthCancel" class="telegram-dialog-cancel" type="button">Не сейчас</button>
+    <p id="telegramAuthError" class="auth-feedback error" role="status" aria-live="polite" hidden></p>
+  </dialog>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script defer>
     'use strict';
@@ -1689,8 +1747,7 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
     function selectAuthMode(mode) {
       authMode = mode;
       const signup=mode==='signup';
-      byId('auth-guest').querySelector('.telegram').hidden=!signup;
-      // Google, SMS and iCloud are supported in both modes. Only guest signup is signup-only.
+      // Telegram, Google, SMS and iCloud work for sign-in and sign-up. Guest signup is signup-only.
       byId('auth-google').hidden=false;
       byId('auth-guest-open').hidden=!signup;
       for(const kind of ['phone','guest']){
@@ -1700,6 +1757,10 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
       byId('auth-icloud-details').open=false;
       byId('auth-legacy-email').open=false;
       byId('auth-icloud-status').hidden=true;
+      byId('auth-icloud-code-panel').hidden=true;
+      byId('auth-icloud-send').hidden=false;
+      byId('auth-icloud-code').value='';
+      icloudPendingEmail='';
 
       document.querySelectorAll('[data-auth-mode]').forEach(button => {
         const selected = button.dataset.authMode === mode;
@@ -1759,7 +1820,7 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
     function refreshSettingsIdentity() {
       const name = byId('profile-name').value.trim() || 'Профиль LOOPA';
       byId('settings-user-name').textContent = name;
-      byId('settings-user-email').textContent = currentUser?.email || currentUser?.phone || (currentUser?.is_anonymous?'Гостевой профиль':'');
+      byId('settings-user-email').textContent = currentUser?.email || currentUser?.phone || (currentUser?.is_anonymous?'Гостевой профиль':telegramIsLinked(currentUser)?'Telegram':'');
       const mini = byId('settings-mini-avatar');
       mini.replaceChildren();
       const actual = byId('account-avatar').querySelector('img');
@@ -2272,10 +2333,11 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
       byId('auth-loading').hidden = true;
       byId('auth-guest').hidden = true;
       byId('auth-account').hidden = false;
+      refreshTelegramLinkUI(user);
       openSettings('home');
       const savedName = user.user_metadata?.display_name || user.user_metadata?.full_name || user.user_metadata?.name || '';
       byId('profile-name').value = savedName;
-      byId('account-email').textContent = user.email || user.phone || (user.is_anonymous?'Гостевой профиль':'');
+      byId('account-email').textContent = user.email || user.phone || (user.is_anonymous?'Гостевой профиль':telegramIsLinked(user)?'Telegram':'');
       byId('joinedDate').textContent=user.created_at?new Date(user.created_at).toLocaleDateString('ru-RU',{day:'numeric',month:'short',year:'numeric'}):'—';
       usageStart();
       renderName(savedName);
@@ -2385,8 +2447,68 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
       if (button.dataset.message) showToast(button.dataset.message);
       if (button.dataset.authMode) selectAuthMode(button.dataset.authMode);
     });
+    // Telegram is an OIDC custom provider; secrets stay in Supabase, never in HTML.
+    const TELEGRAM_PROVIDER='custom:telegram';
+    const telegramDialog=byId('telegramAuthDialog');
+    let telegramLinkExisting=false;
+    function telegramIsLinked(user){
+      return !!user && (user.app_metadata?.provider===TELEGRAM_PROVIDER
+        || user.app_metadata?.providers?.includes(TELEGRAM_PROVIDER)
+        || user.identities?.some(identity=>identity.provider===TELEGRAM_PROVIDER));
+    }
+    function refreshTelegramLinkUI(user){
+      const linked=telegramIsLinked(user),button=byId('telegram-connect-button');
+      button.disabled=linked;
+      button.textContent=linked?'Подключён':'Привязать';
+      byId('telegram-connect-status').textContent=linked?'Telegram привязан к этому аккаунту.':'Используй Telegram для входа в тот же профиль.';
+    }
+    function openTelegramDialog(linkExisting=false){
+      if(!client){feedback('auth-feedback','Supabase недоступен. Проверь подключение.',true);return;}
+      telegramLinkExisting=!!linkExisting;
+      byId('telegramAuthTitle').textContent=linkExisting?'Привязать Telegram':(authMode==='signup'?'Привязать Telegram к LOOPA':'Войти через Telegram');
+      byId('telegramAuthDescription').textContent=linkExisting
+        ?'Подтверди аккаунт Telegram, чтобы потом входить в этот же профиль LOOPA без Google. Друзья и комнаты останутся на месте.'
+        :'Подтверди свой Telegram-аккаунт. Если ты здесь впервые, LOOPA создаст профиль автоматически — без SMS и пароля.';
+      byId('telegramAuthContinue').textContent=linkExisting?'Привязать Telegram':(authMode==='signup'?'Продолжить регистрацию':'Продолжить через Telegram');
+      feedback('telegramAuthError','');
+      telegramDialog.showModal();
+    }
+    byId('auth-telegram').onclick=()=>openTelegramDialog(false);
+    byId('telegram-connect-button').onclick=()=>{
+      if(telegramIsLinked(currentUser))return;
+      openTelegramDialog(true);
+    };
+    byId('telegramAuthCancel').onclick=()=>telegramDialog.close();
+    byId('telegramAuthClose').onclick=()=>telegramDialog.close();
+    telegramDialog.addEventListener('click',event=>{if(event.target===telegramDialog)telegramDialog.close();});
+    byId('telegramAuthContinue').onclick=async()=>{
+      const button=byId('telegramAuthContinue');
+      if(button.disabled)return;
+      button.disabled=true;
+      feedback('telegramAuthError','');
+      try{
+        const redirect=new URL(SITE_URL);
+        if(pendingInvite)redirect.searchParams.set('room',pendingInvite);
+        if(telegramLinkExisting && !currentUser)throw new Error('Сначала войди в существующий аккаунт LOOPA.');
+        const result=telegramLinkExisting
+          ?await client.auth.linkIdentity({provider:TELEGRAM_PROVIDER,options:{redirectTo:redirect.href}})
+          :await client.auth.signInWithOAuth({provider:TELEGRAM_PROVIDER,options:{redirectTo:redirect.href}});
+        if(result.error)throw result.error;
+        // Supabase normally navigates automatically unless skipBrowserRedirect is set.
+        // Never show a fake successful registration before OAuth finishes.
+        if(result.data?.url)window.location.assign(result.data.url);
+      }catch(error){
+        let message=errorText(error);
+        if(/provider is not enabled|unsupported provider|custom_provider_not_found|no provider found|provider not found/i.test((error&&error.message)||'')){
+          message='Telegram пока не подключён в Supabase → Authentication → Custom Providers. Сначала настрой Custom OIDC для Telegram.';
+        }else if(/manual linking|linking is disabled|identity linking is disabled/i.test((error&&error.message)||'')){
+          message='Для привязки включи Allow manual linking в Supabase → Authentication → Sign In / Providers.';
+        }
+        feedback('telegramAuthError',message,true);
+      }finally{button.disabled=false;}
+    };
     // v69: real Supabase sessions only; never simulate a guest locally.
-    let authMethodBusy=false, smsPhone='', smsNextSend=0, icloudNextSend=0, icloudLastEmail='';
+    let authMethodBusy=false, smsPhone='', smsNextSend=0, icloudNextSend=0, icloudLastEmail='', icloudPendingEmail='';
     async function checkAuthProvider(provider){
       if(!client)throw new Error('Подключение недоступно. Обнови страницу.');
       const response=await fetch(SUPABASE_URL+'/auth/v1/settings',{headers:{apikey:SUPABASE_PUBLISHABLE_KEY},signal:AbortSignal.timeout(10000)});
@@ -2440,38 +2562,86 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
       const {data,error}=await client.auth.signInAnonymously({options:{data:{display_name:name}}});if(error)throw error;
       await finishMethodLogin(data);
     });};
-    // iCloud Почта — это подтверждение владения почтовым ящиком, а не Apple OAuth.
-    // Письмо отправляет Supabase Auth (нужен внешний SMTP для публичного проекта).
+    // iCloud Почта: email OTP Supabase Auth (не Apple ID OAuth).
+    // В Supabase -> Authentication -> Email Templates -> Magic Link нужно
+    // указать {{ .Token }} вместо {{ .ConfirmationURL }}.
+    // Для массовой доставки на iCloud требуется внешний SMTP.
     function isIcloudAddress(email){
       return /^[^\s@]+@(?:icloud\.com|me\.com|mac\.com)$/i.test(email);
     }
-    byId('auth-icloud-email').addEventListener('input',()=>{
-      byId('auth-icloud-status').hidden=true;
-    });
-    byId('auth-icloud-form').addEventListener('submit',event=>{
-      event.preventDefault();
-      authMethodRun(byId('auth-icloud-send'),async()=>{
+    function updateIcloudResend(){
+      const remaining=Math.max(0,Math.ceil((icloudNextSend-Date.now())/1000));
+      const button=byId('auth-icloud-resend');
+      button.disabled=remaining>0;
+      button.textContent=remaining>0?'Отправить код повторно через '+remaining+' сек.':'Отправить код повторно';
+    }
+    async function requestIcloudCode(button){
+      await authMethodRun(button,async()=>{
         if(!client)throw new Error('Подключение к Supabase недоступно.');
         const email=byId('auth-icloud-email').value.trim().toLowerCase();
         if(!isIcloudAddress(email))throw new Error('Укажи адрес @icloud.com, @me.com или @mac.com.');
-        if(email===icloudLastEmail && Date.now()<icloudNextSend){
-          throw new Error('Новую ссылку можно запросить через '+Math.ceil((icloudNextSend-Date.now())/1000)+' сек.');
+        if(Date.now()<icloudNextSend){
+          throw new Error('Новый код можно запросить через '+Math.ceil((icloudNextSend-Date.now())/1000)+' сек.');
         }
-        const redirect=new URL(SITE_URL);
-        if(pendingInvite)redirect.searchParams.set('room',pendingInvite);
-        const {error}=await client.auth.signInWithOtp({email,options:{
-          emailRedirectTo:redirect.href,
-          shouldCreateUser:authMode==='signup'
-        }});
+        const {error}=await client.auth.signInWithOtp({
+          email,
+          options:{shouldCreateUser:authMode==='signup'}
+        });
         if(error)throw error;
         icloudLastEmail=email;
+        icloudPendingEmail=email;
         icloudNextSend=Date.now()+60000;
         const status=byId('auth-icloud-status');
-        status.textContent='Письмо отправлено на '+email+'. Открой его и перейди по ссылке, чтобы войти в LOOPA. Проверь также папку «Спам».';
+        status.textContent='Код отправлен на '+email+'. Введи шесть цифр из письма. Если письма нет, проверь папку «Спам».';
         status.hidden=false;
+        byId('auth-icloud-code-panel').hidden=false;
+        byId('auth-icloud-send').hidden=true;
+        byId('auth-icloud-code').value='';
+        updateIcloudResend();
         feedback('auth-feedback','');
+        byId('auth-icloud-code').focus();
       });
+    }
+    async function verifyIcloudCode(){
+      await authMethodRun(byId('auth-icloud-verify'),async()=>{
+        if(!client)throw new Error('Подключение к Supabase недоступно.');
+        const token=byId('auth-icloud-code').value.replace(/\D/g,'');
+        if(!icloudPendingEmail)throw new Error('Сначала запроси код на iCloud-почту.');
+        if(!/^\d{6}$/.test(token))throw new Error('Введи шестизначный код из письма.');
+        const {data,error}=await client.auth.verifyOtp({
+          email:icloudPendingEmail,token,type:'email'
+        });
+        if(error)throw error;
+        await finishMethodLogin(data);
+        icloudPendingEmail='';
+        byId('auth-icloud-code').value='';
+        byId('auth-icloud-code-panel').hidden=true;
+        showToast('Вход через iCloud-почту выполнен.');
+      });
+    }
+    byId('auth-icloud-email').addEventListener('input',()=>{
+      if(byId('auth-icloud-email').value.trim().toLowerCase()===icloudPendingEmail)return;
+      icloudPendingEmail='';
+      byId('auth-icloud-code-panel').hidden=true;
+      byId('auth-icloud-send').hidden=false;
+      byId('auth-icloud-code').value='';
+      byId('auth-icloud-status').hidden=true;
     });
+    byId('auth-icloud-code').addEventListener('input',event=>{
+      const input=event.currentTarget;
+      const digits=input.value.replace(/\D/g,'').slice(0,6);
+      if(input.value!==digits)input.value=digits;
+      if(digits.length===6 && icloudPendingEmail)void verifyIcloudCode();
+    });
+    byId('auth-icloud-form').addEventListener('submit',event=>{
+      event.preventDefault();
+      if(icloudPendingEmail)void verifyIcloudCode();
+      else void requestIcloudCode(byId('auth-icloud-send'));
+    });
+    byId('auth-icloud-send').addEventListener('click',()=>void requestIcloudCode(byId('auth-icloud-send')));
+    byId('auth-icloud-verify').addEventListener('click',()=>void verifyIcloudCode());
+    byId('auth-icloud-resend').addEventListener('click',()=>void requestIcloudCode(byId('auth-icloud-resend')));
+    setInterval(updateIcloudResend,1000);
     byId('auth-form').addEventListener('submit', async (event) => {
       event.preventDefault();
       if (!client) return feedback('auth-feedback','Подключение к Supabase пока недоступно.',true);
@@ -2599,9 +2769,10 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
               currentUser = newUser;
               if (newUser) {displayAccount(newUser);acceptInvite();}
               else displayGuest();
-            } else if (newUser && event === 'USER_UPDATED') {
+            } else if (newUser && (event === 'USER_UPDATED' || event === 'SIGNED_IN')) {
               currentUser = newUser;
               renderAvatar(newUser);
+              refreshTelegramLinkUI(newUser);
             } else if (newUser && event === 'TOKEN_REFRESHED') {
               currentUser = newUser;
               refreshTopProfileAvatar();
