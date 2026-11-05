@@ -543,13 +543,15 @@ body.roomViewing #videoStage #room-frame{width:100%;height:100%;margin:0;transit
 @media(prefers-reduced-motion:reduce){#playbackControls,body.roomViewing #videoStage{transition:none}}
 @media(max-width:390px){body.roomViewing #sheetVideoChange{font-size:11px;padding-inline:7px}body.roomViewing #inviteRoom{font-size:11px;padding-inline:7px}body.roomViewing #room-active .roomBar{gap:5px;padding-inline:8px}}
 
-/* v66: animate only the two heights together; never animate the room's top. */
+/* v68: animate only the two heights together; never animate the room's top. */
 body.roomViewing #room-active,body.roomViewing #videoStage{
   transition:height 180ms cubic-bezier(.2,.7,.2,1);
 }
 @media(prefers-reduced-motion:reduce){
   body.roomViewing #room-active,body.roomViewing #videoStage{transition:none}
 }
+
+.auth-methods{display:grid;gap:12px;margin:24px 0}.auth-method{width:100%;display:flex;align-items:center;gap:15px;text-align:left;padding:18px;border:1px solid #ffffff29;border-radius:18px;background:linear-gradient(135deg,#ffffff0c,#ffffff03);color:#eee;font:inherit;cursor:pointer}.auth-method small{display:block;font-size:12px;color:#aaa;line-height:1.5;margin-top:5px}.auth-method.telegram{background:linear-gradient(135deg,#eeeeee,#bdbdbd);color:#171717;opacity:1;cursor:default}.auth-method.telegram small{color:#505050}.auth-mark{display:grid;place-items:center;width:30px;flex:0 0 30px;font-size:26px}.auth-method:not(:disabled):hover{border-color:#ffffff70}.auth-method:disabled:not(.telegram){opacity:.55}.auth-email-fallback{margin-top:24px}.auth-email-fallback summary{cursor:pointer;color:#aaa;font-size:14px;padding:12px 0}.auth-email-fallback[open] summary{margin-bottom:14px}.auth-methods form{padding:8px 4px}
 </style>
 </head>
 <body>
@@ -633,7 +635,20 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
         <div class="panel glass" id="auth-guest" hidden>
           <p class="panel-note">АККАУНТ LOOPA</p>
           <h2>Твоя история начинается здесь.</h2>
-          <p style="margin:12px 0 20px">Войди или создай аккаунт, чтобы сохранить свой профиль.</p>
+          <p style="margin:12px 0 20px">Выбери удобный способ входа.</p>
+          <div class="auth-methods">
+            <button class="auth-method telegram" type="button" disabled><span class="auth-mark" aria-hidden="true">↗</span><span>Регистрация через Telegram<small>(скоро появится)</small></span></button>
+            <button class="auth-method" id="auth-google" type="button"><span class="auth-mark" aria-hidden="true">G</span><span>Регистрация через Google<small>Вход в существующий аккаунт — здесь же</small></span></button>
+            <button class="auth-method" id="auth-phone-open" type="button" aria-expanded="false" aria-controls="auth-phone-form"><span class="auth-mark" aria-hidden="true">＋</span><span>Регистрация по номеру телефона<small>Без пароля · код из SMS</small></span></button>
+            <form id="auth-phone-form" hidden>
+              <label class="field">Номер телефона<input id="auth-phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="+7 999 123-45-67" required maxlength="24"></label>
+              <button class="action secondary" id="auth-sms-send" type="button">Получить код</button>
+              <div id="auth-code-panel" hidden><label class="field">Код из SMS<input id="auth-code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="000000"></label><button class="action" id="auth-sms-verify" type="submit">Подтвердить и войти</button></div>
+            </form>
+            <button class="auth-method" id="auth-guest-open" type="button" aria-expanded="false" aria-controls="auth-guest-form"><span class="auth-mark" aria-hidden="true">○</span><span>Регистрация как гость<small>Только имя, без почты и пароля</small></span></button>
+            <form id="auth-guest-form" hidden><label class="field">Твоё имя<input id="auth-guest-name" autocomplete="nickname" maxlength="40" required placeholder="Как к тебе обращаться"></label><p class="field-note">Гостевой профиль доступен в этом браузере. После выхода или очистки данных восстановить его не получится.</p><button class="action" id="auth-guest-submit" type="submit">Продолжить как гость</button></form>
+          </div>
+          <details class="auth-email-fallback"><summary>Вход и регистрация по почте</summary>
           <div class="auth-switch" aria-label="Режим авторизации">
             <button type="button" data-auth-mode="login" class="selected" aria-pressed="true">Войти</button>
             <button type="button" data-auth-mode="signup" aria-pressed="false">Регистрация</button>
@@ -652,6 +667,7 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
             <button class="action" id="auth-submit" type="submit">Войти</button>
           </form>
           <button class="inline-link" type="button" id="forgot-password">Забыли пароль?</button>
+          </details>
           <p id="auth-feedback" class="auth-feedback" role="status" aria-live="polite" hidden></p>
         </div>
         <div id="settings-home" class="settings-overview" hidden>
@@ -1552,7 +1568,7 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
     function refreshSettingsIdentity() {
       const name = byId('profile-name').value.trim() || 'Профиль LOOPA';
       byId('settings-user-name').textContent = name;
-      byId('settings-user-email').textContent = currentUser?.email || '';
+      byId('settings-user-email').textContent = currentUser?.email || currentUser?.phone || (currentUser?.is_anonymous?'Гостевой профиль':'');
       const mini = byId('settings-mini-avatar');
       mini.replaceChildren();
       const actual = byId('account-avatar').querySelector('img');
@@ -2066,9 +2082,9 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
       byId('auth-guest').hidden = true;
       byId('auth-account').hidden = false;
       openSettings('home');
-      const savedName = (user.user_metadata && user.user_metadata.display_name) || '';
+      const savedName = user.user_metadata?.display_name || user.user_metadata?.full_name || user.user_metadata?.name || '';
       byId('profile-name').value = savedName;
-      byId('account-email').textContent = user.email || '';
+      byId('account-email').textContent = user.email || user.phone || (user.is_anonymous?'Гостевой профиль':'');
       byId('joinedDate').textContent=user.created_at?new Date(user.created_at).toLocaleDateString('ru-RU',{day:'numeric',month:'short',year:'numeric'}):'—';
       usageStart();
       renderName(savedName);
@@ -2178,6 +2194,61 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
       if (button.dataset.message) showToast(button.dataset.message);
       if (button.dataset.authMode) selectAuthMode(button.dataset.authMode);
     });
+    // v68: real Supabase sessions only; never simulate a guest locally.
+    let authMethodBusy=false, smsPhone='', smsNextSend=0;
+    async function checkAuthProvider(provider){
+      if(!client)throw new Error('Подключение недоступно. Обнови страницу.');
+      const response=await fetch(SUPABASE_URL+'/auth/v1/settings',{headers:{apikey:SUPABASE_PUBLISHABLE_KEY},signal:AbortSignal.timeout(10000)});
+      if(!response.ok)throw new Error('Не удалось проверить доступность входа. Попробуй ещё раз.');
+      const settings=await response.json();
+      if(!settings.external?.[provider])throw new Error(({google:'Вход через Google ещё не подключён. Пока используй вход по почте.',phone:'Вход по телефону ещё не подключён. Пока используй вход по почте.',anonymous_users:'Гостевой вход ещё не подключён. Пока используй вход по почте.'})[provider]);
+    }
+    async function authMethodRun(button,task){
+      if(authMethodBusy)return;
+      authMethodBusy=true;button.disabled=true;feedback('auth-feedback','');
+      try{await task();}catch(error){feedback('auth-feedback',errorText(error),true);}
+      finally{authMethodBusy=false;button.disabled=false;}
+    }
+    async function finishMethodLogin(data){
+      if(!data?.session||!data.user)throw new Error('Не удалось завершить вход. Попробуй ещё раз.');
+      currentUser=data.user;await displayAccount(currentUser);await acceptInvite();
+      byId('auth-code').value='';smsPhone='';
+    }
+    byId('auth-google').onclick=()=>authMethodRun(byId('auth-google'),async()=>{
+      await checkAuthProvider('google');
+      const redirect=new URL(SITE_URL);if(pendingInvite)redirect.searchParams.set('room',pendingInvite);
+      const {error}=await client.auth.signInWithOAuth({provider:'google',options:{redirectTo:redirect.href,queryParams:{prompt:'select_account'}}});
+      if(error)throw error;
+    });
+    for(const kind of ['phone','guest'])byId('auth-'+kind+'-open').onclick=()=>{
+      const form=byId('auth-'+kind+'-form');form.hidden=!form.hidden;
+      byId('auth-'+kind+'-open').setAttribute('aria-expanded',String(!form.hidden));
+      if(!form.hidden)byId(kind==='phone'?'auth-phone':'auth-guest-name').focus();
+    };
+    byId('auth-phone').addEventListener('input',()=>{smsPhone='';byId('auth-code-panel').hidden=true;byId('auth-code').required=false;byId('auth-code').value='';});
+    byId('auth-sms-send').onclick=()=>authMethodRun(byId('auth-sms-send'),async()=>{
+      let phone=byId('auth-phone').value.replace(/[\s()−-]/g,'');
+      if(/^8\d{10}$/.test(phone))phone='+7'+phone.slice(1);
+      if(!/^\+[1-9]\d{7,14}$/.test(phone))throw new Error('Укажи номер с кодом страны, например +7 999 123-45-67.');
+      if(Date.now()<smsNextSend)throw new Error('Повторный код можно запросить через '+Math.ceil((smsNextSend-Date.now())/1000)+' сек.');
+      await checkAuthProvider('phone');
+      const {error}=await client.auth.signInWithOtp({phone,options:{channel:'sms'}});if(error)throw error;
+      smsPhone=phone;smsNextSend=Date.now()+60000;byId('auth-code-panel').hidden=false;byId('auth-code').required=true;
+      feedback('auth-feedback','Код отправлен. Введи его ниже.');byId('auth-code').focus();
+    });
+    byId('auth-phone-form').onsubmit=event=>{event.preventDefault();authMethodRun(byId('auth-sms-verify'),async()=>{
+      const token=byId('auth-code').value.trim();
+      if(!smsPhone)throw new Error('Сначала запроси код для этого номера.');
+      if(!/^\d{6}$/.test(token))throw new Error('Введи 6 цифр из SMS.');
+      const {data,error}=await client.auth.verifyOtp({phone:smsPhone,token,type:'sms'});if(error)throw error;
+      await finishMethodLogin(data);
+    });};
+    byId('auth-guest-form').onsubmit=event=>{event.preventDefault();authMethodRun(byId('auth-guest-submit'),async()=>{
+      const name=byId('auth-guest-name').value.trim();if(!name)throw new Error('Укажи имя.');
+      await checkAuthProvider('anonymous_users');
+      const {data,error}=await client.auth.signInAnonymously({options:{data:{display_name:name}}});if(error)throw error;
+      await finishMethodLogin(data);
+    });};
     byId('auth-form').addEventListener('submit', async (event) => {
       event.preventDefault();
       if (!client) return feedback('auth-feedback','Подключение к Supabase пока недоступно.',true);
@@ -2273,6 +2344,7 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
     });
     byId('sign-out').addEventListener('click',async () => {
       if (!client) return;
+      if(currentUser?.is_anonymous&&!confirm('Выйти из гостевого профиля? После выхода восстановить доступ к нему не получится.'))return;
       byId('sign-out').disabled = true;
       const {error} = await client.auth.signOut();
       byId('sign-out').disabled = false;
@@ -2341,13 +2413,13 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
  window.visualViewport?.addEventListener('scroll',()=>sample('vvScroll'));
  window.addEventListener('scroll',()=>sample('winScroll'));
  const dialog=document.createElement('dialog');dialog.style.cssText='width:90%;max-width:450px;max-height:80dvh;padding:20px;border-radius:20px;background:#19191b;color:#eee;border:1px solid #555';
- const title=document.createElement('p');title.textContent='Замеры клавиатуры · v66';
+ const title=document.createElement('p');title.textContent='Замеры клавиатуры · v68';
  const text=document.createElement('textarea');text.readOnly=true;text.setAttribute('aria-label','Технические замеры');text.style.cssText='width:100%;height:45dvh;font:12px monospace;background:#101012;color:#ddd';
  const close=document.createElement('button');close.textContent='Закрыть';close.onclick=()=>dialog.close();dialog.append(title,text,close);document.body.append(dialog);
  const button=document.createElement('button');button.type='button';button.textContent='Скопировать замеры клавиатуры';button.style.cssText='width:100%;min-height:44px;margin-top:18px;border:1px solid #ffffff30;border-radius:12px;background:#ffffff08;color:#eee;font:13px system-ui';
  button.onclick=async()=>{
   const ancestors=[];for(let el=$('room-active');el&&ancestors.length<7;el=el.parentElement){const c=getComputedStyle(el);ancestors.push({tag:el.tagName,id:el.id,transform:c.transform,filter:c.filter,position:c.position});}
-  const payload=JSON.stringify({build:'v66',screen:[screen.width,screen.height],font:getComputedStyle($('chatText')).fontSize,focusStrategy:'ios-opacity-task',ancestors,rows});
+  const payload=JSON.stringify({build:'v68',screen:[screen.width,screen.height],font:getComputedStyle($('chatText')).fontSize,focusStrategy:'ios-opacity-task',ancestors,rows});
   try{await navigator.clipboard.writeText(payload);button.textContent='Замеры скопированы — вставь в чат';}
   catch{$('roomSheet').close();text.value=payload;dialog.showModal();text.focus();text.select();}
  };
