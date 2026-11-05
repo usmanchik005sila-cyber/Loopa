@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#090a0c">
   <meta name="description" content="LOOPA — ближе, даже на расстоянии. Совместный просмотр с теми, кто важен.">
   <title>LOOPA — Ближе, даже на расстоянии</title>
-  <meta name="loopa-build" content="v70-fast-suggestions-2026-11-05">
+  <meta name="loopa-build" content="v71-live-suggestions-2026-11-05">
   <script>
     try{const m=localStorage.getItem('loopa-wallpaper-motion');document.documentElement.dataset.wallpaperExplicit=String(m==='on');document.documentElement.dataset.wallpaperMotion=m==='off'?'off':'on';}catch{document.documentElement.dataset.wallpaperExplicit='false';document.documentElement.dataset.wallpaperMotion='on';}
   </script>
@@ -569,6 +569,11 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
 #auth-guest .auth-email-fallback summary svg{width:23px;height:23px;flex:none}
 .auth-chevron{margin-left:auto;color:#999;font-size:20px}
 #auth-guest [hidden]{display:none!important}
+
+/* LOOPA v71: clearly distinguish the instant search action from real suggestions. */
+#searchSuggestions button.suggestSearchNow{color:#bdbdc6;border-top:1px solid #ffffff16;background:#ffffff04;font-size:13px}
+#searchSuggestions button.suggestSearchNow:first-child{border-top:0}
+#searchSuggestions button.suggestSearchNow>span:last-child{color:#c7c7d2;font-size:21px;line-height:1}
 </style>
 </head>
 <body>
@@ -1385,71 +1390,152 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
     document.addEventListener('visibilitychange',()=>{if(document.hidden){usageTick();usageReady=false;}else if(currentUser)usageStart();});
     byId('homeJoin').onsubmit=async e=>{e.preventDefault();try{const code=parseRoomCode(byId('homeJoinCode').value);showPage('rooms');await roomRun('join',{room:code});}catch(err){showToast(err.message);}};
 
-    // LOOPA v70 — low-latency suggestions, shared by every video provider.
-    let suggestionTimer=null,suggestionRevision=0,suggestionIndex=-1,suggestionValues=[];
-    const suggestionMemo=new Map(),suggestionHistory=new Map(),suggestionField=byId('queryVideo'),suggestionList=byId('searchSuggestions');
+    // LOOPA v71 — eager suggestions, prefix reuse and safe out-of-order responses.
+    // Search requests are still handled by the existing video-search function.
+    let suggestionTimer=null,suggestionRevision=0,suggestionIndex=-1,suggestionValues=[],suggestionActions=[];
+    const suggestionMemo=new Map(),suggestionHistory=new Map(),suggestionInFlight=new Map(),suggestionRetryAfter=new Map();
+    const suggestionField=byId('queryVideo'),suggestionList=byId('searchSuggestions');
     const suggestionProvider=()=>byId('source').value;
-    const suggestionKey=(provider,q)=>provider+'::'+q.toLocaleLowerCase('ru');
+    const suggestionNormalize=value=>String(value||'').trim().replace(/\s+/g,' ').toLocaleLowerCase('ru').replace(/ё/g,'е');
+    const suggestionKey=(provider,q)=>provider+'::'+suggestionNormalize(q);
+    let suggestionLastRequestAt=0;
     function memoSuggestions(provider,q,values){
       const key=suggestionKey(provider,q);
-      if(suggestionMemo.has(key))suggestionMemo.delete(key);
-      suggestionMemo.set(key,values);
-      if(suggestionMemo.size>100)suggestionMemo.delete(suggestionMemo.keys().next().value);
+      suggestionMemo.delete(key);
+      suggestionMemo.set(key,{values,at:Date.now()});
+      if(suggestionMemo.size>120)suggestionMemo.delete(suggestionMemo.keys().next().value);
+    }
+    function readSuggestionMemo(provider,q){
+      const key=suggestionKey(provider,q),item=suggestionMemo.get(key);
+      if(!item)return null;
+      // Do not permanently cache empty replies (or provider-side temporary outages).
+      const ttl=item.values.length?600000:20000;
+      if(Date.now()-item.at>ttl){suggestionMemo.delete(key);return null;}
+      return item.values;
     }
     function rememberVideoTitles(provider,items){
       const existing=suggestionHistory.get(provider)||[];
       const titles=items.map(item=>item?.title).filter(x=>typeof x==='string'&&x.trim().length>1);
-      suggestionHistory.set(provider,[...new Set([...titles,...existing])].slice(0,100));
+      suggestionHistory.set(provider,[...new Set([...titles,...existing])].slice(0,120));
     }
     function immediateSuggestions(provider,q){
-      const key=suggestionKey(provider,q),normalized=q.toLocaleLowerCase('ru');
-      const exact=suggestionMemo.get(key);
-      const prefixEntries=[...suggestionMemo.entries()].filter(([k])=>k.startsWith(provider+'::')&&k!==key&&k.slice(provider.length+2).startsWith(normalized));
-      const candidates=[...(exact||[]),...(suggestionHistory.get(provider)||[]),...prefixEntries.flatMap(([,values])=>values)];
-      // Prefix matches first, then whole-word matches; never show unrelated titles.
-      const matches=[...new Set(candidates)].filter(x=>typeof x==='string'&&x.toLocaleLowerCase('ru').includes(normalized));
-      matches.sort((a,b)=>Number(b.toLocaleLowerCase('ru').startsWith(normalized))-Number(a.toLocaleLowerCase('ru').startsWith(normalized)));
+      const normalized=suggestionNormalize(q),key=suggestionKey(provider,q);
+      const exact=readSuggestionMemo(provider,q)||[],candidates=[...exact,...(suggestionHistory.get(provider)||[])];
+      // Both directions matter: results for "зва" help while typing "званый".
+      for(const [memoKey,entry] of suggestionMemo){
+        if(memoKey===key||!memoKey.startsWith(provider+'::'))continue;
+        const cachedQuery=memoKey.slice(provider.length+2);
+        if((normalized.startsWith(cachedQuery)||cachedQuery.startsWith(normalized))&&Date.now()-entry.at<600000){
+          candidates.push(...entry.values);
+        }
+      }
+      const matches=[...new Set(candidates)].filter(x=>typeof x==='string'&&suggestionNormalize(x).includes(normalized));
+      // Prefer exact prefix completions over titles where the words occur in the middle.
+      matches.sort((a,b)=>{
+        const an=suggestionNormalize(a),bn=suggestionNormalize(b);
+        const ar=an.startsWith(normalized)?0:an.includes(' '+normalized)?1:2;
+        const br=bn.startsWith(normalized)?0:bn.includes(' '+normalized)?1:2;
+        return ar-br;
+      });
       return matches.slice(0,6);
     }
+    function canShowSuggestions(){
+      return !!(catalogDialog.open&&!byId('searchStage').hidden&&hostHere()&&document.activeElement===suggestionField);
+    }
     function dismissSuggestions(){
-      clearTimeout(suggestionTimer);suggestionRevision++;suggestionIndex=-1;suggestionValues=[];
+      clearTimeout(suggestionTimer);suggestionRevision++;suggestionIndex=-1;suggestionValues=[];suggestionActions=[];
       suggestionList.replaceChildren();suggestionList.hidden=true;
       suggestionField.setAttribute('aria-expanded','false');suggestionField.removeAttribute('aria-activedescendant');
     }
-    function chooseSuggestion(value){
-      const provider=suggestionProvider();suggestionField.value=value.slice(0,100);
-      const list=suggestionHistory.get(provider)||[];
-      suggestionHistory.set(provider,[value,...list.filter(x=>x!==value)].slice(0,100));
+    function runChosenSearch(value){
+      suggestionField.value=value.slice(0,100);
       dismissSuggestions();suggestionField.blur();searchCatalog(false);
     }
-    function showSuggestions(values){
-      suggestionValues=values;suggestionIndex=-1;suggestionList.replaceChildren();
-      values.forEach((value,i)=>{const b=document.createElement('button');b.type='button';b.id='ytSuggestion'+i;b.setAttribute('role','option');b.setAttribute('aria-selected','false');b.tabIndex=-1;
-        const icon=document.createElement('span');icon.textContent='↗';icon.setAttribute('aria-hidden','true');const label=document.createElement('span');label.textContent=value;b.append(label,icon);
-        b.onpointerdown=e=>e.preventDefault();b.onclick=()=>chooseSuggestion(value);suggestionList.append(b);
-      });suggestionList.hidden=!values.length;suggestionField.setAttribute('aria-expanded',String(!!values.length));
+    function chooseSuggestion(value){
+      const provider=suggestionProvider();
+      const list=suggestionHistory.get(provider)||[];
+      suggestionHistory.set(provider,[value,...list.filter(x=>x!==value)].slice(0,120));
+      runChosenSearch(value);
+    }
+    function showSuggestions(values,q){
+      suggestionValues=values;suggestionIndex=-1;suggestionActions=values.map(value=>({type:'hint',value}));
+      // An immediate, truthful fallback even when the provider returns no suggestions.
+      if(q.length>=2)suggestionActions.push({type:'search',value:q});
+      suggestionList.replaceChildren();
+      suggestionActions.forEach((choice,i)=>{
+        const b=document.createElement('button');b.type='button';b.id='ytSuggestion'+i;
+        b.setAttribute('role','option');b.setAttribute('aria-selected','false');b.tabIndex=-1;
+        const icon=document.createElement('span');icon.setAttribute('aria-hidden','true');
+        const label=document.createElement('span');
+        if(choice.type==='search'){
+          b.className='suggestSearchNow';label.textContent='Найти «'+choice.value+'»';icon.textContent='⌕';
+          b.onclick=()=>runChosenSearch(choice.value);
+        }else{
+          label.textContent=choice.value;icon.textContent='↗';b.onclick=()=>chooseSuggestion(choice.value);
+        }
+        b.onpointerdown=e=>e.preventDefault();b.append(label,icon);suggestionList.append(b);
+      });
+      suggestionList.hidden=!suggestionActions.length;
+      suggestionField.setAttribute('aria-expanded',String(!!suggestionActions.length));
+    }
+    function refreshCurrentSuggestions(){
+      if(!canShowSuggestions())return;
+      const q=suggestionField.value.trim();
+      if(q.length<2)return;
+      showSuggestions(immediateSuggestions(suggestionProvider(),q),q);
+    }
+    async function fetchSuggestions(provider,q,owner,code){
+      const key=suggestionKey(provider,q);
+      if(suggestionInFlight.has(key)||readSuggestionMemo(provider,q)!==null)return;
+      const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),6500);
+      suggestionInFlight.set(key,controller);suggestionLastRequestAt=Date.now();
+      // A failed invocation must not cause an endless retry loop.
+      suggestionRetryAfter.set(key,Date.now()+10000);
+      try{
+        const {data,error}=await client.functions.invoke('video-search',{
+          body:{mode:'suggest',provider,q},signal:controller.signal
+        });
+        if(error||!Array.isArray(data?.suggestions))return;
+        if(currentUser?.id!==owner||roomState?.code!==code)return;
+        const remote=[...new Set(data.suggestions.filter(x=>typeof x==='string'&&x.trim().length>1&&x.length<=150))].slice(0,12);
+        memoSuggestions(provider,q,remote);
+        // A reply for an earlier prefix can still help the new, longer query.
+        // Never replace the current list with an unrelated or outdated query.
+        if(suggestionProvider()===provider)refreshCurrentSuggestions();
+      }catch{} // Unsupported providers, timeouts, and network errors never block the UI.
+      finally{
+        clearTimeout(timeout);suggestionInFlight.delete(key);
+        // If we typed while all slots were busy, immediately service the latest query.
+        if(canShowSuggestions())queueSuggestionFetch(suggestionProvider(),suggestionField.value.trim());
+      }
+    }
+    function queueSuggestionFetch(provider,q){
+      clearTimeout(suggestionTimer);
+      if(q.length<2||!canShowSuggestions())return;
+      const key=suggestionKey(provider,q);
+      if(readSuggestionMemo(provider,q)!==null||suggestionInFlight.has(key)||Date.now()<(suggestionRetryAfter.get(key)||0))return;
+      const owner=currentUser.id,code=roomState.code;
+      // Start the first request immediately. Subsequent requests are rate-limited
+      // to avoid overwhelming the server while somebody is typing quickly.
+      const gap=suggestionLastRequestAt?Math.max(0,150-(Date.now()-suggestionLastRequestAt)):0;
+      const wait=Math.max(gap,q.length===2?0:35);
+      suggestionTimer=setTimeout(()=>{
+        if(currentUser?.id!==owner||roomState?.code!==code||!canShowSuggestions())return;
+        if(suggestionProvider()!==provider||suggestionField.value.trim()!==q)return;
+        if(suggestionInFlight.size>=3){suggestionTimer=setTimeout(()=>queueSuggestionFetch(provider,q),110);return;}
+        fetchSuggestions(provider,q,owner,code);
+      },wait);
     }
     function requestSuggestions(){
-      clearTimeout(suggestionTimer);const revision=++suggestionRevision;
+      clearTimeout(suggestionTimer);suggestionRevision++;
       const q=suggestionField.value.trim(),provider=suggestionProvider();
       suggestionIndex=-1;
       if(q.length<2||!catalogDialog.open||byId('searchStage').hidden||!hostHere()){
-        showSuggestions([]);return;
+        showSuggestions([], '');return;
       }
-      // Reuse cached suggestions before any network round trip.
-      const cached=immediateSuggestions(provider,q);showSuggestions(cached);
-      if(suggestionMemo.has(suggestionKey(provider,q)))return;
-      const owner=currentUser.id,code=roomState.code;
-      suggestionTimer=setTimeout(async()=>{
-        try{
-          const {data,error}=await client.functions.invoke('video-search',{body:{mode:'suggest',provider,q}});
-          if(revision!==suggestionRevision||currentUser?.id!==owner||roomState?.code!==code||!catalogDialog.open||byId('searchStage').hidden||suggestionProvider()!==provider||suggestionField.value.trim()!==q)return;
-          if(error||!Array.isArray(data?.suggestions))return;
-          const remote=[...new Set(data.suggestions.filter(x=>typeof x==='string'&&x.length>1&&x.length<=150))].slice(0,10);
-          memoSuggestions(provider,q,remote);
-          showSuggestions([...new Set([...remote,...immediateSuggestions(provider,q)])].slice(0,6));
-        }catch{} // If the provider has no suggestion backend, local recent titles still work.
-      },120);
+      // The fallback and all cached matching suggestions appear in the same input event.
+      showSuggestions(immediateSuggestions(provider,q),q);
+      queueSuggestionFetch(provider,q);
     }
     suggestionField.addEventListener('input',e=>{if(!e.isComposing)requestSuggestions();});
     suggestionField.addEventListener('compositionend',requestSuggestions);
@@ -1457,10 +1543,17 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
     suggestionField.addEventListener('blur',dismissSuggestions);
     suggestionField.addEventListener('keydown',e=>{
       if(e.key==='Escape'&&!suggestionList.hidden){e.preventDefault();e.stopPropagation();dismissSuggestions();return;}
-      if(suggestionList.hidden||!suggestionValues.length)return;
-      if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();suggestionIndex=suggestionIndex<0?(e.key==='ArrowDown'?0:suggestionValues.length-1):(suggestionIndex+(e.key==='ArrowDown'?1:-1)+suggestionValues.length)%suggestionValues.length;
-        [...suggestionList.children].forEach((b,i)=>b.setAttribute('aria-selected',String(i===suggestionIndex)));suggestionField.setAttribute('aria-activedescendant','ytSuggestion'+suggestionIndex);
-      }else if(e.key==='Enter'&&suggestionIndex>=0){e.preventDefault();chooseSuggestion(suggestionValues[suggestionIndex]);}
+      if(suggestionList.hidden||!suggestionActions.length)return;
+      if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+        e.preventDefault();
+        suggestionIndex=suggestionIndex<0?(e.key==='ArrowDown'?0:suggestionActions.length-1)
+          :(suggestionIndex+(e.key==='ArrowDown'?1:-1)+suggestionActions.length)%suggestionActions.length;
+        [...suggestionList.children].forEach((b,i)=>b.setAttribute('aria-selected',String(i===suggestionIndex)));
+        suggestionField.setAttribute('aria-activedescendant','ytSuggestion'+suggestionIndex);
+      }else if(e.key==='Enter'&&suggestionIndex>=0){
+        e.preventDefault();const choice=suggestionActions[suggestionIndex];
+        if(choice.type==='search')runChosenSearch(choice.value);else chooseSuggestion(choice.value);
+      }
     });
     let catalogRevision=0, nextPage=null, catalogQuery='';
     function clearCatalog(){dismissSuggestions();catalogRevision++;nextPage=null;byId('hits').replaceChildren();byId('nextVideos').hidden=true;byId('searchStatus').textContent='';byId('catalogSkeleton').hidden=true;byId('hits').setAttribute('aria-busy','false');byId('catalogSearchButton').disabled=false;}
