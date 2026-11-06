@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="ru">
 <head>
+<!-- LOOPA v85: native player controls, no forced captions -->
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#090a0c">
@@ -871,7 +872,7 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
 #videoStage:not(.customTransport) #playbackControls{pointer-events:none!important}
 #videoStage:not(.customTransport) #playbackControls .transport57 button[data-step]{pointer-events:auto!important}
 
-/* LOOPA v84: retain YouTube's native settings/quality/captions and native seek bar.
+/* LOOPA v84: native YouTube settings/quality/captions and native seek bar.
    The middle 47% of the video is a dedicated tap target for LOOPA's unified overlay.
    The native YouTube top controls and bottom seek/settings remain touch accessible. */
 #videoStage #loopaTapZone{display:none;position:absolute;z-index:1;
@@ -882,6 +883,15 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
 #videoStage.customTransport #playbackControls .transport57 button{pointer-events:none!important}
 #videoStage.customTransport.controlsVisible #playbackControls .transport57 button:not(:disabled){pointer-events:auto!important}
 #videoStage #loopaTimeline{display:none!important}
+/* LOOPA v85 — prefer one complete, reliable native control system per provider.
+   Completely remove the conflicting glass transport overlay and its touch shield.
+   Keep only the emergency manual re-sync action if a genuine sync error arises. */
+#videoStage #loopaTapZone,
+#videoStage #loopaTimeline,
+#videoStage #playbackControls .transport57{display:none!important}
+#videoStage #playbackControls{display:none!important;pointer-events:none!important;opacity:0!important;background:transparent!important}
+#videoStage.syncIssue #playbackControls{display:block!important;opacity:1!important}
+#videoStage.syncIssue #guestResync:not([hidden]){pointer-events:auto!important}
 </style>
 </head>
 <body>
@@ -1165,7 +1175,7 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
       let id;
       if(['youtu.be','youtube.com'].includes(h)){
         id=h==='youtu.be'?u.pathname.slice(1):q.get('v')||u.pathname.match(/^\/(?:shorts|embed|live)\/([^/]+)/)?.[1];
-        if(/^[\w-]{11}$/.test(id||'')) return 'https://www.youtube.com/embed/'+id+'?enablejsapi=1&playsinline=1&controls=1&fs=1&cc_load_policy=0&origin='+encodeURIComponent(location.origin);
+        if(/^[\w-]{11}$/.test(id||'')) return 'https://www.youtube.com/embed/'+id+'?enablejsapi=1&playsinline=1&controls=1&fs=1&origin='+encodeURIComponent(location.origin);
       }
       if(h==='rutube.ru'){
         id=u.pathname.match(/^\/(?:video|play\/embed|shorts)\/([a-f\d]{32})\/?$/i)?.[1];
@@ -1429,15 +1439,19 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
       const active=!!roomState.video,host=hostHere();
       videoStage.hidden=!active;
       const canControl=host||sharedMode;
-      const isYouTube=roomBox()?.src.includes('youtube.com/embed/');
-      videoStage.classList.toggle('customTransport',!!isYouTube&&!rutubeAd);
-      tapZone.hidden=!isYouTube||rutubeAd||!canControl;
-      playbackControls.querySelector('.transport57').hidden=rutubeAd||!canControl;
-      byId('loopaTimeline').hidden=true; // Built-in YouTube seek bar and settings are restored.
-      byId('roomToggle').hidden=!isYouTube;
+      // v85: never mix LOOPA's transport layer with native iframe controls.
+      // YouTube, VK Video and RUTUBE each own their own UI; we only use their APIs
+      // to synchronize playback with the room. This also keeps native menus tappable.
+      videoStage.classList.remove('customTransport','controlsVisible');
+      tapZone.hidden=true;
+      playbackControls.querySelector('.transport57').hidden=true;
+      byId('loopaTimeline').hidden=true;
+      byId('roomToggle').hidden=true;
       refreshTransport();
-      // The fallback sync action only appears when there is an actual problem.
-      byId('guestResync').hidden=host||rutubeAd||!syncProblem;
+      // Preserve manual re-sync exclusively for real problems, not during playback.
+      const needsResync=!host&&!rutubeAd&&!!syncProblem;
+      byId('guestResync').hidden=!needsResync;
+      videoStage.classList.toggle('syncIssue',needsResync);
       playbackControls.querySelectorAll('[data-step]').forEach(b=>{
         b.disabled=rutubeAd||!canControl;
         b.title=b.getAttribute('aria-label');
@@ -1484,23 +1498,13 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
       pending={op:playing?'play':'pause',seconds:pos,video:roomState.video,code:roomState.code,epoch:roomEpoch};
       flushPlayback();updatePlaybackControls();revealControls();
     });
-    // Best-effort captions-off on initial YouTube player startup only.
-    // YouTube does not document a guaranteed captions-off embed parameter.
-    // Never continuously force the setting: the viewer must be able to turn CC on.
-    let defaultCaptionsAttempted=false;
-    function tryDisableInitialYouTubeCaptions(){
-      if(defaultCaptionsAttempted||!ytPlayer?.setOption)return;
-      try {
-        ytPlayer.setOption('captions','track',{});
-        defaultCaptionsAttempted=true;
-      } catch(e) { /* Some YouTube players do not expose caption-track control. */ }
-    }
+    // v85: do not force captions via unsupported IFrame API "track" settings.
+    // Let the YouTube player honor its own caption preferences and native CC menu.
     function readyPlayer(){
-      if(ytPlayer)tryDisableInitialYouTubeCaptions();
-      syncPlayback();updatePlaybackControls();revealControls();
+      syncPlayback();updatePlaybackControls();
     }
     function mountRoomPlayer(url){
-      sample=null;observed={playing:false,pos:0};pending=null;ytPlayer=null;vkPlayer=null;defaultCaptionsAttempted=false;syncSnapshot=null;guestManualUntil=0;nativeNeedsStart=true;nativeAccess=true;localMuted=false;syncProblem='';
+      sample=null;observed={playing:false,pos:0};pending=null;ytPlayer=null;vkPlayer=null;syncSnapshot=null;guestManualUntil=0;nativeNeedsStart=true;nativeAccess=true;localMuted=false;syncProblem='';
       applyingUntil=0;lastPlaybackPublish=0;lastGuestCorrection=0;rutubeAd=false;mediaDuration=0;clearTimeout(overlayTimer);videoStage.classList.remove('controlsVisible');
       const frame=document.createElement('iframe');frame.id='room-frame';frame.title='Видео комнаты';frame.allow='autoplay; encrypted-media; fullscreen; picture-in-picture';frame.allowFullscreen=true;
       roomBox().replaceWith(frame);frame.hidden=!url;if(!url)return;
@@ -1511,7 +1515,7 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
     function bindRoomPlayers(){
       const frame=roomBox();if(!frame?.src)return;
       if(frame.src.includes('youtube.com/')&&window.YT?.Player&&!ytPlayer){
-        ytPlayer=new YT.Player(frame,{events:{onReady:readyPlayer,onApiChange:tryDisableInitialYouTubeCaptions,onStateChange:samplePlayers,onAutoplayBlocked:()=>{nativeAccess=true;updatePlaybackControls();}}});
+        ytPlayer=new YT.Player(frame,{events:{onReady:readyPlayer,onStateChange:samplePlayers,onAutoplayBlocked:()=>{nativeAccess=true;updatePlaybackControls();}}});
       }else if(frame.src.includes('vkvideo.ru/')&&window.VK?.VideoPlayer&&!vkPlayer){
         vkPlayer=VK.VideoPlayer(frame);
         for(const [name,playing] of [['started',true],['resumed',true],['paused',false],['ended',false]])vkPlayer.on(name,()=>{if(frame===roomBox()){observed.playing=playing;samplePlayers();}});
