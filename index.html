@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#090a0c">
   <meta name="description" content="LOOPA — ближе, даже на расстоянии. Совместный просмотр с теми, кто важен.">
   <title>LOOPA — Ближе, даже на расстоянии</title>
-  <meta name="loopa-build" content="v80-player-overlay-instant-chat-keyboard-2026-11-05">
+  <meta name="loopa-build" content="v82-caption-initial-best-effort-2026-11-06">
   <script>
     try{const m=localStorage.getItem('loopa-wallpaper-motion');document.documentElement.dataset.wallpaperExplicit=String(m==='on');document.documentElement.dataset.wallpaperMotion=m==='off'?'off':'on';}catch{document.documentElement.dataset.wallpaperExplicit='false';document.documentElement.dataset.wallpaperMotion='on';}
   </script>
@@ -1393,9 +1393,23 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
       pending={op:playing?'play':'pause',seconds:pos,video:roomState.video,code:roomState.code,epoch:roomEpoch};
       flushPlayback();updatePlaybackControls();revealControls();
     });
-    function readyPlayer(){syncPlayback();updatePlaybackControls();revealControls();}
+    // Best-effort captions-off on initial YouTube player startup only.
+    // YouTube does not document a guaranteed captions-off embed parameter.
+    // Never continuously force the setting: the viewer must be able to turn CC on.
+    let defaultCaptionsAttempted=false;
+    function tryDisableInitialYouTubeCaptions(){
+      if(defaultCaptionsAttempted||!ytPlayer?.setOption)return;
+      try {
+        ytPlayer.setOption('captions','track',{});
+        defaultCaptionsAttempted=true;
+      } catch(e) { /* Some YouTube players do not expose caption-track control. */ }
+    }
+    function readyPlayer(){
+      if(ytPlayer)tryDisableInitialYouTubeCaptions();
+      syncPlayback();updatePlaybackControls();revealControls();
+    }
     function mountRoomPlayer(url){
-      sample=null;observed={playing:false,pos:0};pending=null;ytPlayer=null;vkPlayer=null;syncSnapshot=null;guestManualUntil=0;nativeNeedsStart=true;nativeAccess=true;localMuted=false;syncProblem='';
+      sample=null;observed={playing:false,pos:0};pending=null;ytPlayer=null;vkPlayer=null;defaultCaptionsAttempted=false;syncSnapshot=null;guestManualUntil=0;nativeNeedsStart=true;nativeAccess=true;localMuted=false;syncProblem='';
       applyingUntil=0;lastPlaybackPublish=0;lastGuestCorrection=0;rutubeAd=false;mediaDuration=0;clearTimeout(overlayTimer);videoStage.classList.remove('controlsVisible');
       const frame=document.createElement('iframe');frame.id='room-frame';frame.title='Видео комнаты';frame.allow='autoplay; encrypted-media; fullscreen; picture-in-picture';frame.allowFullscreen=true;
       roomBox().replaceWith(frame);frame.hidden=!url;if(!url)return;
@@ -1404,7 +1418,7 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
     function bindRoomPlayers(){
       const frame=roomBox();if(!frame?.src)return;
       if(frame.src.includes('youtube.com/')&&window.YT?.Player&&!ytPlayer){
-        ytPlayer=new YT.Player(frame,{events:{onReady:readyPlayer,onStateChange:samplePlayers,onAutoplayBlocked:()=>{nativeAccess=true;updatePlaybackControls();}}});
+        ytPlayer=new YT.Player(frame,{events:{onReady:readyPlayer,onApiChange:tryDisableInitialYouTubeCaptions,onStateChange:samplePlayers,onAutoplayBlocked:()=>{nativeAccess=true;updatePlaybackControls();}}});
       }else if(frame.src.includes('vkvideo.ru/')&&window.VK?.VideoPlayer&&!vkPlayer){
         vkPlayer=VK.VideoPlayer(frame);
         for(const [name,playing] of [['started',true],['resumed',true],['paused',false],['ended',false]])vkPlayer.on(name,()=>{if(frame===roomBox()){observed.playing=playing;samplePlayers();}});
