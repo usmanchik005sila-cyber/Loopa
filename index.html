@@ -847,6 +847,29 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
   background:linear-gradient(145deg,rgba(255,255,255,.28),rgba(60,56,72,.48))!important;
   transform:translate(-50%,-50%) scale(.96)!important;
 }
+
+/* v83: one unified transport: skip / play-pause / skip, no independent visibility. */
+#videoStage.customTransport #playbackControls{pointer-events:auto!important;opacity:0!important;}
+#videoStage.customTransport.controlsVisible #playbackControls{opacity:1!important}
+#videoStage.customTransport #playbackControls .transport57{pointer-events:none!important}
+#playbackControls .transport57 #roomToggle{left:50%;top:50%;border-radius:50%!important;background:#10101599!important;}
+#playbackControls .transport57 #roomToggle svg{width:30px!important;height:30px!important;}
+#roomToggle .statePause{display:none}
+#roomToggle.isPlaying .statePause{display:block}
+#roomToggle.isPlaying .statePlay{display:none}
+#videoStage.customTransport #playbackControls .transport57 button{pointer-events:none!important}
+#videoStage.customTransport.controlsVisible #playbackControls .transport57 button:not(:disabled){pointer-events:auto!important}
+#videoStage.customTransport:not(.controlsVisible) #playbackControls button{pointer-events:none!important}
+#playbackControls .transport57 #roomToggle:active{transform:translate(-50%,-50%) scale(.96)!important}
+#loopaTimeline{display:none;position:absolute;left:8px;right:8px;bottom:7px;align-items:center;gap:7px;z-index:3;padding:3px 5px;background:#09090db0;border-radius:9px;color:#fff;font:11px system-ui}
+#videoStage.customTransport.controlsVisible #loopaTimeline{display:flex}
+#loopaTimeline[hidden]{display:none!important}
+#loopaTimeline input{flex:1;min-width:0;accent-color:#f6f6f8;height:22px;touch-action:pan-x}
+#loopaTimeline button{min-width:29px!important;width:29px!important;height:29px!important;font:22px system-ui!important;background:#fff2!important;border-radius:7px!important;pointer-events:auto!important}
+#videoStage.customTransport.controlsVisible #loopaTimeline input{pointer-events:auto!important}
+#videoStage:not(.customTransport) #roomToggle{display:none!important}
+#videoStage:not(.customTransport) #playbackControls{pointer-events:none!important}
+#videoStage:not(.customTransport) #playbackControls .transport57 button[data-step]{pointer-events:auto!important}
 </style>
 </head>
 <body>
@@ -1130,7 +1153,7 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
       let id;
       if(['youtu.be','youtube.com'].includes(h)){
         id=h==='youtu.be'?u.pathname.slice(1):q.get('v')||u.pathname.match(/^\/(?:shorts|embed|live)\/([^/]+)/)?.[1];
-        if(/^[\w-]{11}$/.test(id||'')) return 'https://www.youtube.com/embed/'+id+'?enablejsapi=1&playsinline=1&cc_load_policy=0&origin='+encodeURIComponent(location.origin);
+        if(/^[\w-]{11}$/.test(id||'')) return 'https://www.youtube.com/embed/'+id+'?enablejsapi=1&playsinline=1&controls=0&fs=0&cc_load_policy=0&origin='+encodeURIComponent(location.origin);
       }
       if(h==='rutube.ru'){
         id=u.pathname.match(/^\/(?:video|play\/embed|shorts)\/([a-f\d]{32})\/?$/i)?.[1];
@@ -1211,7 +1234,7 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
       }
       const jumped=previous&&Math.abs(pos-previous.pos-(previous.playing?(now-previous.now)/1000:0))>1;
       if(now>applyingUntil&&(previous?.playing!==playing||jumped))syncPlayback();
-      updatePlaybackControls();
+      updatePlaybackControls();refreshTransport();
     }
     async function flushPlayback(){
       if(writing)return;
@@ -1224,20 +1247,50 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
     const videoStage=document.createElement('div');videoStage.id='videoStage';
     roomBox().before(videoStage);videoStage.append(roomBox());
     const playbackControls=document.createElement('div');playbackControls.id='playbackControls';
-    playbackControls.innerHTML='<div class="transport57" aria-label="Перемотка видео"><button type="button" data-step="-10" aria-label="Назад на 10 секунд" title="Назад на 10 секунд"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M21.5 9.5 10.8 16l10.7 6.5Z"/></svg></button><button type="button" data-step="10" aria-label="Вперёд на 10 секунд" title="Вперёд на 10 секунд"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M10.5 9.5 21.2 16l-10.7 6.5Z"/></svg></button></div><button type="button" id="guestResync" hidden>Синхронизировать</button><span id="playbackHint" role="status"></span>';
+    playbackControls.innerHTML='<div class="transport57" aria-label="Управление воспроизведением"><button type="button" data-step="-10" aria-label="Назад на 10 секунд" title="Назад на 10 секунд"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M21.5 9.5 10.8 16l10.7 6.5Z"/></svg></button><button type="button" id="roomToggle" aria-label="Воспроизвести" title="Воспроизвести"><svg viewBox="0 0 32 32" aria-hidden="true"><path class="statePlay" d="M11 7.5 25 16 11 24.5Z"/><path class="statePause" d="M10 7h4v18h-4z M19 7h4v18h-4z"/></svg></button><button type="button" data-step="10" aria-label="Вперёд на 10 секунд" title="Вперёд на 10 секунд"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M10.5 9.5 21.2 16l-10.7 6.5Z"/></svg></button></div><div id="loopaTimeline" aria-label="Позиция видео"><span id="loopaElapsed">0:00</span><input id="loopaSeek" type="range" min="0" max="100" value="0" step="1" aria-label="Перемотать видео"><span id="loopaDuration">0:00</span><button type="button" id="loopaFullscreen" aria-label="Полный экран" title="Полный экран">⛶</button></div><button type="button" id="guestResync" hidden>Синхронизировать</button><span id="playbackHint" role="status"></span>';
     videoStage.append(playbackControls);
     function revealControls(){
-      // The native iframe handles Play/Pause. Show only lateral 10-second seek buttons.
       clearTimeout(overlayTimer);
       if(!roomState?.video||rutubeAd)return;
       videoStage.classList.add('controlsVisible');
-      overlayTimer=setTimeout(()=>videoStage.classList.remove('controlsVisible'),3000);
+      // All three buttons share the same visibility state and timer.
+      if(sample?.playing)overlayTimer=setTimeout(()=>videoStage.classList.remove('controlsVisible'),2800);
     }
-    // Pointer movement on desktop can reveal the seek buttons; the native iframe
-    // remains interactive because the middle of the overlay never captures input.
+    const loopaSeek=byId('loopaSeek');
+    const formatVideoTime=seconds=>{const n=Math.max(0,Math.floor(Number(seconds)||0));return n>=3600?`${Math.floor(n/3600)}:${String(Math.floor(n%3600/60)).padStart(2,'0')}:${String(n%60).padStart(2,'0')}`:`${Math.floor(n/60)}:${String(n%60).padStart(2,'0')}`;};
+    let seekingTimeline=false;
+    function refreshTransport(){
+      const playing=!!sample?.playing;
+      const toggle=byId('roomToggle');
+      toggle.classList.toggle('isPlaying',playing);
+      toggle.setAttribute('aria-label',playing?'Пауза':'Воспроизвести');
+      toggle.title=playing?'Пауза':'Воспроизвести';
+      const now=performance.now(),seconds=Math.max(0,(sample?.pos||0)+(playing?Math.min(2,(now-(sample?.now||now))/1000):0));
+      byId('loopaElapsed').textContent=formatVideoTime(seconds);
+      byId('loopaDuration').textContent=formatVideoTime(mediaDuration);
+      if(!seekingTimeline){loopaSeek.max=String(Math.max(1,Math.floor(mediaDuration||1)));loopaSeek.value=String(Math.min(Number(loopaSeek.max),Math.floor(seconds)));}
+    }
     videoStage.addEventListener('pointermove',event=>{
-      if(event.pointerType==='mouse'&&roomState?.video&&!videoStage.classList.contains('controlsVisible'))revealControls();
+      if(event.pointerType==='mouse'&&roomState?.video&&videoStage.classList.contains('customTransport'))revealControls();
     },{passive:true});
+    playbackControls.addEventListener('pointerdown',event=>{
+      if(!videoStage.classList.contains('customTransport')||event.target.closest('button,input'))return;
+      revealControls();
+    });
+    loopaSeek.addEventListener('pointerdown',()=>{seekingTimeline=true;clearTimeout(overlayTimer);videoStage.classList.add('controlsVisible');});
+    loopaSeek.addEventListener('input',()=>{byId('loopaElapsed').textContent=formatVideoTime(loopaSeek.value);});
+    loopaSeek.addEventListener('change',()=>{
+      seekingTimeline=false;
+      const next=Number(loopaSeek.value);if(!Number.isFinite(next)||!roomState?.video)return;
+      // Reuse the same permission checks and publishing path as the skip buttons.
+      runTransportAction({seconds:next,playing:!!sample?.playing});
+    });
+    byId('loopaFullscreen').addEventListener('click',()=>{
+      if(document.fullscreenElement)document.exitFullscreen?.();
+      else if(videoStage.requestFullscreen)videoStage.requestFullscreen().catch(()=>showToast('Полный экран недоступен в этом браузере'));
+      else showToast('Полный экран недоступен в этом браузере');
+      revealControls();
+    });
 
     // Room-wide collaborative controls. This session signal rides over Supabase Broadcast;
     // the host remains the only writer to the existing playback RPC. For a production
@@ -1352,7 +1405,12 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
       const active=!!roomState.video,host=hostHere();
       videoStage.hidden=!active;
       const canControl=host||sharedMode;
+      const isYouTube=roomBox()?.src.includes('youtube.com/embed/');
+      videoStage.classList.toggle('customTransport',!!isYouTube&&!rutubeAd);
       playbackControls.querySelector('.transport57').hidden=rutubeAd||!canControl;
+      byId('loopaTimeline').hidden=!isYouTube||rutubeAd;
+      byId('roomToggle').hidden=!isYouTube;
+      refreshTransport();
       // The fallback sync action only appears when there is an actual problem.
       byId('guestResync').hidden=host||rutubeAd||!syncProblem;
       playbackControls.querySelectorAll('[data-step]').forEach(b=>{
@@ -1365,15 +1423,23 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
       videoStage.classList.toggle('guestVideo',!host);
       if(!active||rutubeAd){clearTimeout(overlayTimer);videoStage.classList.remove('controlsVisible');}
     }
+    let timelineTarget=null;
+    async function runTransportAction({seconds,playing}){
+      timelineTarget={seconds,playing};
+      byId('roomToggle').click();
+    }
     playbackControls.addEventListener('click',async e=>{
       const b=e.target.closest('button');if(!b||!roomState?.video||rutubeAd)return;
       if(e.detail)b.blur();revealControls();
       if(b.id==='guestResync'){guestManualUntil=0;applyRoom(true);updatePlaybackControls();return;}
+      if(b.id==='loopaFullscreen')return;
       const host=hostHere();if(!host&&(!sharedMode||!sharedSignalReady))return;
       const fresh=sample&&performance.now()-sample.now<1800;
       let pos=fresh?sample.pos+(sample.playing?(performance.now()-sample.now)/1000:0):Number(roomState.pos)||0;
-      const playing=!!sample?.playing;
+      let playing=!!sample?.playing;
       if(b.dataset.step)pos+=Number(b.dataset.step);
+      if(timelineTarget){pos=timelineTarget.seconds;playing=timelineTarget.playing;timelineTarget=null;}
+      else if(b.id==='roomToggle')playing=!playing;
       pos=Math.max(0,mediaDuration?Math.min(mediaDuration,pos):pos);
       applyingUntil=performance.now()+1000;
       if(!host){
@@ -1413,7 +1479,9 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
       applyingUntil=0;lastPlaybackPublish=0;lastGuestCorrection=0;rutubeAd=false;mediaDuration=0;clearTimeout(overlayTimer);videoStage.classList.remove('controlsVisible');
       const frame=document.createElement('iframe');frame.id='room-frame';frame.title='Видео комнаты';frame.allow='autoplay; encrypted-media; fullscreen; picture-in-picture';frame.allowFullscreen=true;
       roomBox().replaceWith(frame);frame.hidden=!url;if(!url)return;
-      frame.onload=()=>{if(frame===roomBox())bindRoomPlayers();};frame.src=url;updatePlaybackControls();
+      frame.onload=()=>{if(frame===roomBox())bindRoomPlayers();};
+      if(url.includes('youtube.com/embed/')){const u=new URL(url);u.searchParams.set('controls','0');u.searchParams.set('fs','0');url=u.toString();}
+      frame.src=url;updatePlaybackControls();
     }
     function bindRoomPlayers(){
       const frame=roomBox();if(!frame?.src)return;
