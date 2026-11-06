@@ -870,6 +870,18 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
 #videoStage:not(.customTransport) #roomToggle{display:none!important}
 #videoStage:not(.customTransport) #playbackControls{pointer-events:none!important}
 #videoStage:not(.customTransport) #playbackControls .transport57 button[data-step]{pointer-events:auto!important}
+
+/* LOOPA v84: retain YouTube's native settings/quality/captions and native seek bar.
+   The middle 47% of the video is a dedicated tap target for LOOPA's unified overlay.
+   The native YouTube top controls and bottom seek/settings remain touch accessible. */
+#videoStage #loopaTapZone{display:none;position:absolute;z-index:1;
+  left:0;right:0;top:25%;bottom:28%;background:transparent;
+  touch-action:manipulation;cursor:pointer}
+#videoStage.customTransport #loopaTapZone{display:block}
+#videoStage.customTransport #playbackControls{pointer-events:none!important}
+#videoStage.customTransport #playbackControls .transport57 button{pointer-events:none!important}
+#videoStage.customTransport.controlsVisible #playbackControls .transport57 button:not(:disabled){pointer-events:auto!important}
+#videoStage #loopaTimeline{display:none!important}
 </style>
 </head>
 <body>
@@ -1153,7 +1165,7 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
       let id;
       if(['youtu.be','youtube.com'].includes(h)){
         id=h==='youtu.be'?u.pathname.slice(1):q.get('v')||u.pathname.match(/^\/(?:shorts|embed|live)\/([^/]+)/)?.[1];
-        if(/^[\w-]{11}$/.test(id||'')) return 'https://www.youtube.com/embed/'+id+'?enablejsapi=1&playsinline=1&controls=0&fs=0&cc_load_policy=0&origin='+encodeURIComponent(location.origin);
+        if(/^[\w-]{11}$/.test(id||'')) return 'https://www.youtube.com/embed/'+id+'?enablejsapi=1&playsinline=1&controls=1&fs=1&cc_load_policy=0&origin='+encodeURIComponent(location.origin);
       }
       if(h==='rutube.ru'){
         id=u.pathname.match(/^\/(?:video|play\/embed|shorts)\/([a-f\d]{32})\/?$/i)?.[1];
@@ -1249,13 +1261,29 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
     const playbackControls=document.createElement('div');playbackControls.id='playbackControls';
     playbackControls.innerHTML='<div class="transport57" aria-label="Управление воспроизведением"><button type="button" data-step="-10" aria-label="Назад на 10 секунд" title="Назад на 10 секунд"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M21.5 9.5 10.8 16l10.7 6.5Z"/></svg></button><button type="button" id="roomToggle" aria-label="Воспроизвести" title="Воспроизвести"><svg viewBox="0 0 32 32" aria-hidden="true"><path class="statePlay" d="M11 7.5 25 16 11 24.5Z"/><path class="statePause" d="M10 7h4v18h-4z M19 7h4v18h-4z"/></svg></button><button type="button" data-step="10" aria-label="Вперёд на 10 секунд" title="Вперёд на 10 секунд"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M10.5 9.5 21.2 16l-10.7 6.5Z"/></svg></button></div><div id="loopaTimeline" aria-label="Позиция видео"><span id="loopaElapsed">0:00</span><input id="loopaSeek" type="range" min="0" max="100" value="0" step="1" aria-label="Перемотать видео"><span id="loopaDuration">0:00</span><button type="button" id="loopaFullscreen" aria-label="Полный экран" title="Полный экран">⛶</button></div><button type="button" id="guestResync" hidden>Синхронизировать</button><span id="playbackHint" role="status"></span>';
     videoStage.append(playbackControls);
+    // LOOPA v84: the central touch area toggles all three glass controls.
+    // Leave the top/bottom of the YouTube iframe uncovered for native settings,
+    // closed captions, quality selection and the native seek bar.
+    const tapZone=document.createElement('div');
+    tapZone.id='loopaTapZone';
+    tapZone.setAttribute('aria-label','Показать или скрыть управление LOOPA');
+    videoStage.insertBefore(tapZone,playbackControls);
+    function hideControls(){
+      clearTimeout(overlayTimer);
+      videoStage.classList.remove('controlsVisible');
+    }
     function revealControls(){
       clearTimeout(overlayTimer);
       if(!roomState?.video||rutubeAd)return;
       videoStage.classList.add('controlsVisible');
-      // All three buttons share the same visibility state and timer.
-      if(sample?.playing)overlayTimer=setTimeout(()=>videoStage.classList.remove('controlsVisible'),2800);
+      // All three controls use one visibility state. Preserve auto-hide during playback.
+      if(sample?.playing)overlayTimer=setTimeout(hideControls,2800);
     }
+    tapZone.addEventListener('click',()=>{
+      if(!videoStage.classList.contains('customTransport')||!roomState?.video||rutubeAd)return;
+      if(videoStage.classList.contains('controlsVisible'))hideControls();
+      else revealControls();
+    });
     const loopaSeek=byId('loopaSeek');
     const formatVideoTime=seconds=>{const n=Math.max(0,Math.floor(Number(seconds)||0));return n>=3600?`${Math.floor(n/3600)}:${String(Math.floor(n%3600/60)).padStart(2,'0')}:${String(n%60).padStart(2,'0')}`:`${Math.floor(n/60)}:${String(n%60).padStart(2,'0')}`;};
     let seekingTimeline=false;
@@ -1273,10 +1301,6 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
     videoStage.addEventListener('pointermove',event=>{
       if(event.pointerType==='mouse'&&roomState?.video&&videoStage.classList.contains('customTransport'))revealControls();
     },{passive:true});
-    playbackControls.addEventListener('pointerdown',event=>{
-      if(!videoStage.classList.contains('customTransport')||event.target.closest('button,input'))return;
-      revealControls();
-    });
     loopaSeek.addEventListener('pointerdown',()=>{seekingTimeline=true;clearTimeout(overlayTimer);videoStage.classList.add('controlsVisible');});
     loopaSeek.addEventListener('input',()=>{byId('loopaElapsed').textContent=formatVideoTime(loopaSeek.value);});
     loopaSeek.addEventListener('change',()=>{
@@ -1407,8 +1431,9 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
       const canControl=host||sharedMode;
       const isYouTube=roomBox()?.src.includes('youtube.com/embed/');
       videoStage.classList.toggle('customTransport',!!isYouTube&&!rutubeAd);
+      tapZone.hidden=!isYouTube||rutubeAd||!canControl;
       playbackControls.querySelector('.transport57').hidden=rutubeAd||!canControl;
-      byId('loopaTimeline').hidden=!isYouTube||rutubeAd;
+      byId('loopaTimeline').hidden=true; // Built-in YouTube seek bar and settings are restored.
       byId('roomToggle').hidden=!isYouTube;
       refreshTransport();
       // The fallback sync action only appears when there is an actual problem.
@@ -1480,7 +1505,7 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
       const frame=document.createElement('iframe');frame.id='room-frame';frame.title='Видео комнаты';frame.allow='autoplay; encrypted-media; fullscreen; picture-in-picture';frame.allowFullscreen=true;
       roomBox().replaceWith(frame);frame.hidden=!url;if(!url)return;
       frame.onload=()=>{if(frame===roomBox())bindRoomPlayers();};
-      if(url.includes('youtube.com/embed/')){const u=new URL(url);u.searchParams.set('controls','0');u.searchParams.set('fs','0');url=u.toString();}
+      if(url.includes('youtube.com/embed/')){const u=new URL(url);u.searchParams.set('controls','1');u.searchParams.set('fs','1');url=u.toString();}
       frame.src=url;updatePlaybackControls();
     }
     function bindRoomPlayers(){
