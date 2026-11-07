@@ -1,13 +1,16 @@
 <!doctype html>
 <html lang="ru">
 <head>
-<!-- LOOPA v90: manual cinema mode with persistent open chat; prior social and player behavior retained -->
+<!-- LOOPA v91: expanded cinema player, unobstructed chat, subtle PWA support -->
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#090a0c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="LOOPA">
   <meta name="description" content="LOOPA — ближе, даже на расстоянии. Совместный просмотр с теми, кто важен.">
   <title>LOOPA — Ближе, даже на расстоянии</title>
-  <meta name="loopa-version" content="v90">
+  <meta name="loopa-version" content="v91">
   <meta name="loopa-build" content="v82-caption-initial-best-effort-2026-11-06">
   <script>
     try{const m=localStorage.getItem('loopa-wallpaper-motion');document.documentElement.dataset.wallpaperExplicit=String(m==='on');document.documentElement.dataset.wallpaperMotion=m==='off'?'off':'on';}catch{document.documentElement.dataset.wallpaperExplicit='false';document.documentElement.dataset.wallpaperMotion='on';}
@@ -1070,6 +1073,31 @@ body.roomViewing.cinemaMode #room-active .roomChat{background:linear-gradient(18
 body.roomViewing.cinemaMode #room-active #chatLog{background:transparent!important}
 body.roomViewing.cinemaMode #room-active #chatForm{background:#0b0b0d!important;border-top-color:#ffffff20}
 @media(min-width:901px){body.roomViewing.cinemaMode #room-active{width:min(100%,1160px)!important;max-width:1160px!important;box-shadow:0 0 0 100vmax #000!important}body.roomViewing.cinemaMode #videoStage{max-width:1160px}}
+/* v91: Cinema mode removes the in-page room toolbar from document flow. */
+body.roomViewing.cinemaMode #room-active{isolation:isolate}
+body.roomViewing.cinemaMode #room-active .roomBar{
+  display:block!important;position:relative!important;flex:0 0 0px!important;
+  height:0!important;min-height:0!important;max-height:0!important;
+  margin:0!important;padding:0!important;border:0!important;
+  overflow:visible!important;background:transparent!important;z-index:12!important;
+}
+body.roomViewing.cinemaMode #room-active .roomBar .text-link,
+body.roomViewing.cinemaMode #room-active #sheetVideoChange,
+body.roomViewing.cinemaMode #room-active #inviteRoom,
+body.roomViewing.cinemaMode #room-active #accessBadge{display:none!important}
+/* Keep the existing menu reachable so the user can turn Cinema off. */
+body.roomViewing.cinemaMode #room-active #moreRoom{
+  display:grid!important;place-items:center!important;position:absolute!important;
+  top:10px!important;right:11px!important;left:auto!important;
+  margin:0!important;width:40px!important;min-width:40px!important;
+  height:40px!important;min-height:40px!important;
+  border-radius:13px!important;background:#0b0b0de8!important;
+  border:1px solid #ffffff50!important;box-shadow:0 4px 20px #000a!important;
+  color:#fff!important;z-index:14!important;pointer-events:auto!important;
+}
+body.roomViewing.cinemaMode #videoStage{margin:0!important;z-index:1!important}
+body.roomViewing.cinemaMode #room-active .roomChat{background:#050505!important}
+body.roomViewing.cinemaMode #room-active #chatForm{background:#050505!important}
 @media(prefers-reduced-motion:reduce){#cinemaModeToggle .cinemaModeSwitch,#cinemaModeToggle .cinemaModeSwitch:after{transition:none}}
 </style>
 </head>
@@ -1960,6 +1988,7 @@ body.roomViewing.cinemaMode #room-active #chatForm{background:#0b0b0d!important;
     function applyCinemaMode(enabled){
       cinemaModeEnabled=Boolean(enabled);
       document.body.classList.toggle('cinemaMode',cinemaModeEnabled);
+      document.querySelector('meta[name="theme-color"]')?.setAttribute('content',cinemaModeEnabled?'#000000':'#090a0c');
       cinemaButton.setAttribute('aria-pressed',String(cinemaModeEnabled));
       cinemaButton.querySelector('.cinemaModeCopy strong').textContent=cinemaModeEnabled?'Выключить режим кинотеатра':'Режим кинотеатра';
       scheduleWatchViewport();
