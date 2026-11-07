@@ -1047,17 +1047,26 @@ body.roomViewing #videoStage #room-frame{width:100%;height:100%;margin:0;transit
         closeEmoji();field.focus();};tray.append(choice);
     }
     let chatSending=false;
-    const chatSendButton=byId('chatForm').querySelector('button:last-child');
-    byId('chatForm').noValidate=true;
+    const chatForm=byId('chatForm'),chatSendButton=chatForm.querySelector('button:last-child');
+    chatForm.noValidate=true;
     chatSendButton.addEventListener('pointerdown',e=>{if(document.activeElement===byId('chatText'))e.preventDefault();});
-    byId('chatForm').onsubmit=async e=>{
-      e.preventDefault();const input=byId('chatText'),raw=input.value,value=raw.trim();
+    async function sendChatMessage(){
+      const input=watchField,raw=input.value,value=raw.trim();
       if(!value||chatSending||!roomState)return;
       const sendingRoom=roomState.code,epoch=roomEpoch;
       chatSending=true;input.value='';chatSendButton.setAttribute('aria-busy','true');
       try{await roomCall('chat',{media:value});}
       catch(err){if(roomEpoch===epoch&&roomState?.code===sendingRoom){if(!input.value)input.value=raw;showToast(err.message);}}
       finally{chatSending=false;chatSendButton.removeAttribute('aria-busy');}
+    }
+    watchField.addEventListener('keydown',e=>{
+      if(e.key!=='Enter'||e.isComposing||e.keyCode===229)return;
+      e.preventDefault();
+      void sendChatMessage();
+    });
+    chatForm.onsubmit=e=>{
+      e.preventDefault();
+      void sendChatMessage();
     };
     byId('moreRoom').onclick=()=>{const d=roomState;byId('accessEdit').hidden=!hostHere();byId('accessMode').value=d.access_mode;const pick=byId('pick');pick.replaceChildren();
       for(const m of d.members.filter(m=>m.id!==d.host)){const l=document.createElement('label'),c=document.createElement('input');c.type='checkbox';c.value=m.id;c.checked=d.allowed.includes(m.id);l.append(c,document.createTextNode(' '+m.name));pick.append(l);}
