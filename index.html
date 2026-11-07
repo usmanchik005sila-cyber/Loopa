@@ -728,7 +728,7 @@ main{view-transition-name:none!important}
 #settings-theme,#privacy-main-panel,#privacy-linked-panel{transform:none!important}
 /* LOOPA v80: native player owns Play/Pause; two discreet seek targets overlay the video. */
 #videoStage{position:relative;display:block;overflow:hidden!important;background:#000}
-#videoStage #room-frame{position:absolute;inset:0;display:block;width:100%;height:100%;margin:0;border:0;border-radius:0}
+#videoStage #room-frame{position:absolute;inset:0;left:50%;right:auto;display:block;width:var(--watch-player-width,100%);height:100%;margin:0;border:0;border-radius:0;transform:translateX(-50%)}
 body.roomViewing #videoStage{height:var(--watch-player-height,56.25vw)!important;transition:none!important}
 body.roomViewing #videoStage #room-frame{height:100%!important;aspect-ratio:auto;transition:none!important}
 body.roomViewing #room-active{transition:none!important}
@@ -2074,11 +2074,15 @@ body.roomViewing #room-active,body.roomViewing .roomChat,body.roomViewing #chatF
       // slowly while the iOS keyboard was opening or closing).
       const compact=Math.min(normal,Math.max(76,Math.min(128,height*.30)));
       const player=(focused||watchKeyboardOpen)?compact:normal;
+      // Keep a compact keyboard-open player at 16:9 instead of cropping it.
+      const playerWidth=(focused||watchKeyboardOpen)?Math.min(width,compact*16/9):width;
       const oldHeight=root.style.getPropertyValue('--watch-height');
       const oldPlayer=root.style.getPropertyValue('--watch-player-height');
+      const oldPlayerWidth=root.style.getPropertyValue('--watch-player-width');
       const keepBottom=watchKeepBottom,position=watchLog.scrollTop;
       if(oldHeight!==height+'px')root.style.setProperty('--watch-height',height+'px');
       if(oldPlayer!==player+'px')root.style.setProperty('--watch-player-height',player+'px');
+      if(oldPlayerWidth!==playerWidth+'px')root.style.setProperty('--watch-player-width',playerWidth+'px');
       // Fixed elements follow Safari's layout-viewport pan without scrolling
       // the document or combining offsetTop and scrollY twice.
       const top=Math.max(0,window.scrollY||0)+'px';
