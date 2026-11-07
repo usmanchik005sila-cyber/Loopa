@@ -2128,9 +2128,7 @@ body.roomViewing #room-active,body.roomViewing .roomChat,body.roomViewing #chatF
       if(!value||chatSending||!roomState)return;
       const sendingRoom=roomState.code,epoch=roomEpoch;
       chatSending=true;input.value='';chatSendButton.setAttribute('aria-busy','true');
-      // iOS: close the keyboard on the user gesture, BEFORE network work.
-      // Do not refocus after sending; the native Safari keyboard closes once.
-      if(document.activeElement===input){input.blur();}
+      // Keep the composer focused so the keyboard is ready for the next message.
       closeEmoji();
       syncWatchViewport();
       try{await roomCall('chat',{media:value});}
