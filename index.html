@@ -537,7 +537,7 @@ body.roomViewing #room-active{transition:none}
 
 #videoStage{position:relative;background:#000;flex:none;width:100%;overflow:hidden}
 body.roomViewing #videoStage{height:var(--watch-player-height,56.25vw);transition:none}
-body.roomViewing #videoStage #room-frame{width:100%;height:100%;margin:0;transition:none}
+body.roomViewing #videoStage #room-frame{width:var(--watch-player-width,100%);height:100%;margin:0;transition:none}
 #videoStage[hidden],#playbackControls [hidden]{display:none!important}
 #playbackControls{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(transparent 50%,#0007);opacity:0;transition:opacity .18s;pointer-events:none}
 #videoStage.controlsVisible #playbackControls,#videoStage:focus-within #playbackControls{opacity:1}
