@@ -10,8 +10,8 @@
   <meta name="apple-mobile-web-app-title" content="LOOPA">
   <meta name="description" content="LOOPA — ближе, даже на расстоянии. Совместный просмотр с теми, кто важен.">
   <title>LOOPA — Ближе, даже на расстоянии</title>
-  <meta name="loopa-version" content="v91">
-  <meta name="loopa-build" content="v82-caption-initial-best-effort-2026-11-06">
+  <meta name="loopa-version" content="v94">
+  <meta name="loopa-build" content="v94-keyboard-focus">
   <script>
     try{const m=localStorage.getItem('loopa-wallpaper-motion');document.documentElement.dataset.wallpaperExplicit=String(m==='on');document.documentElement.dataset.wallpaperMotion=m==='off'?'off':'on';}catch{document.documentElement.dataset.wallpaperExplicit='false';document.documentElement.dataset.wallpaperMotion='on';}
   </script>
@@ -2181,12 +2181,10 @@ body.roomViewing #room-active,body.roomViewing .roomChat,body.roomViewing #chatF
       if(!value||chatSending||!roomState)return;
       const sendingRoom=roomState.code,epoch=roomEpoch;
       chatSending=true;input.value='';chatSendButton.setAttribute('aria-busy','true');
-      // iOS: close the keyboard on the user gesture, BEFORE network work.
-      // Do not refocus after sending; the native Safari keyboard closes once.
-      if(document.activeElement===input){
-        beginWatchKeyboardDismiss();
-        input.blur();
-      }
+      // v94: keep the input focused after Send/Enter. Calling blur() here
+      // triggered iOS Safari keyboard dismissal plus a moving visual viewport,
+      // causing the entire room composer to slide after *every* message.
+      // The keyboard closes only when the user dismisses it intentionally.
       closeEmoji();
       scheduleWatchViewport();
       try{await roomCall('chat',{media:value});}
