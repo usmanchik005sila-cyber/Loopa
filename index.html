@@ -1022,6 +1022,33 @@ body.dmViewing .dm-composer button{width:44px;height:44px}
 body.dmViewing .dm-screen,#dmLog,#dmForm{transition:none!important;animation:none!important}
 @media(prefers-reduced-motion:reduce){body.dmViewing section[data-page="dm"]{transition:none!important}}
 
+/* LOOPA v89 — hidden is authoritative for signed-in/guest sections. */
+#auth-guest[hidden],#auth-account[hidden],#auth-loading[hidden],
+#settings-home[hidden],#settings-detail[hidden]{display:none!important}
+/* Four destinations: friends and personal conversations stay separate. */
+.bottom{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+.bottom .nav-item{font-size:11px;gap:7px;min-width:0}
+.bottom .nav-item svg{width:24px;height:24px}
+/* Calm glass treatment for the inbox, matching the rest of Private Cinema. */
+.messages-header{margin:20px 0 25px}
+.messages-header h1{margin-bottom:12px}
+.messages-summary{font:13px/1.6 system-ui;color:#a8a8ae}
+.messages-list{display:grid;gap:10px}
+.message-conversation{display:flex;align-items:center;gap:13px;width:100%;min-height:78px;padding:15px 14px;text-align:left;cursor:pointer;color:#efeff1;border:1px solid #ffffff22;border-radius:19px;background:linear-gradient(140deg,#28282bcf,#111113e8);box-shadow:inset 0 1px #ffffff0a}
+.message-conversation:active{background:#ffffff15}
+.message-conversation .friend-avatar{width:48px;height:48px;flex:none;overflow:hidden;font-size:20px}
+.message-conversation .friend-avatar img{width:100%;height:100%;object-fit:cover}
+.message-conversation-content{flex:1;min-width:0;display:grid;gap:6px}
+.message-conversation-head{display:flex;align-items:baseline;justify-content:space-between;gap:9px}
+.message-conversation-head strong{font:600 14px system-ui;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.message-conversation-head time{font:11px system-ui;color:#919197;white-space:nowrap}
+.message-conversation-preview{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#aeaeB4;font:13px/1.4 system-ui}
+.messages-state{padding:26px 18px;border:1px solid #ffffff1a;border-radius:20px;background:linear-gradient(145deg,#202023a6,#101013ca);color:#b4b4bc;font:13px/1.7 system-ui;text-align:center}
+.messages-state button{display:block;min-height:42px;margin:16px auto 0;padding:0 20px;border:1px solid #ffffff30;border-radius:14px;background:#ffffff12;color:#f7f7f7;font:600 13px system-ui;cursor:pointer}
+#people .roomMemberChip[data-peer-id]{cursor:pointer;text-align:left;font-family:inherit}
+#people .roomMemberChip[data-peer-id]:active{background:#ffffff1b}
+#people .roomMemberChip[data-peer-id]:focus-visible,.chatUserPhoto[data-avatar-user]:focus-visible{outline:2px solid #e5e5e7;outline-offset:3px}
+.roomChat .chatUserPhoto[data-avatar-user]{cursor:pointer}
 </style>
 </head>
 <body>
@@ -1031,6 +1058,7 @@ body.dmViewing .dm-screen,#dmLog,#dmForm{transition:none!important;animation:non
     <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M17 5a3 3 0 0 1 0 6m1 4a5 5 0 0 1 3 5"/></symbol>
     <symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
     <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></symbol>
+    <symbol id="i-mail-nav" viewBox="0 0 24 24"><rect x="2.5" y="4.5" width="19" height="15" rx="3"/><path d="m3.5 7 8.5 6 8.5-6"/></symbol>
     <symbol id="i-message" viewBox="0 0 24 24"><path d="M20.5 11.5a8.5 8.5 0 0 1-8.5 8.5 9 9 0 0 1-3.5-.7L3.5 21l1.7-4.8A8.5 8.5 0 1 1 20.5 11.5Z"/><path d="M8 11.5h8M8 14.5h5"/></symbol>
     <symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18h1.5a2 2 0 0 0 1.5-3.4 1.7 1.7 0 0 1 1.2-2.9H18a3 3 0 0 0 3-3A9 9 0 0 0 12 3z"/><circle cx="7.5" cy="11" r=".7"/><circle cx="10" cy="7" r=".7"/><circle cx="15" cy="7.5" r=".7"/></symbol>
     <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></symbol>
@@ -1099,6 +1127,12 @@ body.dmViewing .dm-screen,#dmLog,#dmForm{transition:none!important;animation:non
         </div>
       </section>
 
+
+      <section data-page="messages" hidden>
+        <div class="eyebrow">ЛИЧНОЕ ОБЩЕНИЕ</div>
+        <div class="messages-header"><h1>Твои<br>сообщения.</h1><p class="messages-summary">Все личные переписки в LOOPA — в одном месте.</p></div>
+        <div id="messagesList" class="messages-list" aria-live="polite"><div class="messages-state">Открываем переписки…</div></div>
+      </section>
 
       <section data-page="friend-profile" hidden>
         <button class="friend-page-back" id="friendPageBack" type="button">‹ Назад к друзьям</button>
@@ -1299,6 +1333,7 @@ body.dmViewing .dm-screen,#dmLog,#dmForm{transition:none!important;animation:non
   <nav class="bottom" aria-label="Основная навигация">
     <button class="nav-item active" type="button" data-go="home" aria-current="page"><svg><use href="#i-home"/></svg><span>Главная</span></button>
     <button class="nav-item" type="button" data-go="friends"><span class="nav-item-icon-wrap"><svg><use href="#i-users"/></svg><span class="nav-badge" id="friends-nav-badge" aria-hidden="true"></span></span><span>Друзья</span></button>
+    <button class="nav-item" type="button" data-go="messages"><svg><use href="#i-mail-nav"/></svg><span>Сообщения</span></button>
     <button class="nav-item" type="button" data-go="profile"><svg><use href="#i-person"/></svg><span>Профиль</span></button>
   </nav>
   <div class="requests-overlay" id="requests-overlay" hidden>
@@ -1851,6 +1886,11 @@ body.dmViewing .dm-screen,#dmLog,#dmForm{transition:none!important;animation:non
           const bubble=document.createElement('div');bubble.className='bubble'+(own?'':' peer');bubble.textContent=msg.body||'';
           const photo=last?roomAvatar(group.author,own?'Ты':group.name||'Участник','chatUserPhoto'):document.createElement('span');
           if(!last)photo.className='chatAvatarSpace';
+          if(last&&!own&&group.author&&group.author!==currentUser?.id){
+            photo.tabIndex=0;photo.setAttribute('role','button');photo.setAttribute('aria-label','Профиль '+(group.name||'участника'));
+            photo.onclick=()=>openRoomPeer(group.author,group.name);
+            photo.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openRoomPeer(group.author,group.name);}};
+          }
           if(own)line.append(bubble,photo);else line.append(photo,bubble);
           thread.append(line);
         });
@@ -1865,7 +1905,9 @@ body.dmViewing .dm-screen,#dmLog,#dmForm{transition:none!important;animation:non
       const messages=data.chat||[],members=data.members||[],online=members.filter(m=>m.online);
       byId('accessBadge').textContent=modeNames[data.access_mode];
       const chips=members.map(m=>{
-        const chip=document.createElement('div');chip.className='roomMemberChip'+(m.online?'':' is-offline');chip.setAttribute('role','listitem');
+        const isPeer=!!m.id&&m.id!==currentUser?.id;
+        const chip=document.createElement(isPeer?'button':'div');chip.className='roomMemberChip'+(m.online?'':' is-offline');chip.setAttribute('role','listitem');
+        if(isPeer){chip.type='button';chip.dataset.peerId=m.id;chip.title='Открыть профиль '+(m.name||'участника');chip.setAttribute('aria-label','Открыть профиль '+(m.name||'участника'));chip.onclick=()=>openRoomPeer(m.id,m.name);}
         const name=document.createElement('span');name.className='roomMemberLabel';name.textContent=m.name||'Участник';
         const state=document.createElement('small');state.textContent=m.online?'В комнате':'Переподключается';name.append(state);
         chip.append(roomAvatar(m.id,m.name),name);return chip;
@@ -2042,7 +2084,8 @@ body.dmViewing .dm-screen,#dmLog,#dmForm{transition:none!important;animation:non
       if(op==='read'&&prev&&data.changed<prev.changed)return;
       if(prev?.code===data.code && data.server_time<prev.server_time)return;
       byId('room-active').classList.toggle('choosing',!data.video);
-      document.body.classList.toggle('roomViewing',!!data.video);syncWatchViewport();
+      document.body.classList.toggle('roomViewing',!!data.video&&lastPage==='rooms');
+      if(lastPage==='rooms')syncWatchViewport();
       byId('sheetVideoChange').hidden=data.host!==u;
 
       byId('setupTitle').textContent=data.host===u?'Выбери видео':'Ведущий выбирает видео';
@@ -2523,6 +2566,7 @@ body.dmViewing .dm-screen,#dmLog,#dmForm{transition:none!important;animation:non
     byId('catalogForm').onsubmit=e=>{e.preventDefault();searchCatalog(false);};
     byId('nextVideos').onclick=()=>searchCatalog(true);
     let lastPage = 'home';
+    let roomPeerJourney=false; // Visiting someone's profile from a room must not end the room.
     const navigationReducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)');
     let nativeNavigationUpdating=false;
     function navigateSmoothly(update){
@@ -2571,10 +2615,17 @@ body.dmViewing .dm-screen,#dmLog,#dmForm{transition:none!important;animation:non
       document.documentElement.style.removeProperty('--dm-visual-height');
     }
     function showPage(destination) {
+      if(lastPage==='messages'&&destination!=='messages')stopMessagesInbox();
       if(lastPage==='dm' && destination!=='dm')clearDirectMessageChannel();
       if(destination==='dm'&&lastPage!=='dm')setDmViewing(true);
       else if(lastPage==='dm'&&destination!=='dm')setDmViewing(false);
-      if(lastPage==='rooms' && destination!=='rooms') roomExit();
+      // Room → participant profile → DM → room: keep the room session alive.
+      const enteringPeerFromRoom=lastPage==='rooms'&&destination==='friend-profile'&&!!roomState;
+      if(enteringPeerFromRoom)roomPeerJourney=true;
+      const withinRoomPeerJourney=roomPeerJourney&&['rooms','friend-profile','dm'].includes(destination);
+      if(lastPage==='rooms' && destination!=='rooms' && !enteringPeerFromRoom) roomExit();
+      else if(roomPeerJourney && !withinRoomPeerJourney){if(roomState)roomExit();roomPeerJourney=false;}
+      if(destination==='rooms')roomPeerJourney=false;
       if(destination==='rooms' && !roomState && currentUser) roomRun('list');
       const changed = destination !== lastPage;
       pages.forEach(page => {
@@ -2586,7 +2637,7 @@ body.dmViewing .dm-screen,#dmLog,#dmForm{transition:none!important;animation:non
       });
       lastPage = destination;
       tabs.forEach(tab => {
-        const active = tab.dataset.go === (destination==='rooms'?'home':(['friend-profile','dm'].includes(destination)?'friends':destination));
+        const active = tab.dataset.go === (destination==='rooms'?'home':(destination==='friend-profile'?'friends':(destination==='dm'?(dmPageReturn==='messages'?'messages':'friends'):destination)));
         tab.classList.toggle('active', active);
         if (active) tab.setAttribute('aria-current', 'page');
         else tab.removeAttribute('aria-current');
@@ -2594,6 +2645,10 @@ body.dmViewing .dm-screen,#dmLog,#dmForm{transition:none!important;animation:non
       toast.hidden = true;
       if (destination === 'profile' && currentUser && !byId('recovery-form').hidden) openSettings('account');
       else if (destination === 'profile') openSettings('home');
+      // The watch-room layout must not cover the profile or inbox when the room is kept alive.
+      if(destination!=='rooms'){document.body.classList.remove('roomViewing','chatTyping');}
+      else if(roomState){document.body.classList.toggle('roomViewing',!!roomState.video);syncWatchViewport();}
+      if (destination === 'messages') {refreshMessagesInbox();subscribeMessagesInbox();}
       if (destination === 'friends') {
         syncFriendsSession();
         if (currentUser) refreshFriendLists();
@@ -3009,6 +3064,7 @@ body.dmViewing .dm-screen,#dmLog,#dmForm{transition:none!important;animation:non
       if(!currentUser||!profile?.id)return;
       const requestId=++friendProfileRequest;
       profilePageReturn=lastPage==='dm'?'friends':lastPage;
+      byId('friendPageBack').textContent=profilePageReturn==='rooms'?'‹ Назад в комнату':(profilePageReturn==='messages'?'‹ Назад к сообщениям':'‹ Назад к друзьям');
       profilePeer={...profile};
       byId('friendPageName').textContent=profile.display_name||'Пользователь LOOPA';
       byId('friendPageAvatar').replaceChildren(avatarForUser(profile));
@@ -3049,7 +3105,19 @@ body.dmViewing .dm-screen,#dmLog,#dmForm{transition:none!important;animation:non
         if(requestId===friendProfileRequest){byId('friendPageTime').textContent='—';}
       }
     }
-    byId('friendPageBack').onclick=()=>showPage('friends');
+    async function openRoomPeer(userId,visibleName){
+      if(!currentUser||!client||!userId||userId===currentUser.id)return;
+      // User IDs come from the server's current room roster or message history.
+      // Only load public profile fields, never emails or hidden auth metadata.
+      const fallback={id:userId,display_name:roomProfileCache.get(userId)?.name||visibleName||'Участник'};
+      if(byId('roomSheet').open)byId('roomSheet').close();
+      try{
+        const {data}=await client.from('profiles').select('id,display_name,avatar_path,updated_at').eq('id',userId).maybeSingle();
+        if(currentUser&&roomState)openFriendProfile(data||fallback);
+        else if(currentUser)openFriendProfile(data||fallback);
+      }catch{if(currentUser)openFriendProfile(fallback);}
+    }
+    byId('friendPageBack').onclick=()=>showPage(profilePageReturn==='rooms'&&roomState?'rooms':(profilePageReturn==='messages'?'messages':'friends'));
     byId('friendPageWrite').onclick=()=>{if(profilePeer)openDirectMessage(profilePeer);};
     byId('friendPageInvite').onclick=async()=>{
       if(!profilePeer||!currentUser)return;
@@ -3065,6 +3133,74 @@ body.dmViewing .dm-screen,#dmLog,#dmForm{transition:none!important;animation:non
       }catch(e){showToast(inviteError(e));}
       finally{button.disabled=false;}
     };
+    let messagesInboxGeneration=0,messagesInboxChannel=null,messagesInboxOwner=null;
+    function stopMessagesInbox(){
+      if(messagesInboxChannel&&client)client.removeChannel(messagesInboxChannel).catch(()=>{});
+      messagesInboxChannel=null;messagesInboxOwner=null;
+    }
+    function subscribeMessagesInbox(){
+      if(!client||!currentUser)return;
+      if(messagesInboxChannel&&messagesInboxOwner===currentUser.id)return;
+      stopMessagesInbox();
+      messagesInboxOwner=currentUser.id;
+      messagesInboxChannel=client.channel('loopa-inbox-'+currentUser.id)
+        .on('postgres_changes',{event:'INSERT',schema:'public',table:'loopa_dm_messages_v87',filter:'recipient_id=eq.'+currentUser.id},()=>{
+          if(lastPage==='messages')refreshMessagesInbox();
+        }).subscribe();
+    }
+    function inboxState(text,allowNav=false){
+      const root=byId('messagesList');root.replaceChildren();
+      const box=document.createElement('div');box.className='messages-state';box.textContent=text;
+      if(allowNav){const btn=document.createElement('button');btn.type='button';btn.textContent='Перейти к друзьям';btn.onclick=()=>showPage('friends');box.append(btn);}
+      root.append(box);
+    }
+    async function refreshMessagesInbox(){
+      const revision=++messagesInboxGeneration,owner=currentUser?.id;
+      if(!owner||!client){inboxState('Войди в LOOPA, чтобы видеть свои переписки.');return;}
+      inboxState('Загружаем переписки…');
+      try{
+        const {data,error}=await client.from('loopa_dm_messages_v87')
+          .select('id,sender_id,recipient_id,body,created_at')
+          .or(`sender_id.eq.${owner},recipient_id.eq.${owner}`)
+          .order('created_at',{ascending:false}).limit(500);
+        if(error)throw error;
+        if(revision!==messagesInboxGeneration||currentUser?.id!==owner)return;
+        const latest=new Map();
+        for(const msg of data||[]){
+          const peerId=msg.sender_id===owner?msg.recipient_id:msg.sender_id;
+          if(peerId&&!latest.has(peerId))latest.set(peerId,msg);
+        }
+        if(!latest.size){inboxState('Здесь появятся твои переписки. Открой профиль друга и нажми «Написать», чтобы начать общение.',true);return;}
+        const ids=[...latest.keys()];
+        const {data:people,error:profileError}=await client.from('profiles')
+          .select('id,display_name,avatar_path,updated_at').in('id',ids);
+        if(revision!==messagesInboxGeneration||currentUser?.id!==owner)return;
+        // If a profile isn't public or was removed, keep the conversation accessible.
+        const names=new Map((!profileError&&people||[]).map(p=>[p.id,p]));
+        const root=byId('messagesList');root.replaceChildren();
+        for(const [peerId,msg] of latest){
+          const profile=names.get(peerId)||{id:peerId,display_name:'Пользователь LOOPA'};
+          const btn=document.createElement('button');btn.type='button';btn.className='message-conversation';
+          btn.setAttribute('aria-label','Открыть переписку с '+(profile.display_name||'пользователем'));
+          btn.append(friendAvatar(profile));
+          const copy=document.createElement('span');copy.className='message-conversation-content';
+          const heading=document.createElement('span');heading.className='message-conversation-head';
+          const name=document.createElement('strong');name.textContent=profile.display_name||'Пользователь LOOPA';
+          const date=document.createElement('time');date.dateTime=msg.created_at;
+          const stamp=new Date(msg.created_at);
+          date.textContent=Number.isFinite(stamp.getTime())?stamp.toLocaleDateString('ru-RU',{day:'numeric',month:'short'})+' · '+stamp.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}):'';
+          heading.append(name,date);
+          const preview=document.createElement('span');preview.className='message-conversation-preview';
+          preview.textContent=(msg.sender_id===owner?'Ты: ':'')+(msg.body||'');
+          copy.append(heading,preview);btn.append(copy);
+          btn.onclick=()=>openDirectMessage(profile);
+          root.append(btn);
+        }
+      }catch(error){
+        if(revision!==messagesInboxGeneration)return;
+        inboxState('Не удалось загрузить сообщения. Проверь подключение и SQL для личных переписок (v87).');
+      }
+    }
     function clearDirectMessageChannel(){
       if(dmChannel&&client){client.removeChannel(dmChannel).catch(()=>{});dmChannel=null;}
     }
@@ -3118,7 +3254,7 @@ body.dmViewing .dm-screen,#dmLog,#dmForm{transition:none!important;animation:non
     async function openDirectMessage(profile){
       if(!currentUser||!profile?.id)return;
       if(profile.id===currentUser.id)return;
-      dmPageReturn=lastPage==='friend-profile'?'friend-profile':'friends';
+      dmPageReturn=lastPage==='friend-profile'?'friend-profile':(lastPage==='messages'?'messages':'friends');
       dmPeer={...profile};
       byId('dmPeerName').textContent=profile.display_name||'Друг';
       byId('dmPeerAvatar').replaceChildren(avatarForUser(profile));
@@ -3138,7 +3274,7 @@ body.dmViewing .dm-screen,#dmLog,#dmForm{transition:none!important;animation:non
     }
     byId('dmBack').onclick=()=>{
       clearDirectMessageChannel();
-      showPage(dmPageReturn==='friend-profile'?'friend-profile':'friends');
+      showPage(dmPageReturn==='friend-profile'?'friend-profile':(dmPageReturn==='messages'?'messages':'friends'));
     };
     byId('dmForm').addEventListener('submit',async event=>{
       event.preventDefault();
@@ -3470,6 +3606,14 @@ body.dmViewing .dm-screen,#dmLog,#dmForm{transition:none!important;animation:non
     });
 
     function displayGuest() {
+      // Session restoration may finish out of order on mobile Safari.
+      // Never reveal the registration panel if Supabase already gave us a user.
+      if (currentUser) {
+        byId('auth-loading').hidden=true;
+        byId('auth-guest').hidden=true;
+        return;
+      }
+      messagesInboxGeneration++;stopMessagesInbox();
       clearDirectMessageChannel();dmPeer=null;profilePeer=null;friendProfileRequest++;
       if(dmPolicyDialog.open)dmPolicyDialog.close();setDmPolicyView('everyone',false);
       historyOwner=null;byId('homeRecent').replaceChildren();byId('room-recent').replaceChildren();byId('usageTime').textContent='—';
@@ -3486,6 +3630,8 @@ body.dmViewing .dm-screen,#dmLog,#dmForm{transition:none!important;animation:non
     }
     async function displayAccount(user) {
       if (!user) return;
+      // A confirmed session always owns the profile view; never show both cards.
+      byId('auth-guest').hidden=true;
       setDmPolicyView('everyone',false);
       if(roomUser && roomUser!==user.id)roomExit();
       startPresence(user);
@@ -3546,7 +3692,8 @@ body.dmViewing .dm-screen,#dmLog,#dmForm{transition:none!important;animation:non
           localStorage.setItem('loopa-notify-sound',String(soundEnabled));
         }
       }
-      pingUsageV87();
+      // v88+: historyCall/usageStart own the shared usage counter.
+      // Do not call the removed v87 function: it used to abort session restoration.
     }
     function renderAvatar(user) {
       const avatar = byId('account-avatar');
@@ -4011,8 +4158,16 @@ body.dmViewing .dm-screen,#dmLog,#dmForm{transition:none!important;animation:non
         });
         await syncSession();
       } catch (err) {
-        displayGuest();
-        feedback('auth-feedback',errorText(err),true);
+        // A failure while loading optional profile data must not sign out a valid
+        // Supabase session, nor show the register form above the account settings.
+        if (currentUser) {
+          byId('auth-loading').hidden=true;
+          byId('auth-guest').hidden=true;
+          feedback('profile-feedback','Не удалось загрузить часть данных профиля: '+errorText(err),true);
+        } else {
+          displayGuest();
+          feedback('auth-feedback',errorText(err),true);
+        }
       }
     }
     selectAuthMode('signup');
