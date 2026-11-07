@@ -1099,6 +1099,20 @@ body.roomViewing.cinemaMode #videoStage{margin:0!important;z-index:1!important}
 body.roomViewing.cinemaMode #room-active .roomChat{background:#050505!important}
 body.roomViewing.cinemaMode #room-active #chatForm{background:#050505!important}
 @media(prefers-reduced-motion:reduce){#cinemaModeToggle .cinemaModeSwitch,#cinemaModeToggle .cinemaModeSwitch:after{transition:none}}
+
+/* v92 — stable room composer and precise Send glyph. */
+body.roomViewing #chatForm{align-items:center!important;gap:9px!important}
+body.roomViewing #chatForm #chatText{min-width:0;flex:1 1 auto;height:44px!important;min-height:44px!important;font-size:16px!important;line-height:22px!important;box-sizing:border-box}
+body.roomViewing #chatForm #roomChatSend{
+  flex:0 0 42px!important;display:grid!important;place-items:center!important;
+  width:42px!important;height:42px!important;min-width:42px!important;min-height:42px!important;
+  margin:0!important;padding:0!important;line-height:1!important;
+  border:0!important;border-radius:50%!important;background:#e4e4e6!important;color:#151518!important;
+  cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;
+}
+body.roomViewing #roomChatSend svg{display:block!important;width:22px!important;height:22px!important;fill:none!important;stroke:currentColor!important;stroke-width:2.1!important;stroke-linecap:round!important;stroke-linejoin:round!important;transform:none!important}
+body.roomViewing #roomChatSend[aria-busy="true"]{opacity:.65}
+body.roomViewing #room-active,body.roomViewing .roomChat,body.roomViewing #chatForm{transition:none!important;animation:none!important}
 </style>
 </head>
 <body>
@@ -1148,7 +1162,7 @@ body.roomViewing.cinemaMode #room-active #chatForm{background:#050505!important}
         <h1>Твои<br>комнаты.</h1>
         <div id="room-lobby" class="panel glass"><h2>Смотреть вместе</h2><button class="action" data-room="create">Создать комнату</button><label class="friend-search-label" for="join-code">Код или ссылка</label><input id="join-code" class="friend-search-input" autocomplete="off" maxlength="1000" placeholder="Код или ссылка"><button class="action secondary" data-room="join">Войти по коду</button><h3>Вы смотрели</h3><div id="room-recent"></div></div>
 <div id="room-active" class="panel glass" hidden><div class="setupHeader"><p class="panel-note">СОВМЕСТНЫЙ ПРОСМОТР</p><h2 id="setupTitle">Выбери видео</h2></div><div class="roomBar"><button class="text-link" data-room="exit">‹ Назад</button><small id="accessBadge"></small><button id="moreRoom" class="friend-small-action" aria-label="Меню комнаты">⋯</button></div><div class="playerCode"><span>Код</span><b id="room-code"></b><button type="button" data-room="copy" aria-label="Скопировать код комнаты"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M15 5V4a1 1 0 0 0-1-1H5a2 2 0 0 0-2 2v10a1 1 0 0 0 1 1h1"/></svg></button></div><iframe id="room-frame" hidden title="Видео комнаты"></iframe><button id="inviteRoom" type="button" class="roomInvite">＋ Пригласить</button><small id="room-status" hidden></small><div id="room-host"><details id="videoEdit"><summary><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="4"/><path d="m10 9 5 3-5 3z"/></svg>Сменить видео</summary><button id="catalogOpen" type="button" class="catalogLaunch" aria-haspopup="dialog" aria-expanded="false"><span class="launchIcon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg></span><span>Каталог видео<small>YouTube, VK Видео и RUTUBE</small></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button></details></div>
-<section class="roomChat"><h2>Чат комнаты</h2><div id="chatLog"></div><div id="emojiTray" hidden aria-label="Выбор эмодзи"></div><form id="chatForm"><button type="button" id="emojiOpen" aria-label="Выбрать эмодзи" aria-controls="emojiTray" aria-expanded="false">☺</button><input class="friend-search-input" id="chatText" maxlength="1000" aria-label="Сообщение" placeholder="Сообщение…" required><button class="friend-small-action" aria-label="Отправить">↑</button></form></section></div>
+<section class="roomChat"><h2>Чат комнаты</h2><div id="chatLog"></div><div id="emojiTray" hidden aria-label="Выбор эмодзи"></div><form id="chatForm"><button type="button" id="emojiOpen" aria-label="Выбрать эмодзи" aria-controls="emojiTray" aria-expanded="false">☺</button><input class="friend-search-input" id="chatText" type="text" enterkeyhint="send" autocomplete="off" maxlength="1000" aria-label="Сообщение" placeholder="Сообщение…" required><button class="friend-small-action" id="roomChatSend" type="submit" aria-label="Отправить сообщение"><svg aria-hidden="true" viewBox="0 0 24 24" focusable="false"><path d="M12 20V4m0 0-6.25 6.25M12 4l6.25 6.25"/></svg></button></form></section></div>
 <dialog id="catalog" aria-labelledby="catalogTitle"><div class="catalogInner"><header class="catalogTop"><button type="button" id="catalogBack" hidden>‹ Все сервисы</button><span id="catalogWordmark">LOOPA</span><button type="button" id="catalogClose" aria-label="Закрыть каталог">×</button></header><div id="providerStage"><p class="catalogEyebrow">СМОТРИМ ВМЕСТЕ</p><h2 id="catalogTitle">Что посмотрим?</h2><p class="catalogIntro">Выбери сервис. Найди видео. Смотри вместе.</p><div class="providerGrid"><button type="button" class="providerTile" data-provider="youtube"><span class="serviceIcon"><svg viewBox="0 0 32 24" aria-hidden="true"><rect width="32" height="24" rx="7" fill="#ff0033"/><path d="m13 6 10 6-10 6z" fill="white"/></svg></span><span class="tileArrow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></span><span class="tileName">YouTube</span><span class="tileCaption">Найти видео</span></button><button type="button" class="providerTile" data-provider="vk"><span class="serviceIcon"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#0077ff"/><path d="M7 10h4c.2 5 2.1 7.1 3.6 7.6V10h3.7v4.3c1.5-.2 3.1-2.2 3.7-4.3h3.7c-.5 2.7-2.4 4.8-3.8 5.7 1.5.7 3.6 2.6 4.4 5.3h-4.1c-.7-2-2.2-3.5-3.9-3.7V21h-.6C10.9 21 7.4 17 7 10" fill="white"/></svg></span><span class="tileArrow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></span><span class="tileName">VK Видео</span><span class="tileCaption">Найти видео</span></button><button type="button" class="providerTile" id="rutubeOpen" data-provider="rutube"><span class="serviceIcon"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#17191f"/><circle cx="25" cy="7" r="4" fill="#ed143b"/><path d="M8 9h10a6 6 0 0 1 1 12l6 6h-7l-6-6v6H8zm4 4v4h6a2 2 0 0 0 0-4z" fill="white"/></svg></span><span class="tileArrow">↗</span><span class="tileName">RUTUBE</span><span class="tileCaption">Найти видео</span></button></div><button id="catalogLink" type="button" class="catalogLink"><span class="linkGlyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M21 3 3 10l7 3 3 7 8-17Z" stroke="#29A9EB" stroke-width="1.7" stroke-linejoin="round"/><path d="m10 13 6-6" stroke="#29A9EB" stroke-width="1.7" stroke-linecap="round"/></svg></span><span><strong>Есть ссылка?</strong><small>YouTube, VK Видео, RUTUBE</small></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button><p class="catalogFoot" id="catalogFoot">Видео откроется у всех участников комнаты</p></div><section id="searchStage" hidden aria-label="Поиск видео"><div class="catalogService"><span id="activeServiceIcon" class="serviceIcon"></span><div><p class="catalogEyebrow">КАТАЛОГ ВИДЕО</p><h2 id="activeServiceName">YouTube</h2></div></div><select hidden id="source"><option value="youtube">YouTube</option><option value="vk">VK Видео</option><option value="rutube">RUTUBE</option></select><form id="catalogForm"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input id="queryVideo" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="searchSuggestions" maxlength="100" placeholder="Видео или канал" aria-label="Название видео или канала" autocomplete="off" enterkeyhint="search"><button type="submit" id="catalogSearchButton">Найти</button></form><div id="searchSuggestions" role="listbox" aria-label="Подсказки поиска" hidden></div><p id="searchStatus" role="status" aria-live="polite">Найди то, что хочется посмотреть вместе</p><div id="catalogSkeleton" hidden aria-hidden="true"><div></div><div></div></div><div id="hits" aria-busy="false"></div><button type="button" id="nextVideos" hidden>Ещё видео</button></section><section id="linkStage" hidden><p class="catalogEyebrow">ПРЯМОЙ ВХОД К ВИДЕО</p><h2 class="linkStageTitle">Открыть по ссылке</h2><p class="catalogIntro">YouTube, VK Видео или RUTUBE</p><div id="linkEdit"><label class="friend-search-label" for="room-link">Ссылка на видео</label><input id="room-link" type="url" class="friend-search-input" placeholder="Ссылка на видео"><button class="action" data-room="video">Открыть видео</button></div></section></div></dialog><dialog id="inviteSheet"><header><h2>Пригласить друзей</h2><button type="button" id="closeInvites" aria-label="Закрыть">×</button></header><p id="inviteHint">Выбери друга — приглашение появится у него в LOOPA.</p><div id="inviteList"></div><button type="button" id="shareRoomLink" class="roomInvite">Отправить ссылку</button></dialog><dialog id="roomSheet"><div class="roomSheetHeading"><strong>Настройки комнаты</strong><button class="roomSheetClose" type="button" onclick="this.closest('dialog').close()" aria-label="Закрыть настройки">×</button></div><button type="button" id="sheetVideoChange" aria-label="Сменить видео" title="Сменить видео">Сменить видео</button><button type="button" id="cinemaModeToggle" class="cinemaModeToggle" aria-pressed="false"><span class="cinemaModeGlyph" aria-hidden="true">▣</span><span class="cinemaModeCopy"><strong>Режим кинотеатра</strong><small>Видео в центре внимания, чат остаётся открытым</small></span><span class="cinemaModeSwitch" aria-hidden="true"></span></button><h3>Участники</h3><div id="people" role="list" aria-label="Участники"></div><div id="sharedControlEdit" hidden><h3>Настройки комнаты</h3><div class="sharedControlLine"><div class="sharedControlCopy"><strong>Совместное управление</strong><small>Разрешить участникам ставить видео на паузу, включать и перематывать</small></div><label class="presence-switch" aria-label="Совместное управление"><input type="checkbox" id="roomSharedControl"><span class="presence-switch-track"></span></label></div><p id="sharedControlStatus" role="status">По умолчанию видео управляет создатель комнаты</p></div><div id="accessEdit"><h3>Доступ в комнату</h3><div class="roomAccessOptions" role="group" aria-label="Доступ в комнату"><button type="button" data-access="code" aria-pressed="true">Открытая</button><button type="button" data-access="private" aria-pressed="false">Закрытая</button><button type="button" data-access="friends" aria-pressed="false">Для друзей</button></div><select hidden id="accessMode" class="privacy-select"><option value="code">Любой</option><option value="friends">Только друзья</option><option value="private">Приватная</option></select><div id="pick"></div><small id="accessWarning"></small><button class="action" id="saveAccess">Сохранить доступ</button></div></dialog><p id="room-note" role="status"></p>
       </section>
 
@@ -1997,7 +2011,7 @@ body.roomViewing.cinemaMode #room-active #chatForm{background:#050505!important}
       applyCinemaMode(!cinemaModeEnabled);
       byId('roomSheet').close();
     });
-    let watchBaseHeight=0,watchWidth=0,watchKeyboardOpen=false,watchViewportTimer=0,watchViewportUntil=0;
+    let watchBaseHeight=0,watchWidth=0,watchKeyboardOpen=false,watchViewportTimer=0;
     let watchKeepBottom=true;
     const watchLog=byId('chatLog'),watchField=byId('chatText');
     watchField.readOnly=false;watchField.inputMode='text';
@@ -2063,23 +2077,18 @@ body.roomViewing.cinemaMode #room-active #chatForm{background:#050505!important}
     }
     function stopWatchViewport(){
       restoreWatchField();
-      if(watchViewportTimer)clearTimeout(watchViewportTimer);
-      watchViewportTimer=0;watchViewportUntil=0;
-    }
-    function watchViewportTick(){
+      if(watchViewportTimer)cancelAnimationFrame(watchViewportTimer);
       watchViewportTimer=0;
-      if(!document.body.classList.contains('roomViewing')||document.hidden)return;
-      syncWatchViewport();
-      if(performance.now()<watchViewportUntil)watchViewportTimer=setTimeout(watchViewportTick,16);
     }
     function scheduleWatchViewport(){
       if(!document.body.classList.contains('roomViewing')||document.hidden)return;
-      // Safari may update geometry before dispatching its next viewport event.
-      // A bounded timer also observes geometry while Safari defers animation frames.
-      // Never scroll or refocus the document.
-      syncWatchViewport();
-      watchViewportUntil=performance.now()+1200;
-      if(!watchViewportTimer)watchViewportTimer=setTimeout(watchViewportTick,16);
+      // Update once per actual viewport change, without the old 1.2-second
+      // polling tail which made the composer appear to settle late on iOS.
+      if(watchViewportTimer)return;
+      watchViewportTimer=requestAnimationFrame(()=>{
+        watchViewportTimer=0;
+        syncWatchViewport();
+      });
     }
     document.addEventListener('visibilitychange',()=>{
       if(document.hidden)stopWatchViewport();else scheduleWatchViewport();
@@ -2108,11 +2117,22 @@ body.roomViewing.cinemaMode #room-active #chatForm{background:#050505!important}
     const chatSendButton=byId('chatForm').querySelector('button:last-child');
     byId('chatForm').noValidate=true;
     chatSendButton.addEventListener('pointerdown',e=>{if(document.activeElement===byId('chatText'))e.preventDefault();});
+    // Safari's blue keyboard Send/Return key submits this single-line input.
+    watchField.addEventListener('keydown',event=>{
+      if(event.key!=='Enter'||event.isComposing||event.keyCode===229||event.shiftKey||event.ctrlKey||event.metaKey||event.altKey)return;
+      event.preventDefault();
+      byId('chatForm').requestSubmit();
+    });
     byId('chatForm').onsubmit=async e=>{
       e.preventDefault();const input=byId('chatText'),raw=input.value,value=raw.trim();
       if(!value||chatSending||!roomState)return;
       const sendingRoom=roomState.code,epoch=roomEpoch;
       chatSending=true;input.value='';chatSendButton.setAttribute('aria-busy','true');
+      // iOS: close the keyboard on the user gesture, BEFORE network work.
+      // Do not refocus after sending; the native Safari keyboard closes once.
+      if(document.activeElement===input){input.blur();}
+      closeEmoji();
+      syncWatchViewport();
       try{await roomCall('chat',{media:value});}
       catch(err){if(roomEpoch===epoch&&roomState?.code===sendingRoom){if(!input.value)input.value=raw;showToast(err.message);}}
       finally{chatSending=false;chatSendButton.removeAttribute('aria-busy');}
