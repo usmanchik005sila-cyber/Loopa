@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ru">
 <head>
-<!-- LOOPA v85: native player controls, no forced captions -->
+<!-- LOOPA v86: direct messages privacy choice, default everyone -->
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#090a0c">
@@ -892,6 +892,41 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
 #videoStage #playbackControls{display:none!important;pointer-events:none!important;opacity:0!important;background:transparent!important}
 #videoStage.syncIssue #playbackControls{display:block!important;opacity:1!important}
 #videoStage.syncIssue #guestResync:not([hidden]){pointer-events:auto!important}
+/* LOOPA v86 — message privacy, same quiet glass language as room settings */
+.dm-privacy-entry{gap:11px;min-height:69px;transition:border-color .18s ease,background .18s ease}
+.dm-privacy-entry:active{background:#ffffff13}
+.dm-entry-copy{flex:1;min-width:0}
+.dm-entry-copy strong{display:block;font-size:14px;font-weight:630;color:#eeeef0}
+.dm-entry-copy small{display:block;font-size:12px;color:#a9a9af;line-height:1.4;margin-top:4px}
+.dm-entry-value{flex:none;color:#e5e5e8;font:600 12px/1.2 system-ui;padding:8px 10px;border:1px solid #ffffff20;border-radius:10px;background:#ffffff08;max-width:112px;white-space:nowrap}
+.dm-privacy-entry .linked-entry-chevron{margin-left:0}
+#dm-policy-dialog{position:fixed;top:50%;left:50%;right:auto;bottom:auto;transform:translate(-50%,-50%);margin:0;box-sizing:border-box;width:min(490px,calc(100vw - 22px));max-width:calc(100vw - 22px);max-height:min(80dvh,680px);overflow:auto;overscroll-behavior:contain;padding:19px 18px 19px;border:1px solid #ffffff29;border-radius:24px;background:radial-gradient(ellipse at 10% 0%,#ffffff0c,transparent 75%),linear-gradient(145deg,#222225,#111114);color:#f0f0f1;box-shadow:0 26px 90px #000c;font:inherit}
+#dm-policy-dialog::backdrop{background:#000b;backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
+.dm-dialog-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px}
+.dm-dialog-top>span{font:650 10px/1.3 system-ui;letter-spacing:2px;color:#a7a7af}
+#dm-policy-close{border:0;background:transparent;color:#bfbfc5;font:300 27px/1 system-ui;display:grid;place-items:center;width:36px;height:36px;border-radius:10px;cursor:pointer}
+#dm-policy-close:active{background:#ffffff10}
+#dm-policy-dialog h2{font:600 clamp(20px,5vw,25px)/1.2 system-ui;margin:0 0 8px;letter-spacing:-.6px}
+#dm-policy-description{color:#a9a9b0;font:400 13px/1.55 system-ui;margin:0 0 18px}
+.dm-choices{display:grid;gap:9px}
+.dm-choice{display:block;cursor:pointer;position:relative}
+.dm-choice input{position:absolute;opacity:0;width:1px;height:1px}
+.dm-choice-card{display:flex;align-items:center;gap:13px;padding:15px 12px;border-radius:17px;border:1px solid #ffffff1c;background:#ffffff07;min-height:78px;box-sizing:border-box;transition:background .18s,border-color .18s,transform .18s}
+.dm-choice input:checked+.dm-choice-card{border-color:#ffffff8a;background:linear-gradient(145deg,#ffffff1b,#ffffff07);box-shadow:inset 0 1px #ffffff16}
+.dm-choice input:focus-visible+.dm-choice-card{outline:2px solid #eaeaf0;outline-offset:3px}
+.dm-choice:active .dm-choice-card{transform:scale(.992)}
+.dm-choice-icon{width:40px;height:40px;flex:none;display:grid;place-items:center;border-radius:13px;border:1px solid #ffffff1f;background:#ffffff0a;color:#cfcfd5}
+.dm-choice-icon svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.dm-choice-text{flex:1;min-width:0}
+.dm-choice-text strong{display:block;font:600 14px/1.3 system-ui;color:#f2f2f4}
+.dm-choice-text small{display:block;color:#adaeb4;font:400 11px/1.5 system-ui;margin-top:4px}
+.dm-choice-check{flex:none;display:grid;place-items:center;width:22px;height:22px;border-radius:50%;border:1px solid #ffffff31;color:transparent;font:650 13px/1 system-ui}
+.dm-choice input:checked+.dm-choice-card .dm-choice-check{color:#18181b;background:#eaeaed;border-color:#f6f6f8}
+.dm-policy-helper{color:#9797a0;font:400 11px/1.5 system-ui;margin:15px 2px}
+#dm-policy-dialog .dm-policy-save{width:100%;min-height:46px;border-radius:13px;font-size:14px}
+#dm-policy-dialog .dm-policy-save:disabled{opacity:.55;cursor:wait}
+#dm-policy-feedback{margin:12px 0 0}
+@media(prefers-reduced-motion:reduce){.dm-choice-card,.dm-privacy-entry{transition:none}}
 </style>
 </head>
 <body>
@@ -901,6 +936,7 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
     <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M17 5a3 3 0 0 1 0 6m1 4a5 5 0 0 1 3 5"/></symbol>
     <symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
     <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></symbol>
+    <symbol id="i-message" viewBox="0 0 24 24"><path d="M20.5 11.5a8.5 8.5 0 0 1-8.5 8.5 9 9 0 0 1-3.5-.7L3.5 21l1.7-4.8A8.5 8.5 0 1 1 20.5 11.5Z"/><path d="M8 11.5h8M8 14.5h5"/></symbol>
     <symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18h1.5a2 2 0 0 0 1.5-3.4 1.7 1.7 0 0 1 1.2-2.9H18a3 3 0 0 0 3-3A9 9 0 0 0 12 3z"/><circle cx="7.5" cy="11" r=".7"/><circle cx="10" cy="7" r=".7"/><circle cx="15" cy="7.5" r=".7"/></symbol>
     <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></symbol>
     <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/></symbol>
@@ -1079,6 +1115,11 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
               </div>
               <div class="privacy-group"><h3>ОБЩЕНИЕ</h3>
                 <div class="privacy-item"><span class="privacy-item-icon"><svg><use href="#i-person"/></svg></span><span class="privacy-item-body"><strong>Заявки в друзья</strong><small id="friend-request-setting-note">Другие пользователи могут отправлять тебе заявки</small></span><label class="presence-switch" aria-label="Разрешить заявки в друзья"><input id="allow-friend-requests" type="checkbox" checked disabled><span class="presence-switch-track"></span></label></div>
+                <button class="privacy-action linked-accounts-entry dm-privacy-entry" type="button" id="open-dm-policy" aria-haspopup="dialog" aria-controls="dm-policy-dialog">
+                  <span class="linked-entry-icon"><svg aria-hidden="true"><use href="#i-message"/></svg></span>
+                  <span class="dm-entry-copy"><strong>Личные сообщения</strong><small>Кто может писать мне</small></span>
+                  <span class="dm-entry-value" id="dm-policy-summary">Все</span><span class="linked-entry-chevron" aria-hidden="true">›</span>
+                </button>
                 <div class="privacy-item"><span class="privacy-item-icon"><svg><use href="#i-room"/></svg></span><span class="privacy-item-body"><strong>Приглашения в комнаты</strong><small>Кто сможет присылать приглашения</small><select id="room-invite-policy" class="privacy-select" disabled><option value="everyone">Все пользователи</option><option value="friends" selected>Только друзья</option><option value="nobody">Никто</option></select></span></div>
                 <div class="privacy-item privacy-blocks"><span class="privacy-item-icon"><svg><use href="#i-lock"/></svg></span><span class="privacy-item-body"><strong>Заблокированные</strong><small>Пользователи не смогут отправлять заявки и приглашения</small><div id="blocked-users-list" class="blocked-users-list"><span class="friends-empty">Загрузка списка…</span></div></span></div>
                 <p id="communication-feedback" class="auth-feedback" role="status" aria-live="polite" hidden></p>
@@ -1137,6 +1178,18 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
+  <dialog id="dm-policy-dialog" aria-labelledby="dm-policy-title" aria-describedby="dm-policy-description">
+    <div class="dm-dialog-top"><span>ЛИЧНОЕ ПРОСТРАНСТВО</span><button type="button" id="dm-policy-close" aria-label="Закрыть">×</button></div>
+    <h2 id="dm-policy-title">Кто может писать мне</h2>
+    <p id="dm-policy-description">Выбери, кто сможет начинать с тобой личную переписку в LOOPA.</p>
+    <div class="dm-choices" role="radiogroup" aria-label="Кто может писать личные сообщения">
+      <label class="dm-choice"><input type="radio" name="dm-policy" value="everyone" checked><span class="dm-choice-card"><span class="dm-choice-icon"><svg aria-hidden="true"><use href="#i-users"/></svg></span><span class="dm-choice-text"><strong>Все пользователи</strong><small>Любой пользователь LOOPA сможет тебе написать</small></span><span class="dm-choice-check" aria-hidden="true">✓</span></span></label>
+      <label class="dm-choice"><input type="radio" name="dm-policy" value="friends"><span class="dm-choice-card"><span class="dm-choice-icon"><svg aria-hidden="true"><use href="#i-lock"/></svg></span><span class="dm-choice-text"><strong>Только друзья</strong><small>Написать смогут лишь люди из твоих друзей</small></span><span class="dm-choice-check" aria-hidden="true">✓</span></span></label>
+    </div>
+    <p class="dm-policy-helper" id="dm-policy-helper">По умолчанию разрешены сообщения от всех пользователей.</p>
+    <button class="action dm-policy-save" type="button" id="dm-policy-save">Сохранить выбор</button>
+    <p id="dm-policy-feedback" class="auth-feedback" role="status" aria-live="polite" hidden></p>
+  </dialog>
   <dialog id="telegramAuthDialog" class="telegram-auth-dialog" aria-labelledby="telegramAuthTitle" aria-describedby="telegramAuthDescription">
     <div class="telegram-dialog-head"><span class="telegram-dialog-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 3 2.9 10.5c-.7.3-.7 1.2.1 1.5l4.6 1.5 1.8 5.4c.2.7 1 .9 1.5.3l2.7-2.8 4.6 3.4c.6.4 1.4.1 1.5-.6L22 4.2c.1-.8-.3-1.4-1-1.2Z" fill="#36aee2" stroke="none"/><path d="m8 13.5 10.8-7.1-8.4 9.8" fill="none" stroke="#fff" stroke-width="1.2" stroke-linecap="round"/></svg></span><button id="telegramAuthClose" type="button" aria-label="Закрыть">×</button></div>
     <p class="telegram-dialog-eyebrow">LOOPA · БЫСТРЫЙ ДОСТУП</p>
@@ -2480,6 +2533,65 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
       finally{byId('privacy-reset').disabled=false;}
     });
     byId('privacy-signout').addEventListener('click',()=>byId('sign-out').click());
+    // Direct messages: store the user's preference on their Supabase profile.
+    // Message-write permissions must also be enforced server-side when DMs ship.
+    let dmPolicyValue='everyone',dmPolicyReady=false;
+    const dmPolicyDialog=byId('dm-policy-dialog');
+    function dmPolicyLabel(value){return value==='friends'?'Только друзья':'Все';}
+    function refreshDmPolicyView(){
+      byId('dm-policy-summary').textContent=dmPolicyLabel(dmPolicyValue);
+      byId('dm-policy-helper').textContent=dmPolicyReady
+        ?'Изменение сохранится в профиле LOOPA и будет учитываться при запуске личных сообщений.'
+        :'Для сохранения настройки сначала добавь поле dm_policy в Supabase (SQL для v86).';
+    }
+    function setDmPolicyView(value,ready){
+      dmPolicyValue=value==='friends'?'friends':'everyone';
+      dmPolicyReady=!!ready;
+      refreshDmPolicyView();
+    }
+    async function loadDmPolicy(owner){
+      if(!client||!owner)return;
+      setDmPolicyView('everyone',false);
+      try{
+        const {data,error}=await client.from('profiles').select('dm_policy').eq('id',owner).maybeSingle();
+        if(currentUser?.id!==owner)return;
+        if(error)throw error;
+        if(!data){setDmPolicyView('everyone',false);return;}
+        setDmPolicyView(data.dm_policy,true);
+      }catch(err){
+        if(currentUser?.id===owner){setDmPolicyView('everyone',false);}
+      }
+    }
+    byId('open-dm-policy').addEventListener('click',()=>{
+      if(!currentUser)return;
+      dmPolicyDialog.querySelectorAll('input[name="dm-policy"]').forEach(input=>input.checked=input.value===dmPolicyValue);
+      feedback('dm-policy-feedback','');refreshDmPolicyView();
+      if(!dmPolicyDialog.open)dmPolicyDialog.showModal();
+    });
+    byId('dm-policy-close').addEventListener('click',()=>dmPolicyDialog.close());
+    dmPolicyDialog.addEventListener('click',event=>{
+      if(event.target!==dmPolicyDialog)return;
+      const rect=dmPolicyDialog.getBoundingClientRect();
+      if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)dmPolicyDialog.close();
+    });
+    byId('dm-policy-save').addEventListener('click',async()=>{
+      const owner=currentUser?.id;
+      if(!owner||!client){feedback('dm-policy-feedback','Войди в аккаунт, чтобы изменить настройку.',true);return;}
+      if(!dmPolicyReady){feedback('dm-policy-feedback','Сначала выполни SQL-настройку LOOPA v86 в Supabase, затем обнови страницу.',true);return;}
+      const choice=dmPolicyDialog.querySelector('input[name="dm-policy"]:checked')?.value;
+      if(!['everyone','friends'].includes(choice))return;
+      const save=byId('dm-policy-save');save.disabled=true;
+      feedback('dm-policy-feedback','');
+      try{
+        const {data,error}=await client.from('profiles').update({dm_policy:choice}).eq('id',owner).select('dm_policy').single();
+        if(error)throw error;
+        if(currentUser?.id!==owner)return;
+        setDmPolicyView(data.dm_policy,true);
+        dmPolicyDialog.close();
+        showToast('Настройка личных сообщений сохранена');
+      }catch(err){feedback('dm-policy-feedback',errorText(err),true);}
+      finally{save.disabled=false;}
+    });
     async function saveCommunicationSetting(values, control, previous) {
       if (!client || !currentUser) return;
       control.disabled=true; feedback('communication-feedback','');
@@ -2923,6 +3035,7 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
     });
 
     function displayGuest() {
+      if(dmPolicyDialog.open)dmPolicyDialog.close();setDmPolicyView('everyone',false);
       historyOwner=null;byId('homeRecent').replaceChildren();byId('room-recent').replaceChildren();byId('usageTime').textContent='—';
       byId('roomInboxButton').hidden=true;byId('roomInviteNotice').hidden=true;byId('inviteSheet').close();inviteInbox=[];inviteSeen.clear();updateUnifiedBadge();
       roomExit();
@@ -2937,6 +3050,7 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
     }
     async function displayAccount(user) {
       if (!user) return;
+      setDmPolicyView('everyone',false);
       if(roomUser && roomUser!==user.id)roomExit();
       startPresence(user);
       syncFriendsSession();
@@ -2987,6 +3101,7 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
       } catch (err) {
         feedback('profile-feedback', errorText(err), true);
       }
+      await loadDmPolicy(user.id);
     }
     function renderAvatar(user) {
       const avatar = byId('account-avatar');
