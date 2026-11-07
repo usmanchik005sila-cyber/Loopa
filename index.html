@@ -1,13 +1,13 @@
 <!doctype html>
 <html lang="ru">
 <head>
-<!-- LOOPA v86: direct messages privacy choice, default everyone -->
+<!-- LOOPA v88: synchronized public friend usage and stable mobile DM keyboard -->
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#090a0c">
   <meta name="description" content="LOOPA — ближе, даже на расстоянии. Совместный просмотр с теми, кто важен.">
   <title>LOOPA — Ближе, даже на расстоянии</title>
-  <meta name="loopa-version" content="v87">
+  <meta name="loopa-version" content="v88">
   <meta name="loopa-build" content="v82-caption-initial-best-effort-2026-11-06">
   <script>
     try{const m=localStorage.getItem('loopa-wallpaper-motion');document.documentElement.dataset.wallpaperExplicit=String(m==='on');document.documentElement.dataset.wallpaperMotion=m==='off'?'off':'on';}catch{document.documentElement.dataset.wallpaperExplicit='false';document.documentElement.dataset.wallpaperMotion='on';}
@@ -992,6 +992,36 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
 @media(max-width:390px){#roomInviteNotice{gap:6px;padding:12px 10px}#roomInviteNotice button{padding:8px} .friend-profile-actions button{font-size:12px}}
 @media(prefers-reduced-motion:reduce){#roomInviteNotice{transition:none}}
 
+
+/* LOOPA v88 — DM becomes an independent visual-viewport-sized screen.
+   It never scrolls the surrounding profile/navigation when iOS opens the keyboard. */
+html:has(body.dmViewing){overflow:hidden!important;height:100%;overscroll-behavior:none}
+body.dmViewing{position:fixed!important;inset:0!important;width:100%;height:100%;overflow:hidden!important;overscroll-behavior:none}
+body.dmViewing .top,body.dmViewing .bottom{display:none!important}
+body.dmViewing section[data-page="dm"]{
+ position:fixed!important;display:flex!important;flex-direction:column!important;
+ top:var(--dm-visual-top,0px)!important;left:0!important;right:0!important;
+ width:100%!important;height:var(--dm-visual-height,100dvh)!important;
+ min-height:0!important;margin:0!important;padding:0!important;
+ box-sizing:border-box!important;z-index:100;
+ background:linear-gradient(150deg,#151518,#08090b 80%);
+ overflow:hidden!important;animation:none!important;transform:none!important;filter:none!important;
+}
+body.dmViewing section[data-page="dm"]>.eyebrow{display:none!important}
+body.dmViewing .dm-screen{
+ flex:1;min-height:0!important;max-height:none!important;height:100%!important;
+ width:100%;border:0;border-radius:0;box-shadow:none;overflow:hidden;
+ background:transparent;
+}
+body.dmViewing .dm-header{padding: max(12px,env(safe-area-inset-top)) 15px 12px;min-height:56px;background:#111114f5}
+body.dmViewing .dm-log{flex:1;min-height:0!important;overflow-y:auto!important;scroll-behavior:auto!important;-webkit-overflow-scrolling:touch;overflow-anchor:none;overscroll-behavior:contain;padding:14px 14px 18px}
+body.dmViewing .dm-composer{flex:none;min-height:64px;padding:10px 12px max(12px,env(safe-area-inset-bottom));box-sizing:border-box;background:#101013}
+body.dmViewing.dmKeyboardOpen .dm-composer{padding-bottom:8px;min-height:60px}
+body.dmViewing .dm-composer textarea{font-size:16px!important;line-height:22px;min-height:44px;max-height:88px;scroll-margin:0;overflow-anchor:none}
+body.dmViewing .dm-composer button{width:44px;height:44px}
+body.dmViewing .dm-screen,#dmLog,#dmForm{transition:none!important;animation:none!important}
+@media(prefers-reduced-motion:reduce){body.dmViewing section[data-page="dm"]{transition:none!important}}
+
 </style>
 </head>
 <body>
@@ -1085,7 +1115,7 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
             <button class="main" id="friendPageWrite" type="button">Написать</button>
             <button id="friendPageInvite" type="button">Пригласить</button>
           </div>
-          <p class="friend-profile-description">Время активности учитывается с обновления v87, когда LOOPA открыта на экране. Статистика доступна только друзьям.</p>
+          <p class="friend-profile-description">Общее время в LOOPA синхронизируется при входе пользователя. Статистика доступна только друзьям.</p>
           <p id="friend-profile-missing" hidden></p>
         </div>
       </section>
@@ -1095,7 +1125,7 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
           <div class="dm-header"><button id="dmBack" aria-label="Назад к профилю" type="button">‹</button><div id="dmPeerAvatar"></div><div class="dm-header-info"><strong id="dmPeerName">Собеседник</strong><small>Личные сообщения LOOPA</small></div></div>
           <div class="dm-log" id="dmLog" aria-live="polite"><p class="dm-empty">Загрузка переписки…</p></div>
           <p id="dm-error" role="status" hidden></p>
-          <form id="dmForm" class="dm-composer"><textarea id="dmInput" aria-label="Сообщение" placeholder="Сообщение…" maxlength="2000" rows="1" required></textarea><button id="dmSend" type="submit" aria-label="Отправить сообщение">↑</button></form>
+          <form id="dmForm" class="dm-composer"><textarea id="dmInput" aria-label="Сообщение" placeholder="Сообщение…" maxlength="2000" rows="1" enterkeyhint="send" required></textarea><button id="dmSend" type="submit" aria-label="Отправить сообщение">↑</button></form>
         </div>
       </section>
 
@@ -2273,6 +2303,22 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
       if(error){if(op==='read'){byId('room-recent').textContent='История недоступна. Проверь SQL-обновление.';}return;}
       historyOwner=owner;renderHistory(data.history||[]);
       const minutes=Math.floor(Number(data.seconds||0)/60);byId('usageTime').textContent=Math.floor(minutes/60)+' ч '+minutes%60+' мин';
+      // Share exactly this existing cumulative value with friends; the v87 counter
+      // was unrelated and started at zero, causing the two profile screens to disagree.
+      syncFriendUsageV88(data.seconds,owner);
+    }
+    let usageV88Owner='',usageV88Value=-1,usageV88At=0,usageV88Busy=false;
+    async function syncFriendUsageV88(seconds,owner){
+      const value=Number(seconds);
+      if(!client||!currentUser||currentUser.id!==owner||!Number.isFinite(value)||value<0)return;
+      if(usageV88Owner!==owner){usageV88Owner=owner;usageV88Value=-1;usageV88At=0;}
+      const rounded=Math.floor(value),now=Date.now();
+      if(usageV88Busy||rounded===usageV88Value&&now-usageV88At<60000)return;
+      usageV88Busy=true;
+      try{
+        const {error}=await client.rpc('loopa_usage_snapshot_v88',{observed_total_seconds:rounded});
+        if(!error&&currentUser?.id===owner){usageV88Value=rounded;usageV88At=Date.now();}
+      }catch{}finally{usageV88Busy=false;}
     }
     function usageStart(){usageLast=performance.now();usageReady=true;historyCall('start');}
     function usageTick(){const now=performance.now(),elapsed=Math.min(20,Math.max(0,(now-usageLast)/1000));usageLast=now;if(usageReady&&currentUser)historyCall('tick',{elapsed});}
@@ -2497,8 +2543,37 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
         animation.oncancel=()=>{if(element._loopaAnimation===animation)element._loopaAnimation=null;};
       }
     }
+    // Independent DM viewport prevents iOS Safari from scrolling the whole website
+    // when focusing a text field, and returns to its normal size on keyboard dismissal.
+    let dmViewportFrame=0;
+    function updateDmViewport(){
+      if(!document.body.classList.contains('dmViewing'))return;
+      const viewport=window.visualViewport;
+      const height=viewport?.height||window.innerHeight;
+      const top=Math.max(0,viewport?.offsetTop||0);
+      document.documentElement.style.setProperty('--dm-visual-top',top+'px');
+      document.documentElement.style.setProperty('--dm-visual-height',Math.max(210,height)+'px');
+      document.body.classList.toggle('dmKeyboardOpen',window.innerHeight-height>120);
+    }
+    function scheduleDmViewport(){
+      if(!document.body.classList.contains('dmViewing'))return;
+      cancelAnimationFrame(dmViewportFrame);
+      dmViewportFrame=requestAnimationFrame(updateDmViewport);
+    }
+    window.visualViewport?.addEventListener('resize',scheduleDmViewport);
+    window.visualViewport?.addEventListener('scroll',scheduleDmViewport);
+    window.addEventListener('resize',scheduleDmViewport);
+    function setDmViewing(active){
+      if(active){document.body.classList.add('dmViewing');updateDmViewport();return;}
+      byId('dmInput').blur();
+      document.body.classList.remove('dmViewing','dmKeyboardOpen');
+      document.documentElement.style.removeProperty('--dm-visual-top');
+      document.documentElement.style.removeProperty('--dm-visual-height');
+    }
     function showPage(destination) {
       if(lastPage==='dm' && destination!=='dm')clearDirectMessageChannel();
+      if(destination==='dm'&&lastPage!=='dm')setDmViewing(true);
+      else if(lastPage==='dm'&&destination!=='dm')setDmViewing(false);
       if(lastPage==='rooms' && destination!=='rooms') roomExit();
       if(destination==='rooms' && !roomState && currentUser) roomRun('list');
       const changed = destination !== lastPage;
@@ -2947,7 +3022,7 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
       try{
         const [p,stats,prs]=await Promise.all([
           client.from('profiles').select('id,display_name,avatar_path,updated_at').eq('id',profile.id).maybeSingle(),
-          client.rpc('loopa_friend_stats_v87',{peer_id:profile.id}),
+          client.rpc('loopa_friend_stats_v88',{peer_id:profile.id}),
           getPublicPresence([profile.id]).catch(()=>({}))
         ]);
         if(requestId!==friendProfileRequest||profilePeer?.id!==profile.id)return;
@@ -2956,11 +3031,16 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
         byId('friendPageStatus').textContent=status?.label||presence?.label||'Статус скрыт';
         if(stats.error){
           byId('friendPageTime').textContent='—';
-          byId('friend-profile-missing').textContent='Для статистики нужно выполнить SQL LOOPA v87 в Supabase.';
+          byId('friend-profile-missing').textContent='Для общей статистики выполни дополнительный SQL LOOPA v88 в Supabase.';
           byId('friend-profile-missing').hidden=false;
         }else if(stats.data?.length){
-          byId('friendPageTime').textContent=prettyUsage(stats.data[0].total_seconds);
-          byId('friendPageJoined').textContent=stats.data[0].joined_at?new Date(stats.data[0].joined_at).toLocaleDateString('ru-RU',{month:'short',year:'numeric'}):'—';
+          const stat=stats.data[0];
+          byId('friendPageTime').textContent=stat.history_synced?prettyUsage(stat.total_seconds):'—';
+          byId('friendPageJoined').textContent=stat.joined_at?new Date(stat.joined_at).toLocaleDateString('ru-RU',{month:'short',year:'numeric'}):'—';
+          if(!stat.history_synced){
+            byId('friend-profile-missing').textContent='Время появится, когда друг один раз откроет обновлённый LOOPA v88.';
+            byId('friend-profile-missing').hidden=false;
+          }
         }else{
           byId('friendPageTime').textContent='Только друзьям';
           byId('friendPageJoined').textContent='—';
@@ -3065,6 +3145,8 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
       const body=byId('dmInput').value.trim();
       if(!body||!dmPeer||!currentUser||dmBusy)return;
       dmBusy=true;byId('dmSend').disabled=true;byId('dm-error').hidden=true;
+      // Dismiss the soft keyboard immediately on Send; don't wait for network latency.
+      byId('dmInput').blur();scheduleDmViewport();
       const peerId=dmPeer.id,owner=currentUser.id;
       try{
         const {data,error}=await client.from('loopa_dm_messages_v87')
@@ -3073,6 +3155,10 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
         if(error)throw error;
         if(dmPeer?.id===peerId&&currentUser?.id===owner){
           byId('dmInput').value='';
+          // Dismiss iPhone keyboard after a successful send. The fixed viewport
+          // then expands automatically without leaving the chat scrolled upwards.
+          byId('dmInput').blur();
+          scheduleDmViewport();
           if(!dmHistory.some(item=>item.id===data.id))dmHistory.push(data);
           renderDirectMessages();
         }
@@ -3083,15 +3169,8 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
           :'Не удалось отправить сообщение. Проверь SQL v87 и подключение к Supabase.';
       }finally{dmBusy=false;byId('dmSend').disabled=false;}
     });
-    let v87UsageBusy=false;
-    async function pingUsageV87(){
-      if(v87UsageBusy||document.visibilityState!=='visible'||!currentUser||!client)return;
-      v87UsageBusy=true;
-      try{await client.rpc('loopa_usage_ping_v87');}catch{}
-      finally{v87UsageBusy=false;}
-    }
-    setInterval(pingUsageV87,15000);
-    document.addEventListener('visibilitychange',()=>{if(!document.hidden)pingUsageV87();});
+    // v88 uses loopa_history27 as the single active-time counter.
+    // Avoid running v87's separate timer: it would double-count active seconds.
 
     function friendRow(profile, presence, buttons) {
       const row = document.createElement('div');
