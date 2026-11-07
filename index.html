@@ -2021,38 +2021,8 @@ body.roomViewing #room-active,body.roomViewing .roomChat,body.roomViewing #chatF
       byId('roomSheet').close();
     });
     let watchBaseHeight=0,watchWidth=0,watchKeyboardOpen=false,watchViewportTimer=0;
-    // v93: restoring the visual viewport on EVERY iOS keyboard-close frame
-    // made the entire room follow the keyboard slowly. Snap the room back
-    // to its last keyboard-free size once, then ignore transient resize ticks.
-    let watchDismissActive=false,watchDismissTimer=0;
-    const watchRoomWidth=()=>Math.min(document.documentElement.clientWidth||window.innerWidth,cinemaModeEnabled?1160:900);
     function watchNormalPlayer(height,width){
       return cinemaModeEnabled&&width>900 ? Math.min(width*9/16,height*.56) : Math.min(width*9/16,430);
-    }
-    function endWatchDismiss(){
-      watchDismissActive=false;
-      if(watchDismissTimer)clearTimeout(watchDismissTimer);
-      watchDismissTimer=0;
-    }
-    function beginWatchKeyboardDismiss(){
-      if(!watchIOS||!document.body.classList.contains('roomViewing')||watchDismissActive)return;
-      const vv=window.visualViewport;
-      const currentHeight=vv?.height||window.innerHeight;
-      const fullHeight=Math.max(watchBaseHeight||0,window.innerHeight||0,currentHeight);
-      if(fullHeight-currentHeight<70&&!watchKeyboardOpen)return;
-      watchDismissActive=true;
-      watchKeyboardOpen=false;
-      document.body.classList.remove('chatTyping');
-      const root=document.documentElement;
-      // One immediate layout change; Safari's native keyboard continues
-      // its own slide-out underneath, rather than dragging the composer.
-      root.style.setProperty('--watch-height',fullHeight+'px');
-      root.style.setProperty('--watch-player-height',watchNormalPlayer(fullHeight,watchRoomWidth())+'px');
-      // Prevent the page offset from following the visual viewport's pan.
-      root.style.setProperty('--watch-top','0px');
-      if(watchKeepBottom)watchLog.scrollTop=watchLog.scrollHeight;
-      // Fallback for unusual iOS browsers that don't dispatch a final resize.
-      watchDismissTimer=setTimeout(()=>{endWatchDismiss();scheduleWatchViewport();},850);
     }
     let watchKeepBottom=true;
     const watchLog=byId('chatLog'),watchField=byId('chatText');
@@ -2092,15 +2062,6 @@ body.roomViewing #room-active,body.roomViewing .roomChat,body.roomViewing #chatF
       const height=viewport?.height||window.innerHeight;
       if(viewport&&Math.abs(viewport.scale-1)>.02)return;
       const focused=document.activeElement===watchField;
-      if(watchDismissActive){
-        if(focused){endWatchDismiss();}
-        else if(height>=Math.max(0,watchBaseHeight-55)){
-          endWatchDismiss();
-        }else{
-          // Ignore every intermediate native keyboard-dismiss frame.
-          return;
-        }
-      }
       if(width!==watchWidth){watchWidth=width;watchBaseHeight=Math.max(height,window.innerHeight);}
       if(!focused&&!watchKeyboardOpen)watchBaseHeight=height;
       // Retain the open state through blur until the keyboard actually retreats.
@@ -2128,7 +2089,6 @@ body.roomViewing #room-active,body.roomViewing .roomChat,body.roomViewing #chatF
     }
     function stopWatchViewport(){
       restoreWatchField();
-      endWatchDismiss();
       watchKeyboardOpen=false;
       if(watchViewportTimer)cancelAnimationFrame(watchViewportTimer);
       watchViewportTimer=0;
@@ -2154,8 +2114,8 @@ body.roomViewing #room-active,body.roomViewing .roomChat,body.roomViewing #chatF
     window.visualViewport?.addEventListener('scroll',scheduleWatchViewport);
     window.addEventListener('resize',scheduleWatchViewport);
     window.addEventListener('scroll',scheduleWatchViewport,{passive:true});
-    watchField.addEventListener('focus',()=>{endWatchDismiss();scheduleWatchViewport();});
-    watchField.addEventListener('blur',()=>{beginWatchKeyboardDismiss();scheduleWatchViewport();});
+    watchField.addEventListener('focus',scheduleWatchViewport);
+    watchField.addEventListener('blur',scheduleWatchViewport);
     syncWatchViewport();
     const tray=byId('emojiTray'), emojiOpen=byId('emojiOpen');
     function closeEmoji(){tray.hidden=true;emojiOpen.setAttribute('aria-expanded','false');}
