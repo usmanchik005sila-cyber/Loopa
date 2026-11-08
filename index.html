@@ -4439,6 +4439,7 @@ html.telegram-miniapp .toast {
       byId('auth-guest').hidden = true;
       byId('auth-account').hidden = false;
       byId('tmaMiniLinkBox').hidden = !isTelegramMiniApp || telegramMiniLinked;
+      if(isTelegramMiniApp && !telegramMiniLinked)void refreshTelegramMiniStatus(user.id);
       refreshTelegramLinkUI(user);
       openSettings('home');
       const savedName = user.user_metadata?.display_name || user.user_metadata?.full_name || user.user_metadata?.name || '';
@@ -4642,6 +4643,30 @@ html.telegram-miniapp .toast {
         note.textContent=telegramMiniErrorMessage(error);
         retry.hidden=false;
       }finally{telegramMiniBusy=false;}
+    }
+
+    async function refreshTelegramMiniStatus(owner){
+      if(!isTelegramMiniApp || !client || !owner || currentUser?.id!==owner)return;
+      try{
+        const {data}=await client.auth.getSession();
+        if(!data?.session?.access_token || currentUser?.id!==owner)return;
+        const response=await telegramMiniRequest('status',data.session.access_token);
+        if(currentUser?.id!==owner)return;
+        if(response.status==='linked'){
+          telegramMiniLinked=true;
+          byId('tmaMiniLinkBox').hidden=true;
+        }else if(response.status==='claimed_by_another_profile'){
+          const button=byId('tmaMiniLinkButton');
+          button.disabled=true;
+          byId('tmaMiniLinkStatus').textContent='Этот Telegram уже привязан к другому профилю LOOPA.';
+        }else if(response.status==='profile_linked_elsewhere'){
+          const button=byId('tmaMiniLinkButton');
+          button.disabled=true;
+          byId('tmaMiniLinkStatus').textContent='Этот профиль LOOPA уже связан с другим Telegram.';
+        }
+      }catch{
+        // Backend may not be deployed yet. The normal account remains accessible.
+      }
     }
     byId('tmaMiniRetry').addEventListener('click',()=>void tryTelegramMiniLogin());
     byId('tmaMiniLinkButton').addEventListener('click',async()=>{
