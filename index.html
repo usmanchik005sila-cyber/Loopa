@@ -1710,7 +1710,7 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
       if(!resumePlayerReady||rutubeAd)return;
       resumeRestorePending=null;
       // Reuse existing host transport, server RPC and guest synchronization.
-      void runTransportAction({seconds:target.pos,playing:false});
+      void runTransportAction({seconds:target.pos,playing:true});
     }
     byId('resumeDismiss').addEventListener('click',hideResumePrompt);
     byId('resumeApply').addEventListener('click',()=>{
@@ -2005,7 +2005,7 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
         if(rutubeAd&&hostHere()&&sample){
           syncPlayback();
         }
-        if(!rutubeAd){if(!hostHere())applyRoom(true);}
+        if(!rutubeAd){if(hostHere())tryApplyResume();else applyRoom(true);}
         return;
       }
       if(rutubeAd)return;
@@ -2610,13 +2610,66 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
 
     let historyOwner=null,historyBusy=false,usageLast=performance.now(),usageReady=false;
     function parseRoomCode(raw){let value=raw.trim();if(/^[a-f0-9]{12}$/i.test(value))return value.toUpperCase();try{const url=new URL(value);const code=url.searchParams.get('room');if(url.origin===new URL(SITE_URL).origin&&/^[a-f0-9]{12}$/i.test(code||''))return code.toUpperCase();}catch{}throw Error('Вставь код комнаты или ссылку-приглашение LOOPA');}
-    function videoCover(item){if(item.image?.startsWith('https://'))return item.image;const id=item.video?.match(/youtube\.com\/embed\/([\w-]{11})/);return id?'https://i.ytimg.com/vi/'+id[1]+'/hqdefault.jpg':'';}
+    function rutubeVideoId(value){
+      return String(value||'').match(/\/(?:video|play\/embed)\/([a-f\d]{32})(?:[/?#]|$)/i)?.[1]?.toLowerCase()||'';
+    }
+    const rutubeCoverRequests=new Map(),rutubeCoverPersisted=new Set();
+    function videoCover(item){
+      const saved=item?.image||item?.picture||item?.thumbnail_url;
+      if(typeof saved==='string'&&saved.startsWith('https://'))return saved;
+      const id=item?.video?.match(/youtube\.com\/embed\/([\w-]{11})/);
+      return id?'https://i.ytimg.com/vi/'+id[1]+'/hqdefault.jpg':'';
+    }
+    function resolveRutubeCover(item){
+      const id=rutubeVideoId(item.video),owner=currentUser?.id;
+      if(!id||!owner||!client)return Promise.resolve('');
+      if(rutubeCoverRequests.has(id))return rutubeCoverRequests.get(id);
+      const request=(async()=>{
+        try{
+          const query=String(item.title||'').trim().slice(0,100);if(query.length<2)return '';
+          const {data,error}=await client.functions.invoke('video-search',{body:{provider:'rutube',q:query,page:null}});
+          if(error||currentUser?.id!==owner||!Array.isArray(data?.items))return '';
+          const match=data.items.find(hit=>rutubeVideoId(hit.url||hit.video||hit.media)===id);
+          const image=match?.image||match?.thumbnail_url||match?.picture||'';
+          return typeof image==='string'&&image.startsWith('https://')?image:'';
+        }catch{return '';}
+      })();
+      rutubeCoverRequests.set(id,request);
+      request.then(image=>{if(!image&&rutubeCoverRequests.get(id)===request)rutubeCoverRequests.delete(id);});
+      return request;
+    }
+    function persistRutubeCover(item,id,image){
+      if(!client||!currentUser?.id||!item.code)return;
+      const key=String(item.code)+'|'+id;if(rutubeCoverPersisted.has(key))return;
+      rutubeCoverPersisted.add(key);const owner=currentUser.id;
+      client.rpc('loopa_history27',{op:'meta',room_code:item.code,media:item.video,caption:String(item.title||'Видео').slice(0,200),picture:image})
+        .then(({error})=>{if(error||currentUser?.id!==owner)rutubeCoverPersisted.delete(key);})
+        .catch(()=>rutubeCoverPersisted.delete(key));
+    }
+    function attachRutubeHistoryCover(item,button,text){
+      const id=rutubeVideoId(item.video);if(!id||button.querySelector('img'))return;
+      resolveRutubeCover(item).then(image=>{
+        if(!image||!button.isConnected||button.querySelector('img'))return;
+        const img=document.createElement('img');img.alt='';img.loading='lazy';
+        img.onerror=()=>img.remove();
+        img.onload=()=>{item.image=image;persistRutubeCover(item,id,image);};
+        button.insertBefore(img,text);img.src=image;
+      });
+    }
     function renderHistory(items){
-      for(const [id,limit] of [['room-recent',2],['homeRecent',2]]){const parent=byId(id);parent.replaceChildren();
-        for(const item of items.slice(0,limit)){const button=document.createElement('button');button.type='button';button.className='historyCard';
-          const image=videoCover(item);if(image){const img=document.createElement('img');img.src=image;img.alt='';img.loading='lazy';img.onerror=()=>img.hidden=true;button.append(img);}
-          const text=document.createElement('span'),small=document.createElement('small'),title=document.createElement('strong'),hint=document.createElement('span');small.textContent=id==='homeRecent'?'Вы смотрели':'Недавний просмотр';title.textContent=item.title||'Видео';const saved=readSavedResume(item.video);hint.textContent=saved?'Сохранено: '+formatVideoTime(saved.pos)+' · Открыть комнату':'Вернуться в комнату →';text.append(small,title,hint);button.append(text);
-          button.onclick=async()=>{button.disabled=true;try{showPage('rooms');await roomCall('join',{room:item.code});}catch(e){showToast('Не удалось войти: комната закрыта или доступ изменился');}finally{button.disabled=false;}};parent.append(button);
+      for(const [id,limit] of [['room-recent',2],['homeRecent',2]]){
+        const parent=byId(id);parent.replaceChildren();
+        for(const item of items.slice(0,limit)){
+          const button=document.createElement('button');button.type='button';button.className='historyCard';
+          const text=document.createElement('span'),small=document.createElement('small'),title=document.createElement('strong'),hint=document.createElement('span');
+          const image=videoCover(item);
+          small.textContent=id==='homeRecent'?'Вы смотрели':'Недавний просмотр';title.textContent=item.title||'Видео';
+          const saved=readSavedResume(item.video);hint.textContent=saved?'Сохранено: '+formatVideoTime(saved.pos)+' · Открыть комнату':'Вернуться в комнату →';text.append(small,title,hint);
+          if(image){const img=document.createElement('img');img.src=image;img.alt='';img.loading='lazy';img.onerror=()=>{img.remove();if(rutubeVideoId(item.video))attachRutubeHistoryCover(item,button,text);};button.append(img);}
+          button.append(text);
+          button.onclick=async()=>{button.disabled=true;try{showPage('rooms');await roomCall('join',{room:item.code});}catch(e){showToast('Не удалось войти: комната закрыта или доступ изменился');}finally{button.disabled=false;}};
+          parent.append(button);
+          if(!image&&rutubeVideoId(item.video))attachRutubeHistoryCover(item,button,text);
         }
         if(!items.length&&id==='room-recent'){const empty=document.createElement('p');empty.className='noticeEmpty';empty.textContent='Здесь появятся два последних видео';parent.append(empty);}
       }
@@ -2832,12 +2885,14 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
           if(typeof hit.url!=='string'||typeof hit.title!=='string')continue;
           const button=document.createElement('button');button.type='button';button.className='videoResult';
           const cover=document.createElement('span');cover.className='resultCover';
-          if(hit.image?.startsWith('https://')){const img=document.createElement('img');img.src=hit.image;img.alt='';img.loading='lazy';img.onerror=()=>img.remove();cover.append(img);}
+          const coverValue=hit.image||hit.thumbnail_url||hit.picture||'';
+          const coverUrl=typeof coverValue==='string'&&coverValue.startsWith('https://')?coverValue:'';
+          if(coverUrl){const img=document.createElement('img');img.src=coverUrl;img.alt='';img.loading='lazy';img.onerror=()=>img.remove();cover.append(img);}
           const play=document.createElement('span');play.className='resultPlay';play.textContent='▶';play.setAttribute('aria-hidden','true');cover.append(play);
           const info=document.createElement('span');info.className='resultInfo';const title=document.createElement('strong');title.textContent=hit.title;const author=document.createElement('small');author.textContent=hit.author|| (({youtube:'YouTube',vk:'VK Видео',rutube:'RUTUBE'})[provider]);const action=document.createElement('span');action.className='resultAction';action.textContent='Смотреть вместе ↗';info.append(title,author,action);button.append(cover,info);
           button.onclick=async()=>{
             if(!hostHere()||roomState.code!==code){showToast('Комната изменилась. Открой каталог заново');return;}
-            button.disabled=true;try{await changeRoomVideo(hit.url);if(roomState?.code===code&&roomState.video===roomMedia(hit.url)){publishWatchTitle(hit.title);historyCall('meta',{room_code:code,media:roomState.video,caption:hit.title.slice(0,200),picture:hit.image||''});closeCatalog();byId('videoEdit').open=false;}else showToast('Не удалось открыть видео. Попробуй ещё раз');}catch(e){showToast(e.message);}finally{button.disabled=false;}
+            button.disabled=true;try{await changeRoomVideo(hit.url);if(roomState?.code===code&&roomState.video===roomMedia(hit.url)){publishWatchTitle(hit.title);historyCall('meta',{room_code:code,media:roomState.video,caption:hit.title.slice(0,200),picture:coverUrl||''});closeCatalog();byId('videoEdit').open=false;}else showToast('Не удалось открыть видео. Попробуй ещё раз');}catch(e){showToast(e.message);}finally{button.disabled=false;}
           };byId('hits').append(button);
         }
         rememberVideoTitles(provider,data.items);
