@@ -321,6 +321,9 @@
     .circle.profile-with-photo .top-profile-avatar{width:100%;height:100%;border-radius:inherit;object-fit:cover;}
     .circle.profile-with-photo .top-profile-initial{color:#252326;display:grid;place-items:center;width:100%;height:100%;background:#e4ddd7;}
     [data-page]{transform-origin:50% 12%;}
+    #content.page-crossfading{position:relative;}
+    #content>.page-transition-out{position:absolute;inset:0;z-index:2;pointer-events:none;}
+    #content>.page-transition-in{position:relative;z-index:1;}
     @keyframes loopaPageArrive{
       from{opacity:0;transform:translate3d(0,12px,0) scale(.995)}
       to{opacity:1;transform:translate3d(0,0,0) scale(1)}
@@ -2705,6 +2708,7 @@ body[data-theme] .theme-choice .theme-check{color:var(--silver)}
     byId('catalogForm').onsubmit=e=>{e.preventDefault();searchCatalog(false);};
     byId('nextVideos').onclick=()=>searchCatalog(true);
     let lastPage = 'home';
+    let activePageCrossfade=null;
     let roomPeerJourney=false; // Visiting someone's profile from a room must not end the room.
     const navigationReducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)');
     let nativeNavigationUpdating=false;
@@ -2728,6 +2732,46 @@ body[data-theme] .theme-choice .theme-check{color:var(--silver)}
         animation.onfinish=()=>{if(element._loopaAnimation===animation)element._loopaAnimation=null;};
         animation.oncancel=()=>{if(element._loopaAnimation===animation)element._loopaAnimation=null;};
       }
+    }
+    function finishPageCrossfade(){
+      const transition=activePageCrossfade;
+      if(!transition)return;
+      transition.outgoingAnimation?.cancel();
+      transition.incomingAnimation?.cancel();
+      transition.outgoing.classList.remove('page-transition-out');
+      transition.incoming.classList.remove('page-transition-in');
+      transition.outgoing.inert=transition.previousInert;
+      if(transition.previousAriaHidden===null)transition.outgoing.removeAttribute('aria-hidden');
+      else transition.outgoing.setAttribute('aria-hidden',transition.previousAriaHidden);
+      transition.content.classList.remove('page-crossfading');
+      transition.content.style.minHeight=transition.previousMinHeight;
+      transition.outgoing.hidden=transition.outgoing.dataset.page!==lastPage;
+      transition.incoming.hidden=transition.incoming.dataset.page!==lastPage;
+      activePageCrossfade=null;
+    }
+    function crossfadePages(outgoing,incoming){
+      if(outgoing._loopaAnimation){outgoing._loopaAnimation.cancel();outgoing._loopaAnimation=null;}
+      if(incoming._loopaAnimation){incoming._loopaAnimation.cancel();incoming._loopaAnimation=null;}
+      const content=byId('content');
+      const transition={outgoing,incoming,content,previousMinHeight:content.style.minHeight,previousAriaHidden:outgoing.getAttribute('aria-hidden'),previousInert:outgoing.inert===true};
+      activePageCrossfade=transition;
+      content.classList.add('page-crossfading');
+      outgoing.classList.add('page-transition-out');
+      incoming.classList.add('page-transition-in');
+      outgoing.setAttribute('aria-hidden','true');
+      outgoing.inert=true;
+      const stableHeight=Math.max(outgoing.scrollHeight,incoming.scrollHeight);
+      if(stableHeight)content.style.minHeight=stableHeight+'px';
+      try{
+        const outgoingAnimation=outgoing.animate([{opacity:1},{opacity:0}],{duration:240,easing:'ease-out',fill:'forwards'});
+        const incomingAnimation=incoming.animate([{opacity:0,transform:'translate3d(0,10px,0)'},{opacity:1,transform:'translate3d(0,0,0)'}],{duration:280,easing:'cubic-bezier(.22,.61,.36,1)',fill:'forwards'});
+        transition.outgoingAnimation=outgoingAnimation;
+        transition.incomingAnimation=incomingAnimation;
+        const track=(element,animation)=>{element._loopaAnimation=animation;animation.onfinish=()=>{if(element._loopaAnimation===animation)element._loopaAnimation=null;};animation.oncancel=()=>{if(element._loopaAnimation===animation)element._loopaAnimation=null;};};
+        track(outgoing,outgoingAnimation);
+        track(incoming,incomingAnimation);
+        Promise.all([outgoingAnimation.finished.catch(()=>{}),incomingAnimation.finished.catch(()=>{})]).then(()=>{if(activePageCrossfade===transition)finishPageCrossfade();});
+      }catch(error){finishPageCrossfade();}
     }
     // Independent DM viewport prevents iOS Safari from scrolling the whole website
     // when focusing a text field, and returns to its normal size on keyboard dismissal.
@@ -2757,6 +2801,7 @@ body[data-theme] .theme-choice .theme-check{color:var(--silver)}
       document.documentElement.style.removeProperty('--dm-visual-height');
     }
     function showPage(destination) {
+      finishPageCrossfade();
       if(lastPage==='messages'&&destination!=='messages')stopMessagesInbox();
       if(lastPage==='dm' && destination!=='dm')clearDirectMessageChannel();
       if(destination==='dm'&&lastPage!=='dm')setDmViewing(true);
@@ -2770,14 +2815,21 @@ body[data-theme] .theme-choice .theme-check{color:var(--silver)}
       if(destination==='rooms')roomPeerJourney=false;
       if(destination==='rooms' && !roomState && currentUser) roomRun('list');
       const changed = destination !== lastPage;
+      const toPage=Array.from(pages).find(page=>page.dataset.page===destination);
+      const fromPage=changed?Array.from(pages).find(page=>page.dataset.page===lastPage&&!page.hidden):null;
+      const canCrossfade=!!(changed&&fromPage&&toPage&&!navigationReducedMotion.matches
+        &&lastPage!=='rooms'&&lastPage!=='dm'&&destination!=='rooms'&&destination!=='dm'
+        &&typeof fromPage.animate==='function'&&typeof toPage.animate==='function');
       pages.forEach(page => {
-        const active = page.dataset.page === destination;
-        if(!active && page._loopaAnimation){page._loopaAnimation.cancel();page._loopaAnimation=null;}
-        page.hidden = !active;
+        const active=page===toPage;
+        const outgoing=canCrossfade&&page===fromPage;
+        if(!active&&!outgoing&&page._loopaAnimation){page._loopaAnimation.cancel();page._loopaAnimation=null;}
+        page.hidden=!(active||outgoing);
         page.classList.remove('page-enter');
-        if (active && changed && destination!=='profile') animateContent(page, destination==='rooms'||destination==='dm');
       });
-      lastPage = destination;
+      lastPage=destination;
+      if(canCrossfade)crossfadePages(fromPage,toPage);
+      else if(toPage&&changed&&destination!=='profile')animateContent(toPage,destination==='rooms'||destination==='dm');
       tabs.forEach(tab => {
         const active = tab.dataset.go === (destination==='rooms'?'home':(destination==='friend-profile'?'friends':(destination==='dm'?(dmPageReturn==='messages'?'messages':'friends'):destination)));
         tab.classList.toggle('active', active);
