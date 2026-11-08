@@ -3343,7 +3343,7 @@ html.telegram-miniapp.telegram-fullscreen #roomInviteNotice {
     }
     if(isTelegramMiniApp){
       document.documentElement.classList.add('telegram-miniapp');
-      const tgDiagnosticsEnabled=new URLSearchParams(location.search).get('tgdebug')==='1';
+      let tgDiagnosticsEnabled=new URLSearchParams(location.search).get('tgdebug')==='1';
       const tgDiagPanel=document.getElementById('tgViewportDiagnostics');
       const tgDiagOutput=document.getElementById('tgDiagOutput');
       const tgDiagEvents=[];
@@ -3373,15 +3373,13 @@ html.telegram-miniapp.telegram-fullscreen #roomInviteNotice {
       });
       const tgRenderDiagnostics=()=>{if(tgDiagnosticsEnabled&&tgDiagPanel&&tgDiagOutput){tgDiagOutput.value=JSON.stringify(tgDiagnosticSnapshot(),null,2);}};
       const tgRecordDiagnostic=(name,detail)=>{
-        if(!tgDiagnosticsEnabled)return;
         let note='';
         if(typeof detail==='string')note=detail.slice(0,180);
         else if(detail&&typeof detail==='object'){const value=detail.error??detail.reason??detail.message; if(typeof value==='string')note=value.slice(0,180);}
         tgDiagEvents.push({event:name,atMs:Math.round(performance.now()),note:note||undefined,isFullscreen:!!telegramWebApp.isFullscreen,viewportHeight:Number.isFinite(telegramWebApp.viewportHeight)?telegramWebApp.viewportHeight:null});
-        if(tgDiagEvents.length>24)tgDiagEvents.shift();tgRenderDiagnostics();
+        if(tgDiagEvents.length>24)tgDiagEvents.shift();if(tgDiagnosticsEnabled)tgRenderDiagnostics();
       };
-      if(tgDiagnosticsEnabled&&tgDiagPanel){
-        tgDiagPanel.hidden=false;
+      if(tgDiagPanel){
         document.getElementById('tgDiagRefresh')?.addEventListener('click',tgRenderDiagnostics);
         document.getElementById('tgDiagClose')?.addEventListener('click',()=>{tgDiagPanel.hidden=true;});
         document.getElementById('tgDiagCopy')?.addEventListener('click',async()=>{
@@ -3389,7 +3387,19 @@ html.telegram-miniapp.telegram-fullscreen #roomInviteNotice {
           try{await navigator.clipboard.writeText(tgDiagOutput.value);if(status)status.textContent='Отчёт скопирован';}
           catch{tgDiagOutput.focus();tgDiagOutput.select();if(status)status.textContent='Отчёт выделен — скопируй его';}
         });
-        tgRecordDiagnostic('miniapp-diagnostics-started');
+        const tgLogo=document.querySelector('.brand');
+        if(tgLogo){
+          let tgLogoTapCount=0,tgLogoTapTimer=0;
+          tgLogo.addEventListener('click',()=>{
+            tgLogoTapCount++;clearTimeout(tgLogoTapTimer);
+            if(tgLogoTapCount>=5){
+              tgLogoTapCount=0;tgDiagnosticsEnabled=true;tgDiagPanel.hidden=false;
+              tgRecordDiagnostic('diagnostics-opened-by-logo');tgRenderDiagnostics();return;
+            }
+            tgLogoTapTimer=setTimeout(()=>{tgLogoTapCount=0;tgLogoTapTimer=0;},2500);
+          });
+        }
+        if(tgDiagnosticsEnabled){tgDiagPanel.hidden=false;tgRecordDiagnostic('diagnostics-opened-by-url');}
       }
       try{telegramWebApp.setHeaderColor?.('#090a0c');}catch(error){tgRecordDiagnostic('setHeaderColor-error',error);}
       try{telegramWebApp.setBackgroundColor?.('#090a0c');}catch(error){tgRecordDiagnostic('setBackgroundColor-error',error);}
@@ -3401,7 +3411,7 @@ html.telegram-miniapp.telegram-fullscreen #roomInviteNotice {
       };
       try{telegramWebApp.onEvent?.('fullscreenChanged',detail=>syncTelegramFullscreen('fullscreenChanged',detail));}catch(error){tgRecordDiagnostic('listen-fullscreenChanged-error',error);}
       try{telegramWebApp.onEvent?.('fullscreenFailed',detail=>syncTelegramFullscreen('fullscreenFailed',detail));}catch(error){tgRecordDiagnostic('listen-fullscreenFailed-error',error);}
-      if(tgDiagnosticsEnabled){for(const eventName of ['viewportChanged','safeAreaChanged','contentSafeAreaChanged']){try{telegramWebApp.onEvent?.(eventName,detail=>tgRecordDiagnostic(eventName,detail));}catch(error){tgRecordDiagnostic('listen-'+eventName+'-error',error);}}}
+      for(const eventName of ['viewportChanged','safeAreaChanged','contentSafeAreaChanged']){try{telegramWebApp.onEvent?.(eventName,detail=>tgRecordDiagnostic(eventName,detail));}catch(error){tgRecordDiagnostic('listen-'+eventName+'-error',error);}}
       syncTelegramFullscreen('initial-fullscreen-state');
       let tgSupportsFullscreen=false;try{tgSupportsFullscreen=!!telegramWebApp.isVersionAtLeast?.('8.0');}catch{}
       if(typeof telegramWebApp.requestFullscreen==='function'&&tgSupportsFullscreen&&!telegramWebApp.isFullscreen){
@@ -3424,7 +3434,7 @@ html.telegram-miniapp.telegram-fullscreen #roomInviteNotice {
       }catch(error){tgRecordDiagnostic('back-button-listener-error',error);}
       try{telegramWebApp.ready?.();tgReadyCalled=true;tgRecordDiagnostic('ready-called');}catch(error){tgRecordDiagnostic('ready-error',error);}
       tgRenderDiagnostics();
-      if(tgDiagnosticsEnabled){setTimeout(()=>tgRecordDiagnostic('snapshot-500ms'),500);setTimeout(()=>tgRecordDiagnostic('snapshot-1800ms'),1800);setTimeout(()=>tgRecordDiagnostic('snapshot-4500ms'),4500);}
+      setTimeout(()=>tgRecordDiagnostic('snapshot-500ms'),500);setTimeout(()=>tgRecordDiagnostic('snapshot-1800ms'),1800);setTimeout(()=>tgRecordDiagnostic('snapshot-4500ms'),4500);
     }
     let activePageTransition=null;
     let roomPeerJourney=false; // Visiting someone's profile from a room must not end the room.
