@@ -11,7 +11,7 @@
   <meta name="description" content="LOOPA — ближе, даже на расстоянии. Совместный просмотр с теми, кто важен.">
   <title>LOOPA — Ближе, даже на расстоянии</title>
   <meta name="loopa-version" content="v94">
-  <meta name="loopa-build" content="v96-telegram-miniapp-clean">
+  <meta name="loopa-build" content="v97-telegram-secure-auth">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
 <script>
@@ -1232,6 +1232,13 @@ html.telegram-miniapp .app {
 html.telegram-miniapp .toast {
   bottom:calc(98px + max(env(safe-area-inset-bottom, 0px), var(--tg-content-safe-area-inset-bottom, 0px)));
 }
+
+/* Telegram Mini App: account linking to keep a single LOOPA identity. */
+.tma-auth-box{border:1px solid #ffffff30;border-radius:15px;background:#ffffff08;padding:14px 16px;margin:14px 0 18px}
+.tma-auth-box strong{font:600 13px/1.4 system-ui;color:#f4f0ef}
+.tma-auth-box p{font:12px/1.6 system-ui;color:#bbb6b8;margin:7px 0 11px}
+.tma-auth-box button{border:1px solid #ffffff42;border-radius:10px;background:#ddd9d5;color:#161619;padding:10px 13px;font:600 12px system-ui;cursor:pointer}
+.tma-auth-box button:disabled{opacity:.55;cursor:default}
 </style>
     </head>
 <body>
@@ -1354,6 +1361,11 @@ html.telegram-miniapp .toast {
           <p class="panel-note">АККАУНТ LOOPA</p>
           <h2>Добро пожаловать в LOOPA.</h2>
           <p class="auth-intro">Создай аккаунт или войди, чтобы смотреть вместе с близкими.</p>
+          <div class="tma-auth-box" id="tmaMiniGuest" hidden>
+            <strong>LOOPA внутри Telegram</strong>
+            <p id="tmaMiniGuestText" role="status" aria-live="polite">Проверяем быстрый вход…</p>
+            <button id="tmaMiniRetry" type="button" hidden>Повторить проверку</button>
+          </div>
           <div class="auth-switch" aria-label="Режим авторизации">
             <button type="button" data-auth-mode="login" aria-pressed="false">Вход</button>
             <button type="button" data-auth-mode="signup" class="selected" aria-pressed="true">Регистрация</button>
@@ -1436,6 +1448,11 @@ html.telegram-miniapp .toast {
             <p id="profile-saved" class="profile-saved" role="status" aria-live="polite" hidden><span aria-hidden="true">✓</span> Сохранено</p>
           </form>
           <p id="profile-feedback" class="auth-feedback" role="status" aria-live="polite" hidden></p>
+          <div class="tma-auth-box" id="tmaMiniLinkBox" hidden>
+            <strong>Быстрый вход из Telegram</strong>
+            <p id="tmaMiniLinkStatus" role="status" aria-live="polite">Привяжи именно этот профиль LOOPA к Telegram — друзья, комнаты и переписки сохранятся. Для аккаунта без почты понадобится технический адрес только для входа.</p>
+            <button id="tmaMiniLinkButton" type="button">Привязать этот профиль</button>
+          </div>
           <form id="recovery-form" hidden>
             <p class="field-note">Восстановление доступа: введи новый пароль.</p>
             <label class="field">Новый пароль
@@ -3555,7 +3572,7 @@ html.telegram-miniapp .toast {
     function refreshSettingsIdentity() {
       const name = byId('profile-name').value.trim() || 'Профиль LOOPA';
       byId('settings-user-name').textContent = name;
-      byId('settings-user-email').textContent = currentUser?.email || currentUser?.phone || (currentUser?.is_anonymous?'Гостевой профиль':telegramIsLinked(currentUser)?'Telegram':'');
+      byId('settings-user-email').textContent = loopaAccountIdentity(currentUser);
       const mini = byId('settings-mini-avatar');
       mini.replaceChildren();
       const actual = byId('account-avatar').querySelector('img');
@@ -4402,6 +4419,8 @@ html.telegram-miniapp .toast {
       byId('auth-loading').hidden = true;
       byId('auth-account').hidden = true;
       byId('auth-guest').hidden = false;
+      byId('tmaMiniGuest').hidden = !isTelegramMiniApp;
+      telegramMiniLinked = false;
       refreshTopProfileAvatar();
       stopPresence();
       resetFriends();
@@ -4419,11 +4438,13 @@ html.telegram-miniapp .toast {
       byId('auth-loading').hidden = true;
       byId('auth-guest').hidden = true;
       byId('auth-account').hidden = false;
+      byId('tmaMiniLinkBox').hidden = !isTelegramMiniApp || telegramMiniLinked;
+      if(isTelegramMiniApp && !telegramMiniLinked)void refreshTelegramMiniStatus(user.id);
       refreshTelegramLinkUI(user);
       openSettings('home');
       const savedName = user.user_metadata?.display_name || user.user_metadata?.full_name || user.user_metadata?.name || '';
       byId('profile-name').value = savedName;
-      byId('account-email').textContent = user.email || user.phone || (user.is_anonymous?'Гостевой профиль':telegramIsLinked(user)?'Telegram':'');
+      byId('account-email').textContent = loopaAccountIdentity(user);
       byId('joinedDate').textContent=user.created_at?new Date(user.created_at).toLocaleDateString('ru-RU',{day:'numeric',month:'short',year:'numeric'}):'—';
       usageStart();
       renderName(savedName);
@@ -4549,6 +4570,124 @@ html.telegram-miniapp .toast {
       if (button.dataset.go) navigateSmoothly(()=>showPage(button.dataset.go));
       if (button.dataset.message) showToast(button.dataset.message);
       if (button.dataset.authMode) selectAuthMode(button.dataset.authMode);
+    });
+
+    // Mini App auth is established ONLY after server-validated Telegram initData.
+    // Never authenticate from initDataUnsafe / client-provided Telegram user IDs.
+    let telegramMiniBusy=false,telegramMiniLinked=false;
+    function loopaAccountIdentity(user){
+      if(!user)return '';
+      const email=String(user.email||'');
+      if(email&&!/@auth\.loopacinema\.invalid$/i.test(email))return email;
+      return user.phone||(user.is_anonymous?'Гостевой профиль':'Telegram');
+    }
+    async function telegramMiniRequest(action,accessToken=''){
+      if(!client||!isTelegramMiniApp||!telegramWebApp?.initData)
+        throw new Error('not_in_telegram');
+      const response=await fetch(SUPABASE_URL+'/functions/v1/telegram-miniapp-auth',{
+        method:'POST',cache:'no-store',
+        headers:{
+          'Content-Type':'application/json',
+          apikey:SUPABASE_PUBLISHABLE_KEY,
+          ...(accessToken?{Authorization:'Bearer '+accessToken}:{})
+        },
+        body:JSON.stringify({action,initData:telegramWebApp.initData})
+      });
+      const result=await response.json().catch(()=>({}));
+      if(!response.ok){
+        const error=new Error(result.error||'backend_unavailable');
+        error.status=response.status;
+        throw error;
+      }
+      return result;
+    }
+    function telegramMiniErrorMessage(error){
+      if(error?.message==='reopen_miniapp')
+        return 'Время подтверждения истекло. Закрой Mini App и открой заново.';
+      if(error?.message==='telegram_already_linked_to_another_profile')
+        return 'Этот Telegram уже связан с другим профилем LOOPA. Сначала войди в него.';
+      if(error?.message==='profile_already_linked_to_another_telegram')
+        return 'Этот профиль LOOPA уже связан с другим Telegram.';
+      if(error?.message==='link_conflict')
+        return 'Профиль уже привязан. Закрой и заново открой Mini App.';
+      if(error?.message==='login_required')return 'Сначала войди в свой профиль LOOPA.';
+      return 'Быстрый вход пока не настроен. Можно войти обычным способом.';
+    }
+    async function tryTelegramMiniLogin(){
+      if(!isTelegramMiniApp||!client||currentUser||telegramMiniBusy)return;
+      telegramMiniBusy=true;
+      const guest=byId('tmaMiniGuest'),note=byId('tmaMiniGuestText'),retry=byId('tmaMiniRetry');
+      guest.hidden=false;retry.hidden=true;
+      note.textContent='Проверяем привязку твоего Telegram…';
+      try{
+        const response=await telegramMiniRequest('login');
+        if(response.status==='unlinked'){
+          note.textContent='Для будущего автовхода сначала войди в свой профиль привычным способом, затем в «Личных данных» нажми «Привязать этот профиль».';
+          return;
+        }
+        if(response.status!=='login_ready'||!response.token_hash){
+          note.textContent='Быстрый вход пока недоступен. Войди привычным способом.';
+          return;
+        }
+        if(currentUser)return;
+        const {data,error}=await client.auth.verifyOtp({
+          token_hash:response.token_hash,type:'magiclink'
+        });
+        if(error||!data?.user)throw error||new Error('session_unavailable');
+        currentUser=data.user;
+        telegramMiniLinked=true;
+        await displayAccount(data.user);
+        await acceptInvite();
+        showToast('Вход через Telegram выполнен');
+      }catch(error){
+        note.textContent=telegramMiniErrorMessage(error);
+        retry.hidden=false;
+      }finally{telegramMiniBusy=false;}
+    }
+
+    async function refreshTelegramMiniStatus(owner){
+      if(!isTelegramMiniApp || !client || !owner || currentUser?.id!==owner)return;
+      try{
+        const {data}=await client.auth.getSession();
+        if(!data?.session?.access_token || currentUser?.id!==owner)return;
+        const response=await telegramMiniRequest('status',data.session.access_token);
+        if(currentUser?.id!==owner)return;
+        if(response.status==='linked'){
+          telegramMiniLinked=true;
+          byId('tmaMiniLinkBox').hidden=true;
+        }else if(response.status==='claimed_by_another_profile'){
+          const button=byId('tmaMiniLinkButton');
+          button.disabled=true;
+          byId('tmaMiniLinkStatus').textContent='Этот Telegram уже привязан к другому профилю LOOPA.';
+        }else if(response.status==='profile_linked_elsewhere'){
+          const button=byId('tmaMiniLinkButton');
+          button.disabled=true;
+          byId('tmaMiniLinkStatus').textContent='Этот профиль LOOPA уже связан с другим Telegram.';
+        }
+      }catch{
+        // Backend may not be deployed yet. The normal account remains accessible.
+      }
+    }
+    byId('tmaMiniRetry').addEventListener('click',()=>void tryTelegramMiniLogin());
+    byId('tmaMiniLinkButton').addEventListener('click',async()=>{
+      const button=byId('tmaMiniLinkButton'),note=byId('tmaMiniLinkStatus');
+      if(button.disabled||!isTelegramMiniApp||!currentUser||!client)return;
+      button.disabled=true;
+      note.textContent='Проверяем профиль LOOPA и Telegram…';
+      try{
+        const {data,error}=await client.auth.getSession();
+        if(error||!data?.session?.access_token)throw new Error('login_required');
+        const result=await telegramMiniRequest('link',data.session.access_token);
+        if(!['linked','already_linked'].includes(result.status))
+          throw new Error('link_failed');
+        telegramMiniLinked=true;
+        note.textContent='Профиль привязан. При следующем запуске войдёшь автоматически.';
+        button.textContent='Telegram привязан';
+        showToast('Быстрый вход через Telegram подключён');
+      }catch(error){
+        note.textContent=telegramMiniErrorMessage(error);
+        button.disabled=false;
+      }
     });
     // Telegram is an OIDC custom provider; secrets stay in Supabase, never in HTML.
     const TELEGRAM_PROVIDER='custom:telegram';
@@ -4933,6 +5072,7 @@ html.telegram-miniapp .toast {
           },0);
         });
         await syncSession();
+        if(isTelegramMiniApp&&!currentUser)await tryTelegramMiniLogin();
       } catch (err) {
         // A failure while loading optional profile data must not sign out a valid
         // Supabase session, nor show the register form above the account settings.
