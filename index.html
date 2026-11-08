@@ -1689,11 +1689,8 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
       if(!currentUser||!data?.video||data.host!==currentUser.id||!roomIsSolo(data))return;
       const record=readSavedResume(data.video);
       if(!record)return;
-      const serverPos=Number(data.pos)||0;
-      // Do not offer an older checkpoint when the room moved much further ahead.
-      // If the server is already near the saved point, still offer: the newly mounted
-      // host player may otherwise start at zero and overwrite that server position.
-      if(serverPos>record.pos+8)return;
+      // Server time can keep advancing after the host closes their player.
+      // Offer the actual measured checkpoint; the solo host chooses explicitly.
       resumePrompt={user:currentUser.id,code:data.code,video:data.video,pos:record.pos,epoch:roomEpoch};
       byId('resumePosition').textContent='Остановились на '+formatVideoTime(record.pos);
       resumeBanner.hidden=false;
