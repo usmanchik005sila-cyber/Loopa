@@ -1171,7 +1171,22 @@ body.roomViewing #resumeBanner{margin:0 -14px;padding:10px 14px;border-radius:0;
 body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
 @media(max-width:360px){#resumeBanner{gap:6px}#resumeBanner button{padding:8px 9px;font-size:11px}}
 </style>
-</head>
+<style id="chat-replies-styles">
+    #chatReplyPreview{display:flex;align-items:center;gap:10px;min-height:48px;box-sizing:border-box;padding:7px 10px;border-top:1px solid #ffffff16;border-left:2px solid #c8c8cc;background:#ffffff06}
+    #chatReplyPreview[hidden]{display:none!important}
+    .chatReplyPreviewCopy{display:grid;gap:2px;min-width:0;flex:1}
+    .chatReplyPreviewCopy strong{font:550 11px/1.3 system-ui;color:#ededf0}
+    .chatReplyPreviewCopy small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#aaaab1;font:11px/1.4 system-ui}
+    #chatReplyCancel{display:grid;place-items:center;width:32px;height:32px;flex:none;border:0;border-radius:50%;background:#ffffff0b;color:#d7d7da;font:22px/1 system-ui;cursor:pointer}
+    #chatLog .chatLine .bubble[data-chat-id]{touch-action:pan-y;transition:transform .16s ease,box-shadow .16s ease}
+    #chatLog .chatLine .bubble.chatReplySwipe{transition:none;box-shadow:0 0 0 1px #ffffff50,0 5px 18px #0005}
+    #chatLog .chatReplyQuote{display:grid;width:100%;box-sizing:border-box;gap:2px;margin:0 0 7px;padding:5px 8px;border:0;border-left:2px solid #bfc0c5;border-radius:0 7px 7px 0;background:#ffffff0a;color:inherit;text-align:left;cursor:pointer}
+    #chatLog .chatReplyQuote strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:550 10px/1.3 system-ui;color:#e7e7eb}
+    #chatLog .chatReplyQuote span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:#c0c0c7;font:10px/1.4 system-ui}
+    #chatLog .bubble.isReplyTarget{outline:2px solid #d8d8dc;outline-offset:2px}
+    @media(prefers-reduced-motion:reduce){#chatLog .chatLine .bubble[data-chat-id]{transition:none}}
+    </style>
+    </head>
 <body>
   <svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden" xmlns="http://www.w3.org/2000/svg">
     <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></symbol>
@@ -1219,7 +1234,7 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
         <h1>Твои<br>комнаты.</h1>
         <div id="room-lobby" class="panel glass"><h2>Смотреть вместе</h2><button class="action" data-room="create">Создать комнату</button><label class="friend-search-label" for="join-code">Код или ссылка</label><input id="join-code" class="friend-search-input" autocomplete="off" maxlength="1000" placeholder="Код или ссылка"><button class="action secondary" data-room="join">Войти по коду</button><h3>Вы смотрели</h3><div id="room-recent"></div></div>
 <div id="room-active" class="panel glass" hidden><div class="setupHeader"><p class="panel-note">СОВМЕСТНЫЙ ПРОСМОТР</p><h2 id="setupTitle">Выбери видео</h2></div><div class="roomBar"><button class="text-link" data-room="exit">‹ Назад</button><small id="accessBadge"></small><button id="moreRoom" class="friend-small-action" aria-label="Меню комнаты">⋯</button></div><div class="playerCode"><span>Код</span><b id="room-code"></b><button type="button" data-room="copy" aria-label="Скопировать код комнаты"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M15 5V4a1 1 0 0 0-1-1H5a2 2 0 0 0-2 2v10a1 1 0 0 0 1 1h1"/></svg></button></div><iframe id="room-frame" hidden title="Видео комнаты"></iframe><button id="inviteRoom" type="button" class="roomInvite">＋ Пригласить</button><small id="room-status" hidden></small><div id="room-host"><details id="videoEdit"><summary><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="4"/><path d="m10 9 5 3-5 3z"/></svg>Сменить видео</summary><button id="catalogOpen" type="button" class="catalogLaunch" aria-haspopup="dialog" aria-expanded="false"><span class="launchIcon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg></span><span>Каталог видео<small>YouTube, VK Видео и RUTUBE</small></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button></details></div>
-<section class="roomChat"><h2>Чат комнаты</h2><div id="chatLog"></div><div id="emojiTray" hidden aria-label="Выбор эмодзи"></div><form id="chatForm"><button type="button" id="emojiOpen" aria-label="Выбрать эмодзи" aria-controls="emojiTray" aria-expanded="false">☺</button><input class="friend-search-input" id="chatText" type="text" enterkeyhint="send" autocomplete="off" maxlength="1000" aria-label="Сообщение" placeholder="Сообщение…" required><button class="friend-small-action" id="roomChatSend" type="submit" aria-label="Отправить сообщение"><svg aria-hidden="true" viewBox="0 0 24 24" focusable="false"><path d="M12 20V4m0 0-6.25 6.25M12 4l6.25 6.25"/></svg></button></form></section></div>
+<section class="roomChat"><h2>Чат комнаты</h2><div id="chatLog"></div><div id="emojiTray" hidden aria-label="Выбор эмодзи"></div><div id="chatReplyPreview" class="chatReplyPreview" hidden><div class="chatReplyPreviewCopy"><strong id="chatReplyAuthor"></strong><small id="chatReplyText"></small></div><button type="button" id="chatReplyCancel" aria-label="Отменить ответ">×</button></div><form id="chatForm"><button type="button" id="emojiOpen" aria-label="Выбрать эмодзи" aria-controls="emojiTray" aria-expanded="false">☺</button><input class="friend-search-input" id="chatText" type="text" enterkeyhint="send" autocomplete="off" maxlength="1000" aria-label="Сообщение" placeholder="Сообщение…" required><button class="friend-small-action" id="roomChatSend" type="submit" aria-label="Отправить сообщение"><svg aria-hidden="true" viewBox="0 0 24 24" focusable="false"><path d="M12 20V4m0 0-6.25 6.25M12 4l6.25 6.25"/></svg></button></form></section></div>
 <dialog id="catalog" aria-labelledby="catalogTitle"><div class="catalogInner"><header class="catalogTop"><button type="button" id="catalogBack" hidden>‹ Все сервисы</button><span id="catalogWordmark">LOOPA</span><button type="button" id="catalogClose" aria-label="Закрыть каталог">×</button></header><div id="providerStage"><p class="catalogEyebrow">СМОТРИМ ВМЕСТЕ</p><h2 id="catalogTitle">Что посмотрим?</h2><p class="catalogIntro">Выбери сервис. Найди видео. Смотри вместе.</p><div class="providerGrid"><button type="button" class="providerTile" data-provider="youtube"><span class="serviceIcon"><svg viewBox="0 0 32 24" aria-hidden="true"><rect width="32" height="24" rx="7" fill="#ff0033"/><path d="m13 6 10 6-10 6z" fill="white"/></svg></span><span class="tileArrow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></span><span class="tileName">YouTube</span><span class="tileCaption">Найти видео</span></button><button type="button" class="providerTile" data-provider="vk"><span class="serviceIcon"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#0077ff"/><path d="M7 10h4c.2 5 2.1 7.1 3.6 7.6V10h3.7v4.3c1.5-.2 3.1-2.2 3.7-4.3h3.7c-.5 2.7-2.4 4.8-3.8 5.7 1.5.7 3.6 2.6 4.4 5.3h-4.1c-.7-2-2.2-3.5-3.9-3.7V21h-.6C10.9 21 7.4 17 7 10" fill="white"/></svg></span><span class="tileArrow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></span><span class="tileName">VK Видео</span><span class="tileCaption">Найти видео</span></button><button type="button" class="providerTile" id="rutubeOpen" data-provider="rutube"><span class="serviceIcon"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#17191f"/><circle cx="25" cy="7" r="4" fill="#ed143b"/><path d="M8 9h10a6 6 0 0 1 1 12l6 6h-7l-6-6v6H8zm4 4v4h6a2 2 0 0 0 0-4z" fill="white"/></svg></span><span class="tileArrow">↗</span><span class="tileName">RUTUBE</span><span class="tileCaption">Найти видео</span></button></div><button id="catalogLink" type="button" class="catalogLink"><span class="linkGlyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M21 3 3 10l7 3 3 7 8-17Z" stroke="#29A9EB" stroke-width="1.7" stroke-linejoin="round"/><path d="m10 13 6-6" stroke="#29A9EB" stroke-width="1.7" stroke-linecap="round"/></svg></span><span><strong>Есть ссылка?</strong><small>YouTube, VK Видео, RUTUBE</small></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button><p class="catalogFoot" id="catalogFoot">Видео откроется у всех участников комнаты</p></div><section id="searchStage" hidden aria-label="Поиск видео"><div class="catalogService"><span id="activeServiceIcon" class="serviceIcon"></span><div><p class="catalogEyebrow">КАТАЛОГ ВИДЕО</p><h2 id="activeServiceName">YouTube</h2></div></div><select hidden id="source"><option value="youtube">YouTube</option><option value="vk">VK Видео</option><option value="rutube">RUTUBE</option></select><form id="catalogForm"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input id="queryVideo" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="searchSuggestions" maxlength="100" placeholder="Видео или канал" aria-label="Название видео или канала" autocomplete="off" enterkeyhint="search"><button type="submit" id="catalogSearchButton">Найти</button></form><div id="searchSuggestions" role="listbox" aria-label="Подсказки поиска" hidden></div><p id="searchStatus" role="status" aria-live="polite">Найди то, что хочется посмотреть вместе</p><div id="catalogSkeleton" hidden aria-hidden="true"><div></div><div></div></div><div id="hits" aria-busy="false"></div><button type="button" id="nextVideos" hidden>Ещё видео</button></section><section id="linkStage" hidden><p class="catalogEyebrow">ПРЯМОЙ ВХОД К ВИДЕО</p><h2 class="linkStageTitle">Открыть по ссылке</h2><p class="catalogIntro">YouTube, VK Видео или RUTUBE</p><div id="linkEdit"><label class="friend-search-label" for="room-link">Ссылка на видео</label><input id="room-link" type="url" class="friend-search-input" placeholder="Ссылка на видео"><button class="action" data-room="video">Открыть видео</button></div></section></div></dialog><dialog id="inviteSheet"><header><h2>Пригласить друзей</h2><button type="button" id="closeInvites" aria-label="Закрыть">×</button></header><p id="inviteHint">Выбери друга — приглашение появится у него в LOOPA.</p><div id="inviteList"></div><button type="button" id="shareRoomLink" class="roomInvite">Отправить ссылку</button></dialog><dialog id="roomSheet"><div class="roomSheetHeading"><strong>Настройки комнаты</strong><button class="roomSheetClose" type="button" onclick="this.closest('dialog').close()" aria-label="Закрыть настройки">×</button></div><button type="button" id="sheetVideoChange" aria-label="Сменить видео" title="Сменить видео">Сменить видео</button><button type="button" id="cinemaModeToggle" class="cinemaModeToggle" aria-pressed="false"><span class="cinemaModeGlyph" aria-hidden="true">▣</span><span class="cinemaModeCopy"><strong>Режим кинотеатра</strong><small>Видео в центре внимания, чат остаётся открытым</small></span><span class="cinemaModeSwitch" aria-hidden="true"></span></button><h3>Участники</h3><div id="people" role="list" aria-label="Участники"></div><div id="sharedControlEdit" hidden><h3>Настройки комнаты</h3><div class="sharedControlLine"><div class="sharedControlCopy"><strong>Совместное управление</strong><small>Разрешить участникам ставить видео на паузу, включать и перематывать</small></div><label class="presence-switch" aria-label="Совместное управление"><input type="checkbox" id="roomSharedControl"><span class="presence-switch-track"></span></label></div><p id="sharedControlStatus" role="status">По умолчанию видео управляет создатель комнаты</p></div><div id="accessEdit"><h3>Доступ в комнату</h3><div class="roomAccessOptions" role="group" aria-label="Доступ в комнату"><button type="button" data-access="code" aria-pressed="true">Открытая</button><button type="button" data-access="private" aria-pressed="false">Закрытая</button><button type="button" data-access="friends" aria-pressed="false">Для друзей</button></div><select hidden id="accessMode" class="privacy-select"><option value="code">Любой</option><option value="friends">Только друзья</option><option value="private">Приватная</option></select><div id="pick"></div><small id="accessWarning"></small><button class="action" id="saveAccess">Сохранить доступ</button></div></dialog><p id="room-note" role="status"></p>
       </section>
 
@@ -2134,8 +2149,52 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
       if(typeof raw==='number')return raw<1e12?raw*1000:raw;
       const stamp=Date.parse(raw);return Number.isFinite(stamp)?stamp:NaN;
     }
-    function renderConversation(messages){
+    let chatReplyTarget=null,chatMessageById=new Map(),chatSwipe=null;
+        function clearChatReply(){
+          chatReplyTarget=null;byId('chatReplyPreview').hidden=true;
+          byId('chatReplyAuthor').textContent='';byId('chatReplyText').textContent='';
+        }
+        function setChatReply(message){
+          if(!message||message.id==null)return;
+          chatReplyTarget={id:String(message.id),author:message.author,name:message.name||'',body:String(message.body||'')};
+          const author=String(message.author)===String(currentUser?.id)?'Ты':message.name||roomProfileCache.get(message.author)?.name||'Участник';
+          byId('chatReplyAuthor').textContent='Ответ на '+author;
+          byId('chatReplyText').textContent=chatReplyTarget.body.slice(0,180);
+          byId('chatReplyPreview').hidden=false;
+        }
+        function jumpToChatMessage(id){
+          const key=String(id),bubble=[...byId('chatLog').querySelectorAll('.bubble[data-chat-id]')].find(el=>el.dataset.chatId===key);
+          if(!bubble){showToast('Исходное сообщение уже не отображается в чате');return;}
+          bubble.scrollIntoView({behavior:'smooth',block:'center'});bubble.classList.add('isReplyTarget');
+          setTimeout(()=>bubble.classList.remove('isReplyTarget'),1400);
+        }
+        const chatLogGesture=byId('chatLog');
+        chatLogGesture.addEventListener('pointerdown',event=>{
+          if(event.pointerType!=='touch'||event.target.closest('button'))return;
+          const bubble=event.target.closest('.chatLine .bubble[data-chat-id]');if(!bubble)return;
+          chatSwipe={bubble,id:bubble.dataset.chatId,pointerId:event.pointerId,x:event.clientX,y:event.clientY,active:false};
+        },{passive:true});
+        chatLogGesture.addEventListener('pointermove',event=>{
+          const gesture=chatSwipe;if(!gesture||gesture.pointerId!==event.pointerId)return;
+          const dx=event.clientX-gesture.x,dy=event.clientY-gesture.y;
+          if(Math.abs(dy)>14&&Math.abs(dy)>Math.abs(dx)*1.1){gesture.bubble.style.transform='';gesture.bubble.classList.remove('chatReplySwipe');chatSwipe=null;return;}
+          if(dx< -8&&Math.abs(dx)>Math.abs(dy)*1.2){gesture.active=true;gesture.bubble.classList.add('chatReplySwipe');gesture.bubble.style.transform='translateX('+Math.max(-48,dx)+'px)';}
+        },{passive:true});
+        function finishChatSwipe(event){
+          const gesture=chatSwipe;if(!gesture||gesture.pointerId!==event.pointerId)return;
+          chatSwipe=null;const dx=event.clientX-gesture.x,dy=event.clientY-gesture.y;
+          gesture.bubble.style.transform='';gesture.bubble.classList.remove('chatReplySwipe');
+          if(gesture.active&&dx< -56&&Math.abs(dx)>Math.abs(dy)*1.2){const message=chatMessageById.get(gesture.id);if(message)setChatReply(message);}
+        }
+        chatLogGesture.addEventListener('pointerup',finishChatSwipe,{passive:true});
+        chatLogGesture.addEventListener('pointercancel',event=>{
+          if(chatSwipe?.pointerId!==event.pointerId)return;
+          chatSwipe.bubble.style.transform='';chatSwipe.bubble.classList.remove('chatReplySwipe');chatSwipe=null;
+        },{passive:true});
+        byId('chatReplyCancel').addEventListener('click',clearChatReply);
+        function renderConversation(messages){
       const log=byId('chatLog'),near=log.scrollHeight-log.scrollTop-log.clientHeight<48,previousScroll=log.scrollTop;
+      chatMessageById=new Map(messages.filter(message=>message?.id!=null).map(message=>[String(message.id),message]));
       log.replaceChildren();
       if(!messages.length){log.textContent='Пока тихо. Напиши первым.';return;}
       const groups=[];
@@ -2153,7 +2212,15 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
         group.items.forEach((msg,i)=>{
           const last=i===group.items.length-1;
           const line=document.createElement('div');line.className='chatLine'+(last?' last-in-thread':'');
-          const bubble=document.createElement('div');bubble.className='bubble'+(own?'':' peer');bubble.textContent=msg.body||'';
+          const bubble=document.createElement('div');bubble.className='bubble'+(own?'':' peer');bubble.dataset.chatId=msg.id==null?'':String(msg.id);
+          const replied=msg.reply?.body?msg.reply:(msg.reply_to?chatMessageById.get(String(msg.reply_to)):null);
+          if(replied&&typeof replied.body==='string'){
+            const quote=document.createElement('button');quote.type='button';quote.className='chatReplyQuote';
+            const quoteAuthor=document.createElement('strong');quoteAuthor.textContent=String(replied.author)===String(currentUser?.id)?'Ты':replied.name||roomProfileCache.get(replied.author)?.name||'Участник';
+            const quoteBody=document.createElement('span');quoteBody.textContent=replied.body;quote.append(quoteAuthor,quoteBody);
+            quote.onclick=event=>{event.stopPropagation();jumpToChatMessage(replied.id);};bubble.append(quote);
+          }
+          bubble.append(document.createTextNode(msg.body||''));
           const photo=last?roomAvatar(group.author,own?'Ты':group.name||'Участник','chatUserPhoto'):document.createElement('span');
           if(!last)photo.className='chatAvatarSpace';
           if(last&&!own&&group.author&&group.author!==currentUser?.id){
@@ -2348,9 +2415,11 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
       // The keyboard closes only when the user dismisses it intentionally.
       closeEmoji();
       scheduleWatchViewport();
-      try{await roomCall('chat',{media:value});}
-      catch(err){if(roomEpoch===epoch&&roomState?.code===sendingRoom){if(!input.value)input.value=raw;showToast(err.message);}}
-      finally{chatSending=false;chatSendButton.removeAttribute('aria-busy');}
+      const reply=chatReplyTarget;
+          const media=reply?JSON.stringify({_loopa_reply_v1:'1',body:value,reply_to:reply.id}):value;
+          try{await roomCall('chat',{media});if(roomEpoch===epoch&&roomState?.code===sendingRoom&&chatReplyTarget?.id===reply?.id)clearChatReply();}
+          catch(err){if(roomEpoch===epoch&&roomState?.code===sendingRoom){if(!input.value)input.value=raw;showToast(err.message);}}
+          finally{chatSending=false;chatSendButton.removeAttribute('aria-busy');}
     };
     byId('moreRoom').onclick=()=>{const d=roomState;if(!d)return;byId('sharedControlEdit').hidden=!hostHere();byId('accessEdit').hidden=!hostHere();byId('accessMode').value=d.access_mode;const pick=byId('pick');pick.replaceChildren();
       for(const m of d.members.filter(m=>m.id!==d.host)){const l=document.createElement('label'),c=document.createElement('input');c.type='checkbox';c.value=m.id;c.checked=d.allowed.includes(m.id);l.append(c,document.createTextNode(' '+m.name));pick.append(l);}
@@ -2365,7 +2434,7 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
     roomSheet.addEventListener('click',e=>{if(e.target===roomSheet&&outsideSheet(e))roomSheet.close();});
 
     byId('saveAccess').onclick=async function(){this.disabled=true;try{await roomCall('access',{media:JSON.stringify({mode:byId('accessMode').value,ids:[...byId('pick').querySelectorAll('input:checked')].map(c=>c.value)})});byId('roomSheet').close();showToast('Доступ обновлён');}catch(err){showToast(err.message);}finally{this.disabled=false;}};
-    function roomExit(){saveResumeCheckpoint();resumeRestorePending=null;hideResumePrompt();applyCinemaMode(false);clearRoomSignals();clearTimeout(roomPeopleTimer);peopleFlash.classList.remove('is-visible');watchPeerSession='';watchPeerSeen.clear();stopWatchViewport();document.body.classList.remove('roomViewing','chatTyping');closeCatalog(true);closeEmoji();byId("room-link").value="";byId('roomSheet').close();byId('chatText').value='';byId('chatLog').replaceChildren();roomEpoch++;syncSnapshot=null;roomState=null;roomUser=null;mountRoomPlayer('');byId('room-active').hidden=true;byId('room-lobby').hidden=false;byId('room-recent').replaceChildren();byId('room-note').textContent='';}
+    function roomExit(){saveResumeCheckpoint();resumeRestorePending=null;clearChatReply();hideResumePrompt();applyCinemaMode(false);clearRoomSignals();clearTimeout(roomPeopleTimer);peopleFlash.classList.remove('is-visible');watchPeerSession='';watchPeerSeen.clear();stopWatchViewport();document.body.classList.remove('roomViewing','chatTyping');closeCatalog(true);closeEmoji();byId("room-link").value="";byId('roomSheet').close();byId('chatText').value='';byId('chatLog').replaceChildren();roomEpoch++;syncSnapshot=null;roomState=null;roomUser=null;mountRoomPlayer('');byId('room-active').hidden=true;byId('room-lobby').hidden=false;byId('room-recent').replaceChildren();byId('room-note').textContent='';}
     async function roomCall(op,args={}){
       if(!currentUser||!client){showPage('profile',()=>showToast('Войди в аккаунт'));return;}
       const u=currentUser.id, epoch=roomEpoch;
@@ -2381,6 +2450,7 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
       if(error){if(op==='read'&&error.message.includes('недоступна'))roomExit();throw Error(error.message);}
       if(op==='list'){await historyCall('read');return;}
       const prev=roomState;
+      if(prev?.code!==data.code)clearChatReply();
       if(op==='read'&&prev&&data.changed<prev.changed)return;
       if(prev?.code===data.code && data.server_time<prev.server_time)return;
       if(prev?.video&&(prev.code!==data.code||prev.video!==data.video))saveResumeCheckpoint();
