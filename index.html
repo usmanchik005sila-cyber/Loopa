@@ -1185,6 +1185,19 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
     #chatLog .chatReplyQuote span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:#c0c0c7;font:10px/1.4 system-ui}
     #chatLog .bubble.isReplyTarget{outline:2px solid #d8d8dc;outline-offset:2px}
     @media(prefers-reduced-motion:reduce){#chatLog .chatLine .bubble[data-chat-id]{transition:none}}
+    
+    /* Keep Safari's room layout and chat scroll from adding a second animation
+       on top of the native iOS keyboard transition. */
+    body.roomViewing #chatLog,
+    body.roomViewing #chatForm,
+    body.roomViewing #chatText,
+    body.roomViewing #room-active,
+    body.roomViewing #videoStage,
+    body.roomViewing #room-frame{
+      transition:none!important;
+      animation:none!important;
+      scroll-behavior:auto!important;
+    }
     </style>
     </head>
 <body>
@@ -2161,6 +2174,9 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
           byId('chatReplyAuthor').textContent='Ответ на '+author;
           byId('chatReplyText').textContent=chatReplyTarget.body.slice(0,180);
           byId('chatReplyPreview').hidden=false;
+      const input=byId('chatText');
+      try{input.focus({preventScroll:true});}catch(_){input.focus();}
+      scheduleWatchViewport();
         }
         function jumpToChatMessage(id){
           const key=String(id),bubble=[...byId('chatLog').querySelectorAll('.bubble[data-chat-id]')].find(el=>el.dataset.chatId===key);
