@@ -1264,6 +1264,19 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
   padding-bottom:max(12px, var(--loopa-tg-safe-bottom, 0px)) !important;
 }
 
+/* Branded opening screen, only inside Telegram. Never block regular website navigation. */
+.loopa-launch-splash{display:none}
+html.telegram-miniapp .loopa-launch-splash{
+  position:fixed;inset:0;z-index:100000;display:grid;place-items:center;
+  background:#090a0c;color:#f4f0ef;pointer-events:none;
+  transition:opacity .38s ease,visibility .38s ease;
+}
+html.telegram-miniapp .loopa-launch-splash.is-hidden{opacity:0;visibility:hidden}
+.loopa-launch-content{display:flex;flex-direction:column;align-items:center;gap:15px;text-align:center;padding:30px}
+.loopa-launch-mark{font:normal clamp(48px,13vw,76px)/1 Georgia,"Times New Roman",serif;letter-spacing:.12em}
+.loopa-launch-tagline{font:400 12px/1.5 system-ui;letter-spacing:.13em;color:#aaa6ab}
+.loopa-launch-line{display:block;width:54px;height:1px;margin-top:14px;background:linear-gradient(90deg,transparent,#d5d1d0,transparent)}
+@media(prefers-reduced-motion:reduce){html.telegram-miniapp .loopa-launch-splash{transition:none}}
 /* Telegram Mini App: account linking to keep a single LOOPA identity. */
 .tma-auth-box{border:1px solid #ffffff30;border-radius:15px;background:#ffffff08;padding:14px 16px;margin:14px 0 18px}
 .tma-auth-box strong{font:600 13px/1.4 system-ui;color:#f4f0ef}
@@ -1298,6 +1311,13 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
     <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h16m-7-7 7 7-7 7"/></symbol>
   </svg>
 
+  <!-- LOOPA-branded in-app opening screen; Telegram's native launch screen is configured separately in BotFather. -->
+  <div id="loopaLaunchSplash" class="loopa-launch-splash" aria-hidden="true">
+    <div class="loopa-launch-content"><span class="loopa-launch-mark">LOOPA</span>
+      <span class="loopa-launch-tagline">Ближе, даже на расстоянии.</span>
+      <span class="loopa-launch-line"></span>
+    </div>
+  </div>
   <div class="app">
     <div class="scenery" aria-hidden="true"><svg class="scenery-art" viewBox="0 0 640 1500" preserveAspectRatio="xMaxYMin slice" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="obsidianPlane" x1="0" y1="0" x2="1" y2=".3"><stop stop-color="#fff" stop-opacity="0"/><stop offset=".65" stop-color="#fff" stop-opacity=".025"/><stop offset="1" stop-color="#fff" stop-opacity=".16"/></linearGradient><linearGradient id="obsidianShade" x1="1" y1="0" x2="0" y2=".65"><stop stop-color="#e5e8ee" stop-opacity=".13"/><stop offset=".55" stop-color="#b5bac4" stop-opacity=".025"/><stop offset="1" stop-color="#11131a" stop-opacity="0"/></linearGradient><linearGradient id="obsidianEdge" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#fff" stop-opacity="0"/><stop offset=".75" stop-color="#e9ebf2" stop-opacity=".24"/><stop offset="1" stop-color="#fff" stop-opacity=".06"/></linearGradient></defs><path d="M386 0H640V621L386 496Z" fill="url(#obsidianPlane)"/><path d="M476 0H640V1020L476 877Z" fill="url(#obsidianShade)"/><path d="M0 331L640 509V688L0 388Z" fill="url(#obsidianShade)"/><path d="M640 253L245 579L640 764Z" fill="url(#obsidianPlane)"/><path d="M640 770L205 1025L640 1156Z" fill="url(#obsidianShade)"/><path d="M0 331L640 509M386 0V496L640 621M476 0V877L640 1020M640 253L245 579M640 770L205 1025" fill="none" stroke="url(#obsidianEdge)" stroke-width=".7"/><path d="M593 0V1140M555 0V1105" fill="none" stroke="#e8ebf2" stroke-opacity=".055" stroke-width=".7"/></svg></div>
     <header class="top">
@@ -3406,6 +3426,14 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
     }
     if(isTelegramMiniApp){
       document.documentElement.classList.add('telegram-miniapp');
+      // The native Telegram launch splash is controlled by BotFather. This is
+      // the matching branded transition inside the WebView after it opens.
+      const launchSplash=document.getElementById('loopaLaunchSplash');
+      if(launchSplash){
+        const hideLaunchSplash=()=>launchSplash.classList.add('is-hidden');
+        window.addEventListener('load',()=>setTimeout(hideLaunchSplash,450),{once:true});
+        setTimeout(hideLaunchSplash,2400); // failsafe: never trap the UI
+      }
       let tgDiagnosticsEnabled=new URLSearchParams(location.search).get('tgdebug')==='1';
       const tgDiagPanel=document.getElementById('tgViewportDiagnostics');
       const tgDiagOutput=document.getElementById('tgDiagOutput');
