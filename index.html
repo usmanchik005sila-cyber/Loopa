@@ -1233,6 +1233,15 @@ html.telegram-miniapp .toast {
   bottom:calc(98px + max(env(safe-area-inset-bottom, 0px), var(--tg-content-safe-area-inset-bottom, 0px)));
 }
 
+/* Telegram fullscreen: Telegram's transparent chrome may overlap the top of the WebView.
+   Respect both OS safe area and Telegram content area; keep ordinary browsers unchanged. */
+html.telegram-miniapp.telegram-fullscreen .app {
+  padding-top:max(env(safe-area-inset-top, 0px), var(--tg-safe-area-inset-top, 0px), var(--tg-content-safe-area-inset-top, 0px));
+}
+html.telegram-miniapp.telegram-fullscreen #roomInviteNotice {
+  top:calc(14px + max(env(safe-area-inset-top, 0px), var(--tg-safe-area-inset-top, 0px), var(--tg-content-safe-area-inset-top, 0px)));
+}
+
 /* Telegram Mini App: account linking to keep a single LOOPA identity. */
 .tma-auth-box{border:1px solid #ffffff30;border-radius:15px;background:#ffffff08;padding:14px 16px;margin:14px 0 18px}
 .tma-auth-box strong{font:600 13px/1.4 system-ui;color:#f4f0ef}
@@ -3320,6 +3329,23 @@ html.telegram-miniapp .toast {
       try{telegramWebApp.setHeaderColor?.('#090a0c');}catch{}
       try{telegramWebApp.setBackgroundColor?.('#090a0c');}catch{}
       try{telegramWebApp.expand?.();}catch{}
+      // Fullscreen is distinct from expand(): remove the Telegram title bar when supported.
+      // Apply safe-area padding only after Telegram confirms the fullscreen state.
+      const syncTelegramFullscreen=()=>{
+        document.documentElement.classList.toggle('telegram-fullscreen',!!telegramWebApp.isFullscreen);
+      };
+      try{
+        telegramWebApp.onEvent?.('fullscreenChanged',syncTelegramFullscreen);
+        telegramWebApp.onEvent?.('fullscreenFailed',syncTelegramFullscreen);
+        syncTelegramFullscreen();
+      }catch{}
+      try{
+        if(typeof telegramWebApp.requestFullscreen==='function'
+          && telegramWebApp.isVersionAtLeast?.('8.0')
+          && !telegramWebApp.isFullscreen){
+          telegramWebApp.requestFullscreen();
+        }
+      }catch{/* Keep the expanded Telegram Mini App as a safe fallback. */}
       try{
         telegramWebApp.BackButton?.onClick(()=>{
           const dialog=[...document.querySelectorAll('dialog[open]')].at(-1);
