@@ -12,7 +12,8 @@
   <title>LOOPA — Ближе, даже на расстоянии</title>
   <meta name="loopa-version" content="v94">
   <meta name="loopa-build" content="v94-keyboard-focus">
-  <script>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script>
     try{const m=localStorage.getItem('loopa-wallpaper-motion');document.documentElement.dataset.wallpaperExplicit=String(m==='on');document.documentElement.dataset.wallpaperMotion=m==='off'?'off':'on';}catch{document.documentElement.dataset.wallpaperExplicit='false';document.documentElement.dataset.wallpaperMotion='on';}
   </script>
   <style>
@@ -1220,7 +1221,17 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
       animation:none!important;
       scroll-behavior:auto!important;
     }
-    </style>
+    /* LOOPA Telegram Mini App: honour Telegram's content inset without changing browser layout. */
+html.telegram-miniapp .bottom {
+  padding-bottom:calc(15px + max(env(safe-area-inset-bottom, 0px), var(--tg-content-safe-area-inset-bottom, 0px)));
+}
+html.telegram-miniapp .app {
+  padding-bottom:calc(108px + max(env(safe-area-inset-bottom, 0px), var(--tg-content-safe-area-inset-bottom, 0px)));
+}
+html.telegram-miniapp .toast {
+  bottom:calc(98px + max(env(safe-area-inset-bottom, 0px), var(--tg-content-safe-area-inset-bottom, 0px)));
+}
+</style>
     </head>
 <body>
   <svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden" xmlns="http://www.w3.org/2000/svg">
@@ -2665,6 +2676,14 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
 
     let invitationBusy=false;
     let pendingInvite=new URL(location.href).searchParams.get('room');
+    // BotFather Main Mini App direct links can carry startapp=room_<12-hex-code>.
+    // The room join RPC still enforces permissions; this is not authentication.
+    if(!pendingInvite&&isTelegramMiniApp){
+      const startParam=telegramWebApp.initDataUnsafe?.start_param
+        ||new URL(location.href).searchParams.get('tgWebAppStartParam')||'';
+      const directRoom=/^room_([a-f0-9]{12})$/i.exec(startParam);
+      if(directRoom)pendingInvite=directRoom[1];
+    }
     if(!/^[a-f0-9]{12}$/i.test(pendingInvite||''))pendingInvite=null;
     async function acceptInvite(){
       if(!pendingInvite||!currentUser||invitationBusy)return;
@@ -2676,7 +2695,15 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
       if(!roomState)return;
       const url=new URL(location.href);url.search='';url.hash='';url.searchParams.set('room',roomState.code);
       const invitation={title:'Комната LOOPA',text:'Посмотрим вместе? Присоединяйся к моей комнате в LOOPA',url:url.href};
-      try{if(navigator.share)await navigator.share(invitation);else{await navigator.clipboard.writeText(url.href);showToast('Ссылка скопирована — отправь другу');}}
+      try{
+        if(isTelegramMiniApp&&telegramWebApp.openTelegramLink){
+          const share=new URL('https://t.me/share/url');
+          share.searchParams.set('url',url.href);
+          share.searchParams.set('text',invitation.text);
+          telegramWebApp.openTelegramLink(share.href);
+        }else if(navigator.share)await navigator.share(invitation);
+        else{await navigator.clipboard.writeText(url.href);showToast('Ссылка скопирована — отправь другу');}
+      }
       catch(e){if(e.name!=='AbortError')showToast('Не удалось поделиться ссылкой');}
     };
     if(pendingInvite)setTimeout(()=>{if(currentUser)acceptInvite();else{showPage('profile',()=>showToast('Войди, чтобы присоединиться к комнате'));}},1200);
@@ -3235,6 +3262,31 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
     byId('catalogForm').onsubmit=e=>{e.preventDefault();searchCatalog(false);};
     byId('nextVideos').onclick=()=>searchCatalog(true);
     let lastPage = 'home';
+    // Telegram's WebApp bridge is UI-only here. Never use initDataUnsafe as proof
+    // of identity: Mini App sign-in needs separate SERVER-side initData validation.
+    const telegramWebApp = window.Telegram?.WebApp || null;
+    const isTelegramMiniApp = !!telegramWebApp?.initData;
+    function syncTelegramNavigation(){
+      if(!isTelegramMiniApp)return;
+      try{
+        if(lastPage==='home')telegramWebApp.BackButton?.hide();
+        else telegramWebApp.BackButton?.show();
+      }catch{}
+    }
+    if(isTelegramMiniApp){
+      document.documentElement.classList.add('telegram-miniapp');
+      try{telegramWebApp.setHeaderColor?.('#090a0c');}catch{}
+      try{telegramWebApp.setBackgroundColor?.('#090a0c');}catch{}
+      try{telegramWebApp.expand?.();}catch{}
+      try{
+        telegramWebApp.BackButton?.onClick(()=>{
+          const dialog=[...document.querySelectorAll('dialog[open]')].at(-1);
+          if(dialog){dialog.close();return;}
+          if(lastPage!=='home')showPage('home');
+        });
+      }catch{}
+      try{telegramWebApp.ready?.();}catch{}
+    }
     let activePageTransition=null;
     let roomPeerJourney=false; // Visiting someone's profile from a room must not end the room.
     const navigationReducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -3356,6 +3408,7 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
         if (active && changed && (destination!=='profile'||animateProfile)) animateContent(page, destination==='rooms'||destination==='dm');
       });
       lastPage = destination;
+      syncTelegramNavigation();
       tabs.forEach(tab => {
         const active = tab.dataset.go === (destination==='rooms'?'home':(destination==='friend-profile'?'friends':(destination==='dm'?(dmPageReturn==='messages'?'messages':'friends'):destination)));
         tab.classList.toggle('active', active);
