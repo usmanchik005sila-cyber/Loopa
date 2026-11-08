@@ -1249,7 +1249,18 @@ html.telegram-miniapp.telegram-fullscreen #roomInviteNotice {
 .tma-auth-box button{border:1px solid #ffffff42;border-radius:10px;background:#ddd9d5;color:#161619;padding:10px 13px;font:600 12px system-ui;cursor:pointer}
 .tma-auth-box button:disabled{opacity:.55;cursor:default}
 </style>
-    </head>
+    <style id="tgViewportDiagnosticsStyles">
+#tgViewportDiagnostics[hidden]{display:none!important}
+#tgViewportDiagnostics{position:fixed;z-index:2147483647;inset:max(12px,env(safe-area-inset-top,0px)) 12px max(12px,env(safe-area-inset-bottom,0px));box-sizing:border-box;display:flex;flex-direction:column;gap:12px;padding:16px;border:1px solid #ffffff35;border-radius:18px;background:#111114f5;color:#f2f0ee;box-shadow:0 18px 60px #000c;font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+#tgViewportDiagnostics .tgDiagHeader{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#tgViewportDiagnostics .tgDiagTitle{flex:1;min-width:160px;font-weight:650}
+#tgViewportDiagnostics button{min-height:38px;padding:7px 10px;border:1px solid #ffffff30;border-radius:10px;background:#ffffff0d;color:#f2f0ee;font:inherit}
+#tgViewportDiagnostics p{margin:0;color:#bdbbc2;font-size:12px}
+#tgViewportDiagnostics textarea{width:100%;min-height:0;flex:1;resize:none;box-sizing:border-box;padding:10px;border:1px solid #ffffff24;border-radius:11px;background:#08080ae8;color:#e6e4e7;font:11px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre;overflow:auto}
+#tgViewportDiagnostics .tgDiagActions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+#tgViewportDiagnostics #tgDiagCopyStatus{color:#bdbbc2;font-size:12px}
+</style>
+</head>
 <body>
   <svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden" xmlns="http://www.w3.org/2000/svg">
     <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></symbol>
@@ -1582,6 +1593,12 @@ html.telegram-miniapp.telegram-fullscreen #roomInviteNotice {
     <p id="telegramAuthError" class="auth-feedback error" role="status" aria-live="polite" hidden></p>
   </dialog>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <div id="tgViewportDiagnostics" hidden role="region" aria-label="Диагностика Telegram Mini App">
+  <div class="tgDiagHeader"><strong id="tgDiagTitle" class="tgDiagTitle">Telegram · диагностика экрана</strong><button id="tgDiagRefresh" type="button">Обновить</button><button id="tgDiagClose" type="button">Закрыть</button></div>
+  <p>Отчёт остаётся на устройстве. Данные входа и initData не собираются.</p>
+  <textarea id="tgDiagOutput" readonly aria-label="Отчёт диагностики Telegram"></textarea>
+  <div class="tgDiagActions"><button id="tgDiagCopy" type="button">Скопировать отчёт</button><span id="tgDiagCopyStatus" role="status"></span></div>
+</div>
   <script defer>
     'use strict';
     const SUPABASE_URL = 'https://wnubqzwsvclvcvozibtc.supabase.co';
@@ -3326,34 +3343,88 @@ html.telegram-miniapp.telegram-fullscreen #roomInviteNotice {
     }
     if(isTelegramMiniApp){
       document.documentElement.classList.add('telegram-miniapp');
-      try{telegramWebApp.setHeaderColor?.('#090a0c');}catch{}
-      try{telegramWebApp.setBackgroundColor?.('#090a0c');}catch{}
-      try{telegramWebApp.expand?.();}catch{}
-      // Fullscreen is distinct from expand(): remove the Telegram title bar when supported.
-      // Apply safe-area padding only after Telegram confirms the fullscreen state.
-      const syncTelegramFullscreen=()=>{
-        document.documentElement.classList.toggle('telegram-fullscreen',!!telegramWebApp.isFullscreen);
+      const tgDiagnosticsEnabled=new URLSearchParams(location.search).get('tgdebug')==='1';
+      const tgDiagPanel=document.getElementById('tgViewportDiagnostics');
+      const tgDiagOutput=document.getElementById('tgDiagOutput');
+      const tgDiagEvents=[];
+      let tgFullscreenRequest='not attempted',tgReadyCalled=false;
+      const tgInset=value=>value&&typeof value==='object'?{top:value.top??null,right:value.right??null,bottom:value.bottom??null,left:value.left??null}:null;
+      const tgCssValue=name=>{try{return getComputedStyle(document.documentElement).getPropertyValue(name).trim()||null;}catch{return null;}};
+      const tgDiagnosticSnapshot=()=>({
+        capturedAt:new Date().toISOString(),
+        telegramVersion:telegramWebApp.version||null,
+        platform:telegramWebApp.platform||null,
+        isExpanded:!!telegramWebApp.isExpanded,
+        isFullscreen:!!telegramWebApp.isFullscreen,
+        fullscreenApiAvailable:typeof telegramWebApp.requestFullscreen==='function',
+        fullscreenApiRequest:tgFullscreenRequest,
+        readyCalled:tgReadyCalled,
+        telegramViewportHeight:Number.isFinite(telegramWebApp.viewportHeight)?telegramWebApp.viewportHeight:null,
+        telegramStableViewportHeight:Number.isFinite(telegramWebApp.viewportStableHeight)?telegramWebApp.viewportStableHeight:null,
+        windowInnerHeight:window.innerHeight,
+        documentClientHeight:document.documentElement.clientHeight,
+        visualViewportHeight:window.visualViewport?.height??null,
+        visualViewportOffsetTop:window.visualViewport?.offsetTop??null,
+        screenHeight:window.screen?.height??null,
+        safeAreaInset:tgInset(telegramWebApp.safeAreaInset),
+        contentSafeAreaInset:tgInset(telegramWebApp.contentSafeAreaInset),
+        cssInsets:{safeTop:tgCssValue('--tg-safe-area-inset-top'),contentTop:tgCssValue('--tg-content-safe-area-inset-top'),contentBottom:tgCssValue('--tg-content-safe-area-inset-bottom'),telegramViewport:tgCssValue('--tg-viewport-height'),telegramStableViewport:tgCssValue('--tg-viewport-stable-height')},
+        recentEvents:tgDiagEvents.slice(-16)
+      });
+      const tgRenderDiagnostics=()=>{if(tgDiagnosticsEnabled&&tgDiagPanel&&tgDiagOutput){tgDiagOutput.value=JSON.stringify(tgDiagnosticSnapshot(),null,2);}};
+      const tgRecordDiagnostic=(name,detail)=>{
+        if(!tgDiagnosticsEnabled)return;
+        let note='';
+        if(typeof detail==='string')note=detail.slice(0,180);
+        else if(detail&&typeof detail==='object'){const value=detail.error??detail.reason??detail.message; if(typeof value==='string')note=value.slice(0,180);}
+        tgDiagEvents.push({event:name,atMs:Math.round(performance.now()),note:note||undefined,isFullscreen:!!telegramWebApp.isFullscreen,viewportHeight:Number.isFinite(telegramWebApp.viewportHeight)?telegramWebApp.viewportHeight:null});
+        if(tgDiagEvents.length>24)tgDiagEvents.shift();tgRenderDiagnostics();
       };
-      try{
-        telegramWebApp.onEvent?.('fullscreenChanged',syncTelegramFullscreen);
-        telegramWebApp.onEvent?.('fullscreenFailed',syncTelegramFullscreen);
-        syncTelegramFullscreen();
-      }catch{}
-      try{
-        if(typeof telegramWebApp.requestFullscreen==='function'
-          && telegramWebApp.isVersionAtLeast?.('8.0')
-          && !telegramWebApp.isFullscreen){
-          telegramWebApp.requestFullscreen();
-        }
-      }catch{/* Keep the expanded Telegram Mini App as a safe fallback. */}
+      if(tgDiagnosticsEnabled&&tgDiagPanel){
+        tgDiagPanel.hidden=false;
+        document.getElementById('tgDiagRefresh')?.addEventListener('click',tgRenderDiagnostics);
+        document.getElementById('tgDiagClose')?.addEventListener('click',()=>{tgDiagPanel.hidden=true;});
+        document.getElementById('tgDiagCopy')?.addEventListener('click',async()=>{
+          tgRenderDiagnostics();const status=document.getElementById('tgDiagCopyStatus');
+          try{await navigator.clipboard.writeText(tgDiagOutput.value);if(status)status.textContent='Отчёт скопирован';}
+          catch{tgDiagOutput.focus();tgDiagOutput.select();if(status)status.textContent='Отчёт выделен — скопируй его';}
+        });
+        tgRecordDiagnostic('miniapp-diagnostics-started');
+      }
+      try{telegramWebApp.setHeaderColor?.('#090a0c');}catch(error){tgRecordDiagnostic('setHeaderColor-error',error);}
+      try{telegramWebApp.setBackgroundColor?.('#090a0c');}catch(error){tgRecordDiagnostic('setBackgroundColor-error',error);}
+      try{telegramWebApp.expand?.();tgRecordDiagnostic('expand-called');}catch(error){tgRecordDiagnostic('expand-error',error);}
+      // Fullscreen remains opt-in at the Telegram client level; log the result without changing the request timing.
+      const syncTelegramFullscreen=(eventName='fullscreenChanged',detail)=>{
+        document.documentElement.classList.toggle('telegram-fullscreen',!!telegramWebApp.isFullscreen);
+        tgRecordDiagnostic(eventName,detail);
+      };
+      try{telegramWebApp.onEvent?.('fullscreenChanged',detail=>syncTelegramFullscreen('fullscreenChanged',detail));}catch(error){tgRecordDiagnostic('listen-fullscreenChanged-error',error);}
+      try{telegramWebApp.onEvent?.('fullscreenFailed',detail=>syncTelegramFullscreen('fullscreenFailed',detail));}catch(error){tgRecordDiagnostic('listen-fullscreenFailed-error',error);}
+      if(tgDiagnosticsEnabled){for(const eventName of ['viewportChanged','safeAreaChanged','contentSafeAreaChanged']){try{telegramWebApp.onEvent?.(eventName,detail=>tgRecordDiagnostic(eventName,detail));}catch(error){tgRecordDiagnostic('listen-'+eventName+'-error',error);}}}
+      syncTelegramFullscreen('initial-fullscreen-state');
+      let tgSupportsFullscreen=false;try{tgSupportsFullscreen=!!telegramWebApp.isVersionAtLeast?.('8.0');}catch{}
+      if(typeof telegramWebApp.requestFullscreen==='function'&&tgSupportsFullscreen&&!telegramWebApp.isFullscreen){
+        tgFullscreenRequest='called before ready()';tgRecordDiagnostic('requestFullscreen-called-before-ready');
+        try{
+          const requestResult=telegramWebApp.requestFullscreen();
+          if(requestResult&&typeof requestResult.then==='function'){
+            requestResult.then(()=>tgRecordDiagnostic('requestFullscreen-promise-resolved')).catch(error=>{tgFullscreenRequest='promise rejected';tgRecordDiagnostic('requestFullscreen-promise-rejected',error);});
+          }
+        }catch(error){tgFullscreenRequest='threw synchronously';tgRecordDiagnostic('requestFullscreen-threw',error);}
+      }else if(telegramWebApp.isFullscreen){tgFullscreenRequest='already fullscreen';tgRecordDiagnostic('requestFullscreen-skipped-already-fullscreen');}
+      else if(typeof telegramWebApp.requestFullscreen!=='function'){tgFullscreenRequest='API unavailable';tgRecordDiagnostic('requestFullscreen-api-unavailable');}
+      else{tgFullscreenRequest='Telegram version below 8.0 or version check unavailable';tgRecordDiagnostic('requestFullscreen-version-not-supported');}
       try{
         telegramWebApp.BackButton?.onClick(()=>{
           const dialog=[...document.querySelectorAll('dialog[open]')].at(-1);
           if(dialog){dialog.close();return;}
           if(lastPage!=='home')showPage('home');
         });
-      }catch{}
-      try{telegramWebApp.ready?.();}catch{}
+      }catch(error){tgRecordDiagnostic('back-button-listener-error',error);}
+      try{telegramWebApp.ready?.();tgReadyCalled=true;tgRecordDiagnostic('ready-called');}catch(error){tgRecordDiagnostic('ready-error',error);}
+      tgRenderDiagnostics();
+      if(tgDiagnosticsEnabled){setTimeout(()=>tgRecordDiagnostic('snapshot-500ms'),500);setTimeout(()=>tgRecordDiagnostic('snapshot-1800ms'),1800);setTimeout(()=>tgRecordDiagnostic('snapshot-4500ms'),4500);}
     }
     let activePageTransition=null;
     let roomPeerJourney=false; // Visiting someone's profile from a room must not end the room.
