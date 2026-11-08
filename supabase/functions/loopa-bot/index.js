@@ -1,10 +1,72 @@
+import { createClient } from "npm:@supabase/supabase-js@2";
 // LOOPA Bot welcome handler. No secret credentials stored in GitHub.
 // Supabase Edge Function "loopa-bot"; Telegram webhook requests are verified.
 const BOT_NAME = "LOOPAvideo_bot";
+const SITE_ORIGIN = "https://loopacinema.ru";
 const SITE_URL = "https://loopacinema.ru/";
 const PROJECT_REF = "wnubqzwsvclvcvozibtc";
 const WEBHOOK_URL = "https://" + PROJECT_REF + ".supabase.co/functions/v1/loopa-bot";
 const utf8 = new TextEncoder();
+function adminClient(){
+  const key=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),url=Deno.env.get("SUPABASE_URL");
+  if(!key||!url)throw Error("admin_config_missing");
+  return createClient(url,key,{auth:{autoRefreshToken:false,persistSession:false}});
+}
+function roomLink(code){
+  if(!/^[a-f0-9]{12}$/i.test(code||""))throw Error("invalid_code");
+  return "https://t.me/"+BOT_NAME+"/loopa?startapp=room_"+code.toLowerCase();
+}
+const escapeHtml=x=>String(x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+async function miniAppAction(request,token){
+  if(request.headers.get("Origin")!==SITE_ORIGIN)return result({error:"invalid_origin"},403);
+  const jwt=/^Bearer (.+)$/i.exec(request.headers.get("Authorization")||"")?.[1];
+  if(!jwt)return result({error:"login_required"},401);
+  if(Number(request.headers.get("content-length")||0)>2048)return result({error:"too_large"},413);
+  const input=await request.json();
+  if(!["notify_invite","share_room"].includes(input?.action))return result({error:"unknown_action"},400);
+  const db=adminClient();
+  const {data:auth,error}=await db.auth.getUser(jwt);
+  if(error||!auth?.user?.id)return result({error:"login_required"},401);
+  const uid=auth.user.id;
+  if(input.action==="notify_invite"){
+    if(!/^[0-9a-f-]{36}$/i.test(input.invitation||""))return result({error:"invalid_invite"},400);
+    const {data:claim,error:claimError}=await db.rpc("loopa_claim_telegram_invite",{p_invitation:input.invitation,p_sender:uid});
+    if(claimError)throw claimError;
+    if(!claim)return result({status:"not_eligible"});
+    const chatId=Number(claim.telegram_id);
+    if(!Number.isSafeInteger(chatId)||chatId<=0)return result({status:"not_eligible"});
+    try{
+      await botAPI(token,"sendMessage",{
+        chat_id:chatId,
+        text:"🎬 <b>Приглашение в LOOPA</b>\n\n<b>"+escapeHtml(claim.sender_name||"Друг")+"</b> зовёт тебя посмотреть видео вместе.\n\n<i>Один экран. Общие моменты.</i>",
+        parse_mode:"HTML",
+        reply_markup:{inline_keyboard:[[{text:"🎞 Присоединиться",url:roomLink(claim.code)}]]}
+      });
+      return result({status:"sent"});
+    }catch{return result({status:"telegram_unavailable"});}
+  }
+  const code=String(input.code||"");
+  if(!/^[a-f0-9]{12}$/i.test(code))return result({error:"invalid_room"},400);
+  const {data:room,error:roomError}=await db.from("loopa_rooms16").select("host").eq("code",code.toUpperCase()).maybeSingle();
+  if(roomError)throw roomError;
+  if(room?.host!==uid)return result({error:"not_room_host"},403);
+  const {data:link,error:linkError}=await db.from("telegram_miniapp_links").select("telegram_id").eq("user_id",uid).maybeSingle();
+  if(linkError)throw linkError;
+  const telegramId=Number(link?.telegram_id);
+  if(!Number.isSafeInteger(telegramId)||telegramId<=0)return result({error:"telegram_not_linked"},409);
+  const prepared=await botAPI(token,"savePreparedInlineMessage",{
+    user_id:telegramId,
+    result:{
+      type:"article",id:crypto.randomUUID(),title:"LOOPA — совместный просмотр",
+      description:"Приглашение в твою комнату",
+      input_message_content:{message_text:"🎬 LOOPA\n\nСмотри вместе. Чувствуй ближе.\n\nПрисоединяйся к моей комнате!"},
+      reply_markup:{inline_keyboard:[[{text:"🎞 Открыть комнату",url:roomLink(code)}]]}
+    },
+    allow_user_chats:true,allow_group_chats:true
+  });
+  return result({status:"ready",message_id:prepared.id});
+}
+
 
 const WELCOME = [
   "🎞 <b>LOOPA.</b>",
@@ -29,7 +91,7 @@ const HELP = [
 function result(body, status=200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: {"Content-Type":"application/json; charset=utf-8", "Cache-Control":"no-store"}
+    headers: {"Content-Type":"application/json; charset=utf-8", "Cache-Control":"no-store", "Access-Control-Allow-Origin":SITE_ORIGIN, "Access-Control-Allow-Headers":"apikey, authorization, content-type", "Access-Control-Allow-Methods":"GET, POST, OPTIONS", "Vary":"Origin"}
   });
 }
 function sameSecret(a,b) {
@@ -79,6 +141,9 @@ Deno.serve(async request=>{
       const info=await getStatus(token);
       return result(info,info.error?409:200);
     }
+    if(request.method==="OPTIONS")return request.headers.get("Origin")===SITE_ORIGIN?result({ok:true}):result({error:"invalid_origin"},403);
+    if(request.method==="POST"&&request.headers.has("Authorization"))
+      return await miniAppAction(request,token);
     // No mutation endpoint. Webhook installation is configured separately.
     if(request.method!=="POST")return result({error:"method_not_allowed"},405);
     const signature=request.headers.get("X-Telegram-Bot-Api-Secret-Token")||"";
@@ -91,11 +156,24 @@ Deno.serve(async request=>{
     const update=JSON.parse(raw);
     const message=update?.message;
     if(!message||message.chat?.type!=="private")return result({ok:true});
-    const command=String(message.text||"").trim().match(/^\/(start|help)(?:@([A-Za-z0-9_]+))?(?:\s|$)/i);
+    const command=String(message.text||"").trim().match(/^\/(start|help|stop)(?:@([A-Za-z0-9_]+))?(?:\s|$)/i);
     if(!command||(command[2]&&command[2].toLowerCase()!==BOT_NAME.toLowerCase()))
       return result({ok:true});
     const chatId=message.chat.id;
     if(!Number.isSafeInteger(chatId))return result({ok:true});
+    if(message.from?.id!==chatId)return result({ok:true});
+    if(command[1].toLowerCase()==="start"||command[1].toLowerCase()==="stop"){
+      const {error}=await adminClient().from("loopa_bot_subscriptions").upsert({
+        telegram_id:String(chatId),enabled:command[1].toLowerCase()==="start",
+        updated_at:new Date().toISOString()
+      },{onConflict:"telegram_id"});
+      if(error)throw error;
+    }
+    if(command[1].toLowerCase()==="stop"){
+      await botAPI(token,"sendMessage",{chat_id:chatId,
+        text:"🔕 Уведомления LOOPA отключены. Для повторного включения отправь /start."});
+      return result({ok:true});
+    }
     await botAPI(token,"sendMessage",{
       chat_id:chatId,
       text:command[1].toLowerCase()==="start"?WELCOME:HELP,
