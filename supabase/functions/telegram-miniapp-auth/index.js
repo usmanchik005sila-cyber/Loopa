@@ -163,7 +163,7 @@ Deno.serve(async (request) => {
       return reply({ status: "login_ready", token_hash: data.properties.hashed_token });
     }
 
-    if (body.action === "link") {
+    if (body.action === "link" || body.action === "status") {
       const match = /^(?:Bearer)\s+(.+)$/i.exec(request.headers.get("Authorization") || "");
       if (!match) return reply({ error: "login_required" }, 401);
       // A Supabase user JWT must be validated with Auth; do not decode/trust it locally.
@@ -174,6 +174,9 @@ Deno.serve(async (request) => {
       const viewerId = viewer.user.id;
       // Do not silently merge or reassign: both telegram_id and user_id are UNIQUE.
       const existing = await lookup(admin, telegramId);
+      if (body.action === "status" && existing) {
+        return reply({ status: existing.user_id === viewerId ? "linked" : "claimed_by_another_profile" });
+      }
       if (existing) {
         return existing.user_id === viewerId
           ? reply({ status: "already_linked" })
@@ -182,6 +185,9 @@ Deno.serve(async (request) => {
       const { data: other, error: otherError } = await admin.from("telegram_miniapp_links")
         .select("telegram_id").eq("user_id", viewerId).maybeSingle();
       if (otherError) throw otherError;
+      if (body.action === "status") {
+        return reply({ status: other ? "profile_linked_elsewhere" : "unlinked" });
+      }
       if (other) return reply({ error: "profile_already_linked_to_another_telegram" }, 409);
 
       if (!viewer.user.email) {
