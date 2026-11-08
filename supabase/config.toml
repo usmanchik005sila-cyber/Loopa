@@ -1,0 +1,5 @@
+# Telegram Mini App sends signed initData, not a Supabase JWT, on first login.
+# Function performs its own Telegram HMAC validation on every request.
+[functions.telegram-miniapp-auth]
+verify_jwt = false
+entrypoint = "./functions/telegram-miniapp-auth/index.js"
