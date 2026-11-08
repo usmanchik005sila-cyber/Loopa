@@ -11,60 +11,9 @@
   <meta name="description" content="LOOPA — ближе, даже на расстоянии. Совместный просмотр с теми, кто важен.">
   <title>LOOPA — Ближе, даже на расстоянии</title>
   <meta name="loopa-version" content="v94">
-  <meta name="loopa-build" content="v95-telegram-diagnostics">
+  <meta name="loopa-build" content="v96-telegram-miniapp-clean">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <!-- Temporary, local-only Mini App startup diagnostics. No Telegram initData is logged or transmitted. -->
-  <script>
-    (() => {
-      const mini = !!window.Telegram?.WebApp?.initData || /tgWebApp(?:Platform|Data)=/.test(location.hash + location.search);
-      if (!mini) return;
-      const info = {ready:false,lastTap:'—',error:'—'};
-      window.__loopaMiniDiagnostic = info;
-      let panel,button;
-      function safeValue(value){return String(value||'—').slice(0,220);}
-      function refresh(){
-        if(!panel)return;
-        panel.querySelector('[data-dg-boot]').textContent=window.__loopaStartupCompleted?'Скрипт загружен':'Скрипт не завершился';
-        panel.querySelector('[data-dg-tap]').textContent=safeValue(info.lastTap);
-        panel.querySelector('[data-dg-error]').textContent=safeValue(info.error);
-      }
-      function show(open){
-        if(!panel)return;
-        panel.hidden=!open;
-        refresh();
-      }
-      window.addEventListener('error',event=>{
-        const file=String(event.filename||'');
-        info.error=safeValue(event.message)+' · '+(file.includes('loopacinema')?'LOOPA':'скрипт')+':'+(event.lineno||'?');
-        show(true);
-      });
-      window.addEventListener('unhandledrejection',event=>{
-        const reason=event.reason;
-        info.error='Promise: '+safeValue(reason?.message||reason);
-        show(true);
-      });
-      document.addEventListener('click',event=>{
-        if(event.target.closest?.('#loopaMiniDiagButton, #loopaMiniDiagPanel'))return;
-        const target=event.target.closest?.('button, a, input, [role="button"]')||event.target;
-        const identity=target.id||target.getAttribute?.('data-go')||target.getAttribute?.('data-room')
-          ||target.getAttribute?.('data-settings')||target.tagName;
-        info.lastTap=safeValue(identity);
-        refresh();
-      },true);
-      document.addEventListener('DOMContentLoaded',()=>{
-        button=document.createElement('button');
-        button.id='loopaMiniDiagButton';button.type='button';button.textContent='?';button.title='Проверка LOOPA';
-        button.style.cssText='position:fixed;top:calc(9px + env(safe-area-inset-top, 0px));right:8px;z-index:2147483646;width:29px;height:29px;border:1px solid #686870;border-radius:50%;background:#1e1e22;color:#fff;font:600 14px system-ui;opacity:.82;cursor:pointer';
-        panel=document.createElement('section');panel.id='loopaMiniDiagPanel';panel.hidden=true;
-        panel.style.cssText='position:fixed;z-index:2147483647;top:calc(44px + env(safe-area-inset-top, 0px));right:8px;box-sizing:border-box;width:min(330px,calc(100vw - 16px));padding:14px 15px;border:1px solid #777;border-radius:14px;background:#19191e;color:#f5f5f7;box-shadow:0 12px 38px #000c;font:12px/1.6 system-ui;overflow-wrap:anywhere';
-        panel.innerHTML='<b>LOOPA · проверка Mini App (v95)</b><div>Загрузка: <span data-dg-boot></span></div><div>Последнее нажатие: <span data-dg-tap></span></div><div>Ошибка: <span data-dg-error></span></div><small style="color:#bcbcc4">Сделай скриншот этого окна после нажатия неработающей кнопки.</small>';
-        button.addEventListener('click',()=>show(panel.hidden));
-        document.body.append(button,panel);
-        refresh();
-        setTimeout(()=>{if(!window.__loopaStartupCompleted)show(true);},900);
-      },{once:true});
-    })();
-  </script>
+
 <script>
     try{const m=localStorage.getItem('loopa-wallpaper-motion');document.documentElement.dataset.wallpaperExplicit=String(m==='on');document.documentElement.dataset.wallpaperMotion=m==='off'?'off':'on';}catch{document.documentElement.dataset.wallpaperExplicit='false';document.documentElement.dataset.wallpaperMotion='on';}
   </script>
@@ -5000,7 +4949,7 @@ html.telegram-miniapp .toast {
     selectAuthMode('signup');
     resetFriends();
     init();
-    window.__loopaStartupCompleted=true;
+
   </script>
 <script async src="https://www.youtube.com/iframe_api"></script><script async src="https://vk.com/js/api/videoplayer.js"></script>
 
