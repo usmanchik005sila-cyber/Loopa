@@ -2336,11 +2336,15 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
       byId('room-active').hidden=false;byId('room-lobby').hidden=true;byId('room-code').textContent=data.code;byId('room-host').hidden=data.host!==u;
       byId('room-status').textContent=!data.video?'Ведущий выбирает видео':data.playing?'Идёт просмотр':'На паузе';
       if(data.video&&(!prev||prev.video!==data.video||op==='join'))historyCall('record',{room_code:data.code});
-      // Rebuild the iframe on history joins that switch rooms even if the video URL matches.
+      // An explicit join (including a history card) must rebuild the player:
+      // an old iframe may remain connected with a src while being black/stale on iOS.
       // Also recover an iframe removed or emptied by a mobile browser.
       const frame=roomBox();
       const roomChanged=!!prev&&prev.code!==data.code;
+      const expectedMedia=data.video?roomMedia(data.video):'';
       const missingPlayer=!!data.video&&(!frame||!frame.isConnected||!frame.getAttribute('src'));
+      const stalePlayer=!!data.video&&!!frame?.getAttribute('src')
+        && !frame.getAttribute('src').startsWith(expectedMedia.split('?')[0]);
       if(roomChanged){
         roomEpoch++;
         syncSnapshot=null;
@@ -2348,8 +2352,8 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
         pending=null;
         syncProblem='';
       }
-      if(roomChanged||prev?.video!==data.video||missingPlayer){
-        mountRoomPlayer(data.video?roomMedia(data.video):'');
+      if(op==='join'||roomChanged||prev?.video!==data.video||missingPlayer||stalePlayer){
+        mountRoomPlayer(expectedMedia);
       }
       if(data.video&&(!prev||prev.video!==data.video||op==='join'))offerSavedResume(data);
       else if(resumePrompt&&(!roomIsSolo(data)||resumePrompt.code!==data.code||resumePrompt.video!==data.video))hideResumePrompt();
