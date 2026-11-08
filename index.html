@@ -2192,7 +2192,18 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
           chatSwipe.bubble.style.transform='';chatSwipe.bubble.classList.remove('chatReplySwipe');chatSwipe=null;
         },{passive:true});
         byId('chatReplyCancel').addEventListener('click',clearChatReply);
+            function normalizeChatMessage(message){
+          if(!message||typeof message.body!=='string'||message.body[0]!=='{')return message;
+          try{
+            const envelope=JSON.parse(message.body);
+            if(envelope&&envelope._loopa_reply_v1==='1'&&typeof envelope.body==='string'){
+              return {...message,body:envelope.body,reply_to:message.reply_to||envelope.reply_to||null};
+            }
+          }catch(_){ }
+          return message;
+        }
         function renderConversation(messages){
+      messages=messages.map(normalizeChatMessage);
       const log=byId('chatLog'),near=log.scrollHeight-log.scrollTop-log.clientHeight<48,previousScroll=log.scrollTop;
       chatMessageById=new Map(messages.filter(message=>message?.id!=null).map(message=>[String(message.id),message]));
       log.replaceChildren();
