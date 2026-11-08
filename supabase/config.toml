@@ -3,3 +3,9 @@
 [functions.telegram-miniapp-auth]
 verify_jwt = false
 entrypoint = "./functions/telegram-miniapp-auth/index.js"
+
+
+# Incoming Telegram updates are authenticated by the webhook secret header.
+[functions.loopa-bot]
+verify_jwt = false
+entrypoint = "./functions/loopa-bot/index.js"
