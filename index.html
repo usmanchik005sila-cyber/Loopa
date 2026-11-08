@@ -2769,14 +2769,41 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       showPage('rooms');await roomRun('join',{room:code});
       const clean=new URL(location.href);clean.searchParams.delete('room');history.replaceState(null,'',clean);invitationBusy=false;
     }
+    // Telegram sharing and bot notifications are authenticated server-side.
+    async function loopaBotAction(action,payload={}){
+      if(!client||!currentUser)throw Error('Войди в аккаунт');
+      const {data,error}=await client.auth.getSession();
+      if(error||!data?.session?.access_token)throw Error('Войди в аккаунт');
+      const response=await fetch(SUPABASE_URL+'/functions/v1/loopa-bot',{
+        method:'POST',cache:'no-store',
+        headers:{'Content-Type':'application/json','apikey':SUPABASE_PUBLISHABLE_KEY,
+          'Authorization':'Bearer '+data.session.access_token},
+        body:JSON.stringify({action,...payload})
+      });
+      const result=await response.json().catch(()=>({}));
+      if(!response.ok)throw Error(result.error||'bot_unavailable');
+      return result;
+    }
+    function telegramRoomUrl(code){
+      return 'https://t.me/LOOPAvideo_bot/loopa?startapp=room_'+String(code).toLowerCase();
+    }
     byId('shareRoomLink').onclick=async()=>{
       if(!roomState)return;
       const url=new URL(location.href);url.search='';url.hash='';url.searchParams.set('room',roomState.code);
       const invitation={title:'Комната LOOPA',text:'Посмотрим вместе? Присоединяйся к моей комнате в LOOPA',url:url.href};
       try{
+        if(isTelegramMiniApp&&typeof telegramWebApp.shareMessage==='function'){
+          try{
+            const prepared=await loopaBotAction('share_room',{code:roomState.code});
+            if(prepared?.message_id){
+              telegramWebApp.shareMessage(prepared.message_id);
+              return;
+            }
+          }catch(e){console.warn('LOOPA Telegram share fallback:',e.message);}
+        }
         if(isTelegramMiniApp&&telegramWebApp.openTelegramLink){
           const share=new URL('https://t.me/share/url');
-          share.searchParams.set('url',url.href);
+          share.searchParams.set('url',telegramRoomUrl(roomState.code));
           share.searchParams.set('text',invitation.text);
           telegramWebApp.openTelegramLink(share.href);
         }else if(navigator.share)await navigator.share(invitation);
@@ -2975,7 +3002,13 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
         loadRoomProfiles(friends.map(f=>f.id));
         for(const f of friends){const row=inviteRow(f.name,f.online),button=document.createElement('button');
           const letter=row.querySelector('.inviteAvatar');if(letter&&f.id){const photo=roomAvatar(f.id,f.name);photo.classList.add('inviteAvatar');letter.replaceWith(photo);}button.type='button';button.textContent=f.invited?'Отправлено':'Пригласить';button.disabled=f.invited;
-          button.onclick=async()=>{button.disabled=true;try{await inviteRPC('send',{room_code:code,peer:f.id});button.textContent='Отправлено';showToast('Приглашение отправлено');}catch(e){button.disabled=false;showToast(inviteError(e));}};
+          button.onclick=async()=>{button.disabled=true;try{
+            const sent=await inviteRPC('send',{room_code:code,peer:f.id});
+            button.textContent='Отправлено';showToast('Приглашение отправлено');
+            // Bot messages are opt-in (/start), and only to the invited linked account.
+            if(sent?.id)loopaBotAction('notify_invite',{invitation:sent.id})
+              .catch(e=>console.warn('LOOPA bot notification:',e.message));
+          }catch(e){button.disabled=false;showToast(inviteError(e));}};
           row.append(button);list.append(row);
         }
       }catch(e){byId('inviteList').textContent=inviteError(e);}
