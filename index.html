@@ -1185,6 +1185,19 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
     #chatLog .chatReplyQuote span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:#c0c0c7;font:10px/1.4 system-ui}
     #chatLog .bubble.isReplyTarget{outline:2px solid #d8d8dc;outline-offset:2px}
     @media(prefers-reduced-motion:reduce){#chatLog .chatLine .bubble[data-chat-id]{transition:none}}
+    
+    /* Keep Safari's room layout and chat scroll from adding a second animation
+       on top of the native iOS keyboard transition. */
+    body.roomViewing #chatLog,
+    body.roomViewing #chatForm,
+    body.roomViewing #chatText,
+    body.roomViewing #room-active,
+    body.roomViewing #videoStage,
+    body.roomViewing #room-frame{
+      transition:none!important;
+      animation:none!important;
+      scroll-behavior:auto!important;
+    }
     </style>
     </head>
 <body>
@@ -2161,6 +2174,9 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
           byId('chatReplyAuthor').textContent='Ответ на '+author;
           byId('chatReplyText').textContent=chatReplyTarget.body.slice(0,180);
           byId('chatReplyPreview').hidden=false;
+      const input=byId('chatText');
+      try{input.focus({preventScroll:true});}catch(_){input.focus();}
+      scheduleWatchViewport();
         }
         function jumpToChatMessage(id){
           const key=String(id),bubble=[...byId('chatLog').querySelectorAll('.bubble[data-chat-id]')].find(el=>el.dataset.chatId===key);
@@ -2295,7 +2311,7 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
       applyCinemaMode(!cinemaModeEnabled);
       byId('roomSheet').close();
     });
-    let watchBaseHeight=0,watchWidth=0,watchKeyboardOpen=false,watchViewportTimer=0;
+    let watchBaseHeight=0,watchWidth=0,watchKeyboardOpen=false,watchViewportTimer=0,watchCloseTimer=0,watchLastHeight=0;
     function watchNormalPlayer(height,width){
       return cinemaModeEnabled&&width>900 ? Math.min(width*9/16,height*.56) : Math.min(width*9/16,430);
     }
@@ -2308,6 +2324,8 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
     // touch interception, forced refocus, or global scroll prevention.
     const watchIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||
       (navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+    const watchStandalone=navigator.standalone===true||window.matchMedia?.('(display-mode: standalone)').matches===true;
+    const watchBrowserIOS=watchIOS&&!watchStandalone;
     let watchFocusTimer=0,watchSavedOpacity=null;
     function restoreWatchField(){
       if(watchFocusTimer)clearTimeout(watchFocusTimer);
@@ -2365,24 +2383,42 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
       if(oldHeight!==height+'px'||oldPlayer!==player+'px'){
         watchLog.scrollTop=keepBottom?watchLog.scrollHeight:position;
       }
+      watchLastHeight=height;
     }
     function stopWatchViewport(){
       restoreWatchField();
       watchKeyboardOpen=false;
       if(watchViewportTimer)cancelAnimationFrame(watchViewportTimer);
       watchViewportTimer=0;
+      if(watchCloseTimer)clearTimeout(watchCloseTimer);
+      watchCloseTimer=0;
+      watchLastHeight=window.visualViewport?.height||window.innerHeight;
     }
     function scheduleWatchViewport(){
-      if(!document.body.classList.contains('roomViewing')||document.hidden)return;
-      // Update once per actual viewport change, without the old 1.2-second
-      // polling tail which made the composer appear to settle late on iOS.
-      if(watchViewportTimer)return;
-      watchViewportTimer=requestAnimationFrame(()=>{
-        watchViewportTimer=0;
-        syncWatchViewport();
-      });
-    }
-    document.addEventListener('visibilitychange',()=>{
+          if(!document.body.classList.contains('roomViewing')||document.hidden)return;
+          const viewportHeight=window.visualViewport?.height||window.innerHeight;
+          const keyboardClosing=watchKeyboardOpen&&(
+            document.activeElement!==watchField||viewportHeight>watchLastHeight+1
+          );
+          // Safari emits viewport resize events throughout its keyboard animation.
+          // Keep the compact layout during dismissal and snap it once the viewport settles.
+          if(watchBrowserIOS&&keyboardClosing){
+            if(watchViewportTimer){cancelAnimationFrame(watchViewportTimer);watchViewportTimer=0;}
+            if(watchCloseTimer)clearTimeout(watchCloseTimer);
+            watchCloseTimer=setTimeout(()=>{
+              watchCloseTimer=0;
+              syncWatchViewport();
+            },80);
+            return;
+          }
+          if(watchCloseTimer){clearTimeout(watchCloseTimer);watchCloseTimer=0;}
+          if(watchViewportTimer)return;
+          watchViewportTimer=requestAnimationFrame(()=>{
+            watchViewportTimer=0;
+            syncWatchViewport();
+          });
+        }
+        document.addEventListener('visibilitychange',()=>{
       if(document.hidden)stopWatchViewport();else scheduleWatchViewport();
     });
     // Keep the newest message beside the composer unless the reader scrolled back.
