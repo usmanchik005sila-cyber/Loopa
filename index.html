@@ -420,12 +420,12 @@
 
 #inviteSheet{box-sizing:border-box;width:min(94vw,480px);max-height:80dvh;padding:22px;color:#eee;border:1px solid #ffffff30;border-radius:24px;background:radial-gradient(ellipse at top left,#ffffff0d,transparent 65%),#101013;box-shadow:0 28px 100px #0009;overflow:auto}
 #inviteSheet::backdrop{background:#000a;backdrop-filter:blur(5px)}#inviteSheet header{display:flex;align-items:center;justify-content:space-between;gap:10px}#inviteSheet h2{font:600 20px system-ui;margin:0}#inviteSheet button{cursor:pointer;color:#eee;border:1px solid #ffffff25;background:#ffffff09;border-radius:11px;min-height:40px;padding:8px 10px;font:12px system-ui}#inviteSheet #closeInvites{font-size:22px;border:0}#inviteHint{color:#aaa5aa;font:13px/1.6 system-ui;margin:10px 0 20px}#inviteList{display:grid;gap:10px;margin-bottom:18px;color:#bab5bb;font-size:13px}.inviteRow{display:flex;align-items:center;gap:10px;border:1px solid #ffffff16;border-radius:16px;background:#08080b;padding:12px}.inviteAvatar{flex-shrink:0;display:grid;place-items:center;width:34px;height:34px;background:#373238;color:#eee;border-radius:50%;font:600 17px Georgia}.inviteName{flex:1;min-width:0;overflow-wrap:anywhere;color:#eee;font:500 14px system-ui}.inviteName small{display:block;color:#aaa4ac;font:11px system-ui;margin-top:5px}.inviteActions{display:flex;flex-direction:column;gap:5px}#inviteSheet button:disabled{opacity:.45;cursor:default}#inviteSheet #shareRoomLink{float:none;width:100%}#inviteSheet [hidden]{display:none!important}#roomInboxButton{position:relative;font-size:19px}#roomInboxButton[hidden]{display:none}#roomInboxCount:not(:empty){position:absolute;right:-3px;top:-3px;border-radius:20px;background:#d98673;color:#171419;font:700 10px system-ui;padding:3px 5px}
-#roomInviteNotice{position:fixed;top:max(14px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:9999;box-sizing:border-box;width:min(94vw,450px);display:flex;align-items:center;gap:8px;background:#151518f5;border:1px solid #ffffff35;border-radius:17px;padding:13px;box-shadow:0 10px 40px #0008;color:#eee;font:13px/1.4 system-ui;backdrop-filter:blur(18px)}#roomInviteNotice[hidden]{display:none}#roomInviteNotice span{flex:1}#roomInviteNotice button{border:1px solid #ffffff25;background:#ffffff10;color:#eee;border-radius:9px;padding:9px;font:12px system-ui;cursor:pointer}
+#roomInviteNotice{position:fixed;top:max(14px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:9999;box-sizing:border-box;width:min(94vw,450px);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 40px;gap:8px;background:radial-gradient(ellipse at top left,#ffffff12,transparent 68%),linear-gradient(145deg,#202023f7,#101012fa);border:1px solid #ffffff35;border-radius:19px;padding:14px;box-shadow:0 16px 48px #0009;color:#eee;font:13px/1.4 system-ui;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}#roomInviteNotice[hidden]{display:none}#roomInviteNotice .invite-notice-body{grid-column:1/-1;display:grid;gap:4px;min-width:0}#roomInviteNotice .invite-notice-body>strong{font:600 13px/1.4 system-ui;color:#f2f1ef}#roomInviteNotice .invite-notice-body>span{min-width:0;color:#bdbdc4;font:12px/1.5 system-ui;overflow-wrap:anywhere}#roomInviteNotice button{min-height:40px;border:1px solid #ffffff25;background:#ffffff08;color:#ddd;border-radius:11px;padding:8px 9px;font:550 12px system-ui;cursor:pointer}#roomInviteNotice #viewRoomInvites{background:linear-gradient(#eeedeb,#d4d3d1);color:#171719;border-color:#ffffff55}#roomInviteNotice #hideRoomInvites{width:40px;font-size:20px}
 
 /* Monochrome smoked glass notifications */
 #requests-dialog{background:radial-gradient(ellipse at top left,#ffffff0c,transparent 60%),linear-gradient(145deg,#252528f5,#101012fa);border:1px solid #ffffff30;border-radius:24px;box-shadow:0 24px 80px #0009;max-height:85dvh;overflow-y:auto;padding:22px}
 .noticeTabs{display:flex;gap:8px;margin:16px 0 20px}.noticeTabs button{flex:1;min-height:40px;border:1px solid #ffffff25;border-radius:12px;background:#ffffff05;color:#bbb;font:13px system-ui;cursor:pointer}.noticeTabs button[aria-pressed=true]{background:#e5e3e0;color:#171719;border-color:#e5e3e0}
-#unifiedRooms{display:grid;gap:12px;margin-bottom:16px}#unifiedRooms[hidden],#friend-incoming[hidden]{display:none}.roomNotice,#friend-incoming .friend-person{padding:14px;background:linear-gradient(145deg,#1b1b1ee8,#08080bea);border:1px solid #ffffff22;border-radius:18px;box-shadow:inset 0 1px #ffffff08}.roomNotice .inviteRow{padding:0;border:0;background:none}.roomNotice .inviteName small{display:block;color:#aaa;font:12px/1.5 system-ui;margin-top:5px}.noticeActions{display:flex;gap:8px;margin-top:15px}.noticeActions button,.watchJoin{min-height:40px;padding:9px 13px;border:1px solid #ffffff28;border-radius:11px;background:#ffffff08;color:#ddd;font:500 12px system-ui;cursor:pointer}.noticeActions button{flex:1}.noticeActions button:first-child,.watchJoin{background:linear-gradient(#eeedeb,#d4d3d1);color:#171719;border-color:#ffffff55}.noticeActions button:disabled{opacity:.45}.noticeEmpty{color:#a5a5aa;font:13px/1.5 system-ui;margin:8px 0}.watchTitle{font:500 13px/1.5 system-ui;color:#e4e3e6;margin-top:6px;overflow-wrap:anywhere}.watchJoin{margin-top:10px;max-width:100%}#friend-list .friend-person{align-items:flex-start;padding:16px 12px;border:1px solid #ffffff1c;border-radius:17px;background:linear-gradient(145deg,#222225c9,#0c0c0fe8);margin:10px 0}#friend-list .friend-person-status{align-items:flex-start;font-size:11px;line-height:1.5}.presence-dot.online{background:#d2d2d7;box-shadow:0 0 8px #ffffff20}.top-badge,.nav-badge{background:#d8d8db;color:#18181b}.inviteAvatar{background:#343438}.requests-overlay{backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+#unifiedRooms{display:grid;gap:12px;margin-bottom:16px}#unifiedRooms[hidden],#friend-incoming[hidden]{display:none}.roomNotice,#friend-incoming .friend-person{padding:14px;background:linear-gradient(145deg,#1b1b1ee8,#08080bea);border:1px solid #ffffff22;border-radius:18px;box-shadow:inset 0 1px #ffffff08}.roomNotice .inviteRow{padding:0;border:0;background:none}.roomNotice .inviteName small{display:block;color:#aaa;font:12px/1.5 system-ui;margin-top:5px}.noticeActions{display:flex;gap:8px;margin-top:15px}.noticeActions button,.watchJoin{min-height:40px;padding:9px 13px;border:1px solid #ffffff28;border-radius:11px;background:#ffffff08;color:#ddd;font:500 12px system-ui;cursor:pointer}.noticeActions button{flex:1}.noticeActions button:first-child,.watchJoin{background:linear-gradient(#eeedeb,#d4d3d1);color:#171719;border-color:#ffffff55}.noticeActions button:disabled{opacity:.45}.noticeEmpty{color:#a5a5aa;font:13px/1.5 system-ui;margin:8px 0}.watchTitle{font:500 13px/1.5 system-ui;color:#e4e3e6;margin-top:6px;overflow-wrap:anywhere}.watchJoin{margin-top:10px;max-width:100%}.invitePreview{display:flex;align-items:center;gap:12px;min-width:0;margin-top:13px;padding:13px;border:1px solid #ffffff17;border-radius:15px;background:linear-gradient(130deg,#ffffff0c,#ffffff03)}.invitePreviewIcon{flex:0 0 34px;display:grid;place-items:center;width:34px;height:34px;border:1px solid #ffffff12;border-radius:11px;background:#ffffff09;color:#e6e5e2;font:12px system-ui}.invitePreviewCopy{min-width:0}.invitePreviewLabel{display:block;color:#a8a7ae;font:10px/1.4 system-ui;letter-spacing:.11em;text-transform:uppercase}.invitePreview .watchTitle{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-top:4px;color:#e8e7ea;font:550 14px/1.4 system-ui}.invitePreviewMeta{display:block;margin-top:5px;color:#aaa9af;font:11px/1.4 system-ui}.noticeActions button:last-child{background:#ffffff04;color:#c7c6cb;border-color:#ffffff24}.noticeActions button{min-width:0}#friend-list .friend-person{align-items:flex-start;padding:16px 12px;border:1px solid #ffffff1c;border-radius:17px;background:linear-gradient(145deg,#222225c9,#0c0c0fe8);margin:10px 0}#friend-list .friend-person-status{align-items:flex-start;font-size:11px;line-height:1.5}.presence-dot.online{background:#d2d2d7;box-shadow:0 0 8px #ffffff20}.top-badge,.nav-badge{background:#d8d8db;color:#18181b}.inviteAvatar{background:#343438}.requests-overlay{backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
 
 .wideJoin{display:flex;align-items:center;gap:10px;box-sizing:border-box;width:100%;padding:9px 10px 9px 17px;margin:18px 0;border:1px solid #ffffff2b;border-radius:18px;background:linear-gradient(135deg,#ffffff0e,#08080bd9);box-shadow:inset 0 1px #ffffff0b;backdrop-filter:blur(16px)}.wideJoin input{flex:1;min-width:0;border:0;background:none;color:#eee;font:16px system-ui;outline:none}.wideJoin:focus-within{border-color:#ffffff80}.wideJoin button{flex-shrink:0;min-width:44px;min-height:44px;border:1px solid #ffffff40;border-radius:12px;background:linear-gradient(#eeedeb,#cdcdcf);color:#19191c;font-size:23px;cursor:pointer}.recentGrid,#room-recent{display:grid;gap:12px;margin-top:14px}.historyCard{display:flex;align-items:center;gap:14px;width:100%;min-width:0;padding:12px;text-align:left;border:1px solid #ffffff26;border-radius:19px;background:radial-gradient(ellipse at top left,#ffffff0c,transparent 65%),linear-gradient(145deg,#27272aca,#0d0d10e8);color:#e9e8eb;cursor:pointer;box-shadow:inset 0 1px #ffffff0b}.historyCard img{width:42%;max-width:180px;aspect-ratio:16/9;object-fit:cover;border-radius:11px}.historyCard>span{flex:1;min-width:0}.historyCard strong{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font:550 14px/1.4 system-ui;margin:5px 0 9px}.historyCard small{color:#a9a8af;font:11px system-ui}.historyCard>span>span{font:11px system-ui;color:#c6c5cb}.historyCard:disabled{opacity:.5}.profileStats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:8px 0 10px}.profileStats>div{padding:14px 12px;border:1px solid #ffffff22;border-radius:15px;background:linear-gradient(145deg,#252528c9,#0d0d10df)}.profileStats strong{display:block;font:600 16px/1.4 system-ui;color:#eee;overflow-wrap:anywhere}.profileStats small{display:block;margin-top:7px;color:#aaa9af;font:11px system-ui}.statsNote{font:11px/1.5 system-ui!important;color:#a6a4aa!important;margin-bottom:20px!important}#noticeEmpty27{text-align:center;padding:28px 6px;margin:0}#noticeEmpty27[hidden]{display:none}
 
@@ -1492,7 +1492,7 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
       <div class="noticeTabs"><button data-notice-tab="all" aria-pressed="true">Все</button><button data-notice-tab="rooms">Комнаты</button><button data-notice-tab="friends">Друзья</button></div><p id="noticeEmpty27" class="noticeEmpty" hidden></p><div id="unifiedRooms"></div><div id="friend-incoming"><div class="friends-empty">Загрузка заявок…</div></div>
     </section>
   </div>
-  <aside id="roomInviteNotice" hidden role="status" aria-live="polite"><span class="invite-notice-body"><strong>Приглашение в комнату</strong><span id="roomInviteNoticeText"></span></span><button type="button" id="viewRoomInvites">Войти</button><button type="button" id="declineRoomInvite">Нет</button><button type="button" id="hideRoomInvites" aria-label="Скрыть">×</button></aside>
+  <aside id="roomInviteNotice" hidden role="status" aria-live="polite"><span class="invite-notice-body"><strong>Приглашение в комнату</strong><span id="roomInviteNoticeText"></span></span><button type="button" id="viewRoomInvites">Присоединиться</button><button type="button" id="declineRoomInvite">Позже</button><button type="button" id="hideRoomInvites" aria-label="Скрыть">×</button></aside>
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
   <dialog id="dm-policy-dialog" aria-labelledby="dm-policy-title" aria-describedby="dm-policy-description">
@@ -2668,7 +2668,7 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
     function showInviteBanner(invite){
       if(!invite)return;
       activeBannerInvite=invite;
-      byId('roomInviteNoticeText').textContent=invite.name+' приглашает посмотреть вместе';
+      byId('roomInviteNoticeText').textContent=inviteSummary(invite);
       byId('roomInviteNotice').hidden=false;
       playInviteSound();
     }
@@ -2677,7 +2677,7 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
       const invitation=activeBannerInvite;
       if(!invitation)return;
       if(action==='accept' && roomState && roomState.code!==invitation.code && !confirm('Перейти в комнату друга?'))return;
-      ['viewRoomInvites','declineRoomInvite'].forEach(id=>byId(id).disabled=true);
+      ['viewRoomInvites'].forEach(id=>byId(id).disabled=true);
       try{
         await inviteRPC(action,{invitation:invitation.id});
         hideInviteBanner();
@@ -2686,7 +2686,7 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
         }
         await pollInvites();
       }catch(e){showToast(inviteError(e));}
-      finally{['viewRoomInvites','declineRoomInvite'].forEach(id=>byId(id).disabled=false);}
+      finally{['viewRoomInvites'].forEach(id=>byId(id).disabled=false);}
     }
 
     const inviteDialog=byId('inviteSheet');
@@ -2703,6 +2703,27 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
       if(online!==undefined){const small=document.createElement('small');small.textContent=online?'Сейчас в LOOPA':'Не в сети';label.append(small);}
       row.append(avatar,label);return row;
     }
+    const deferredInviteStorageKey='loopa-invite-later-v1';
+    let deferredInviteKeys=new Set();
+    try{const saved=JSON.parse(localStorage.getItem(deferredInviteStorageKey)||'[]');if(Array.isArray(saved))deferredInviteKeys=new Set(saved.filter(x=>typeof x==='string'));}catch{}
+    function inviteKey(item){return String(item?.id||'')+':'+String(item?.sent||'');}
+    function persistDeferredInvites(){try{localStorage.setItem(deferredInviteStorageKey,JSON.stringify(Array.from(deferredInviteKeys).slice(-120)));}catch{}}
+    function isInviteDeferred(item){return deferredInviteKeys.has(inviteKey(item));}
+    function syncDeferredInvites(items){const active=new Set(items.map(inviteKey));const next=new Set(Array.from(deferredInviteKeys).filter(key=>active.has(key)));if(next.size!==deferredInviteKeys.size){deferredInviteKeys=next;persistDeferredInvites();}}
+    function inviteCountWord(value){const n=Math.abs(value),hundred=n%100,ten=n%10;if(hundred>=11&&hundred<=14)return 'участников';if(ten===1)return 'участник';if(ten>=2&&ten<=4)return 'участника';return 'участников';}
+    function invitePreview(item){
+      const preview=document.createElement('div');preview.className='invitePreview';
+      const icon=document.createElement('span');icon.className='invitePreviewIcon';icon.setAttribute('aria-hidden','true');icon.textContent='▶';
+      const copy=document.createElement('span');copy.className='invitePreviewCopy';
+      const label=document.createElement('small');label.className='invitePreviewLabel';label.textContent=item.watch_title==='Закрытая комната'?'Детали после входа':item.watch_title?'Сейчас смотрят':'Совместный просмотр';
+      const title=document.createElement('strong');title.className='watchTitle';title.textContent=String(item.watch_title||'Смотрят вместе');
+      copy.append(label,title);
+      const count=Number(item.participant_count);
+      if(item.participant_count!==null&&item.participant_count!==undefined&&Number.isInteger(count)&&count>=0){const meta=document.createElement('small');meta.className='invitePreviewMeta';meta.textContent=count===0?'Сейчас в комнате никого нет':count+' '+inviteCountWord(count)+' сейчас в комнате';copy.append(meta);}
+      preview.append(icon,copy);return preview;
+    }
+    function inviteSummary(item){const title=String(item.watch_title||'Смотрят вместе');const count=Number(item.participant_count);const people=item.participant_count!==null&&item.participant_count!==undefined&&Number.isInteger(count)&&count>=0?(count===0?' · сейчас в комнате никого нет':' · '+count+' '+inviteCountWord(count)+' в комнате'):'';return String(item.name||'Друг')+' приглашает посмотреть: '+title+people;}
+    function deferInvite(item){if(!item)return;const key=inviteKey(item);if(key===':')return;deferredInviteKeys.add(key);persistDeferredInvites();inviteSeen.add(key);if(activeBannerInvite&&inviteKey(activeBannerInvite)===key)hideInviteBanner();renderRoomNotices();updateUnifiedBadge();showToast('Приглашение осталось во входящих — к нему можно вернуться позже.');}
     function openInviteDialog(title,hint){
       inviteDialog.querySelector('h2').textContent=title;byId('inviteHint').textContent=hint;
       byId('inviteList').replaceChildren();if(!inviteDialog.open)inviteDialog.showModal();
@@ -2729,28 +2750,30 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
       }catch(e){byId('inviteList').textContent=inviteError(e);}
     };
     async function showInviteInbox(){
-      openInviteDialog('Приглашения','Друзья зовут тебя посмотреть видео вместе.');byId('shareRoomLink').hidden=true;
+      openInviteDialog('Приглашения','Приглашения остаются здесь, пока ты не войдёшь или не отклонишь их.');byId('shareRoomLink').hidden=true;
       await pollInvites();const list=byId('inviteList');list.replaceChildren();
       if(!inviteInbox.length)list.textContent='Новых приглашений пока нет.';
-      for(const item of inviteInbox){const row=inviteRow(item.name),actions=document.createElement('div');actions.className='inviteActions';
-        for(const [action,label] of [['accept','Войти'],['decline','Отклонить']]){const b=document.createElement('button');b.type='button';b.textContent=label;
+      for(const item of inviteInbox){const card=document.createElement('article');card.className='roomNotice';const row=inviteRow(item.name),actions=document.createElement('div');actions.className='inviteActions';
+        const note=document.createElement('small');note.textContent='Приглашает посмотреть вместе';row.querySelector('.inviteName').append(note);
+        for(const [action,label] of [['accept','Присоединиться'],['decline','Отклонить']]){const b=document.createElement('button');b.type='button';b.textContent=label;
           b.onclick=async()=>{if(action==='accept'&&roomState&&roomState.code!==item.code&&!confirm('Перейти в комнату друга?'))return;
             actions.querySelectorAll('button').forEach(x=>x.disabled=true);
             try{await inviteRPC(action,{invitation:item.id});if(action==='accept'){inviteDialog.close();showPage('rooms');await roomRun('join',{room:item.code});}await pollInvites();if(inviteDialog.open)showInviteInbox();}
             catch(e){showToast(inviteError(e));actions.querySelectorAll('button').forEach(x=>x.disabled=false);}
           };actions.append(b);
-        }row.append(actions);list.append(row);
+        }
+        row.append(actions);card.append(row,invitePreview(item));list.append(card);
       }
     }
     async function pollInvites(){
       const owner=currentUser?.id;byId('roomInboxButton').hidden=!owner;
-      if(!owner||!client){inviteOwner=null;inviteInbox=[];inviteSeen.clear();byId('roomInviteNotice').hidden=true;return;}
+      if(!owner||!client){inviteOwner=null;inviteInbox=[];inviteSeen.clear();hideInviteBanner();renderRoomNotices();updateUnifiedBadge();return;}
       if(inviteBusy)return;inviteBusy=true;
-      try{const data=await inviteRPC('inbox');if(currentUser?.id!==owner)return;
-        if(inviteOwner!==owner){inviteOwner=owner;inviteSeen.clear();}inviteInbox=data;
+      try{const data=await inviteRPC('inbox');if(currentUser?.id!==owner)return;if(!Array.isArray(data))throw Error('Не удалось прочитать приглашения');
+        if(inviteOwner!==owner){inviteOwner=owner;inviteSeen.clear();}inviteInbox=data;syncDeferredInvites(data);
         updateUnifiedBadge();renderRoomNotices();
-        const fresh=data.find(x=>!inviteSeen.has(x.id+':'+x.sent));
-        data.forEach(x=>inviteSeen.add(x.id+':'+x.sent));
+        const fresh=data.find(x=>!inviteSeen.has(inviteKey(x))&&!isInviteDeferred(x));
+        data.forEach(x=>inviteSeen.add(inviteKey(x)));
         if(fresh)showInviteBanner(fresh);
         if(!data.length)hideInviteBanner();
       }catch(e){if(inviteDialog.open&&byId('shareRoomLink').hidden)byId('inviteHint').textContent=inviteError(e);}
@@ -2758,15 +2781,15 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
     }
     byId('roomInboxButton').onclick=showInviteInbox;
     byId('viewRoomInvites').onclick=()=>handleInviteBanner('accept');
-    byId('declineRoomInvite').onclick=()=>handleInviteBanner('decline');
+    byId('declineRoomInvite').onclick=()=>deferInvite(activeBannerInvite);
     byId('hideRoomInvites').onclick=hideInviteBanner;
     setInterval(()=>{if(!document.hidden)pollInvites();},8000);
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)pollInvites();});
 
 
-    function updateUnifiedBadge(){const count=friendNoticeCount+inviteInbox.length,badge=byId('top-request-badge');badge.textContent=count>99?'99+':String(count);badge.classList.toggle('visible',count>0);byId('top-notifications-button').setAttribute('aria-label','Уведомления: '+count);}
+    function updateUnifiedBadge(){const count=friendNoticeCount+inviteInbox.filter(x=>!isInviteDeferred(x)).length,badge=byId('top-request-badge');badge.textContent=count>99?'99+':String(count);badge.classList.toggle('visible',count>0);byId('top-notifications-button').setAttribute('aria-label','Уведомления: '+count);}
     function filterNotices(){
-      const rooms=inviteInbox.length,friends=friendNoticeCount;
+      const rooms=inviteInbox.filter(x=>!isInviteDeferred(x)).length,friends=friendNoticeCount;
       byId('unifiedRooms').hidden=noticeTab==='friends'||!rooms;
       byId('friend-incoming').hidden=noticeTab==='rooms'||!friends;
       const empty=noticeTab==='all'?!rooms&&!friends:noticeTab==='rooms'?!rooms:!friends;
@@ -2777,10 +2800,23 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
     document.querySelectorAll('[data-notice-tab]').forEach(b=>b.onclick=()=>{noticeTab=b.dataset.noticeTab;filterNotices();});
     function renderRoomNotices(){
       const list=byId('unifiedRooms');list.replaceChildren();
-      if(!inviteInbox.length){const empty=document.createElement('p');empty.className='noticeEmpty';empty.textContent='Приглашений в комнаты пока нет';list.append(empty);}
-      for(const item of inviteInbox){const card=document.createElement('article');card.className='roomNotice';const row=inviteRow(item.name);const text=document.createElement('small');text.textContent='Приглашает посмотреть вместе';row.querySelector('.inviteName').append(text);card.append(row);const actions=document.createElement('div');actions.className='noticeActions';
-        for(const [action,label] of [['accept','Войти'],['decline','Отклонить']]){const b=document.createElement('button');b.type='button';b.textContent=label;b.onclick=async()=>{if(action==='accept'&&roomState&&roomState.code!==item.code&&!confirm('Перейти в комнату друга?'))return;actions.querySelectorAll('button').forEach(x=>x.disabled=true);try{await inviteRPC(action,{invitation:item.id});if(action==='accept'){closeRequestsDialog();showPage('rooms');await roomRun('join',{room:item.code});}await pollInvites();}catch(e){showToast(inviteError(e));actions.querySelectorAll('button').forEach(x=>x.disabled=false);}};actions.append(b);}card.append(actions);list.append(card);
-      }filterNotices();
+      const visible=inviteInbox.filter(item=>!isInviteDeferred(item));
+      if(!visible.length){const empty=document.createElement('p');empty.className='noticeEmpty';empty.textContent='Приглашений в комнаты пока нет';list.append(empty);}
+      for(const item of visible){
+        const card=document.createElement('article');card.className='roomNotice';const row=inviteRow(item.name);
+        const note=document.createElement('small');note.textContent='Приглашает посмотреть вместе';row.querySelector('.inviteName').append(note);card.append(row,invitePreview(item));
+        const actions=document.createElement('div');actions.className='noticeActions';
+        for(const [action,label] of [['accept','Присоединиться'],['later','Позже']]){
+          const b=document.createElement('button');b.type='button';b.textContent=label;
+          b.onclick=async()=>{if(action==='later'){deferInvite(item);return;}if(roomState&&roomState.code!==item.code&&!confirm('Перейти в комнату друга?'))return;
+            actions.querySelectorAll('button').forEach(x=>x.disabled=true);
+            try{await inviteRPC('accept',{invitation:item.id});closeRequestsDialog();showPage('rooms');await roomRun('join',{room:item.code});await pollInvites();}
+            catch(e){showToast(inviteError(e));actions.querySelectorAll('button').forEach(x=>x.disabled=false);}
+          };actions.append(b);
+        }
+        card.append(actions);list.append(card);
+      }
+      filterNotices();
     }
     async function publishWatchTitle(title){
       if(!hostHere()||!roomState.video||!title)return;
