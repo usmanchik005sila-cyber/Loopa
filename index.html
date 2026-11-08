@@ -1717,8 +1717,22 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
         ||choice.epoch!==roomEpoch){
         hideResumePrompt();showToast('Просмотр уже изменился. Перемотка отменена');return;
       }
-      resumeRestorePending=choice;
       hideResumePrompt();
+      // iOS Safari can render a black YouTube iframe when a paused seek is
+      // issued before the native player has actually begun playback. Load the
+      // embed at the saved timestamp instead, leaving native Play to the user.
+      if(roomState.video.includes('youtube.com/embed/')){
+        const seconds=Math.max(0,Math.floor(choice.pos));
+        const embed=new URL(roomMedia(roomState.video));
+        embed.searchParams.set('start',String(seconds));
+        embed.searchParams.delete('autoplay');
+        mountRoomPlayer(embed.toString());
+        sample={pos:seconds,playing:false,now:performance.now()};
+        pending={op:'pause',seconds,video:roomState.video,code:roomState.code,epoch:roomEpoch};
+        flushPlayback();
+        return;
+      }
+      resumeRestorePending=choice;
       tryApplyResume();
     });
     setInterval(saveResumeCheckpoint,10000);
