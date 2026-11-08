@@ -1653,6 +1653,7 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
     resumeBanner.innerHTML='<span class="resumeCopy"><strong>Продолжить просмотр?</strong><small id="resumePosition"></small></span><button type="button" id="resumeApply">Продолжить</button><button type="button" id="resumeDismiss" aria-label="Скрыть предложение">×</button>';
     byId('chatLog').before(resumeBanner);
     let resumePrompt=null,resumeRestorePending=null,resumePlayerReady=false;
+    let rutubeResumeTarget=null,rutubeResumeAttempts=0,rutubeResumeTimer=0,rutubeResumeLastSeek=0;
     function readResumeCheckpoints(){
       const key=resumeStorageKey();if(!key)return [];
       try{
@@ -1699,20 +1700,50 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
       byId('resumePosition').textContent='Остановились на '+formatVideoTime(record.pos);
       showResumePromptIfReady();
     }
-    function tryApplyResume(){
-      const target=resumeRestorePending;
-      if(!target)return;
-      if(!roomState||!currentUser||!hostHere()||!roomIsSolo(roomState)
-        ||target.user!==currentUser.id||target.code!==roomState.code
-        ||target.video!==roomState.video||target.epoch!==roomEpoch){
-        resumeRestorePending=null;return;
-      }
-      if(!resumePlayerReady||rutubeAd)return;
-      resumeRestorePending=null;
-      // Reuse existing host transport, server RPC and guest synchronization.
-      void runTransportAction({seconds:target.pos,playing:true});
-    }
-    byId('resumeDismiss').addEventListener('click',hideResumePrompt);
+    function rutubeResumeContextValid(target){
+          return !!(target&&roomState&&currentUser&&hostHere()&&roomIsSolo(roomState)
+            &&target.user===currentUser.id&&target.code===roomState.code
+            &&target.video===roomState.video&&target.epoch===roomEpoch);
+        }
+        function cancelRutubeResume(){
+          clearTimeout(rutubeResumeTimer);rutubeResumeTimer=0;rutubeResumeTarget=null;
+          rutubeResumeAttempts=0;rutubeResumeLastSeek=0;
+        }
+        function retryRutubeResume(){
+          const target=rutubeResumeTarget;if(!target)return;
+          if(!rutubeResumeContextValid(target)){cancelRutubeResume();return;}
+          if(!resumePlayerReady||rutubeAd)return;
+          const now=performance.now();if(now-rutubeResumeLastSeek<650)return;
+          if(rutubeResumeAttempts>=30){cancelRutubeResume();showToast('Rutube не подтвердил перемотку. Нажми «Продолжить» ещё раз');return;}
+          rutubeResumeAttempts++;rutubeResumeLastSeek=now;
+          const seconds=Math.floor(mediaDuration>0?Math.min(target.pos,Math.max(0,mediaDuration-1)):target.pos);
+          sendRutube('player:setCurrentTime',{time:seconds});sendRutube('player:play');
+          clearTimeout(rutubeResumeTimer);rutubeResumeTimer=setTimeout(retryRutubeResume,700);
+        }
+        function observeRutubeResumeTime(time){
+          const target=rutubeResumeTarget;if(!target)return false;
+          if(!rutubeResumeContextValid(target)){cancelRutubeResume();return true;}
+          if(!rutubeAd&&Number.isFinite(time)&&Math.abs(time-target.pos)<=4){
+            cancelRutubeResume();observed={playing:true,pos:time};
+            void runTransportAction({seconds:target.pos,playing:true});return true;
+          }
+          retryRutubeResume();return true;
+        }
+        function tryApplyResume(){
+          const target=resumeRestorePending;
+          if(!target)return;
+          if(!rutubeResumeContextValid(target)){resumeRestorePending=null;return;}
+          if(!resumePlayerReady||rutubeAd)return;
+          resumeRestorePending=null;
+          if(target.video.includes('rutube.ru/')){
+            cancelRutubeResume();rutubeResumeTarget=target;rutubeResumeLastSeek=performance.now();
+            // Retry after the ad transition and verify using Rutube's currentTime event.
+            void runTransportAction({seconds:target.pos,playing:true});
+            rutubeResumeTimer=setTimeout(retryRutubeResume,900);return;
+          }
+          void runTransportAction({seconds:target.pos,playing:true});
+        }
+        byId('resumeDismiss').addEventListener('click',hideResumePrompt);
     byId('resumeApply').addEventListener('click',()=>{
       const choice=resumePrompt;
       if(!choice)return;
@@ -1954,7 +1985,7 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
       syncPlayback();updatePlaybackControls();
     }
     function mountRoomPlayer(url){
-      resumePlayerReady=false;resumeRestorePending=null;hideResumePrompt();
+      resumePlayerReady=false;resumeRestorePending=null;cancelRutubeResume();hideResumePrompt();
       sample=null;observed={playing:false,pos:0};pending=null;ytPlayer=null;vkPlayer=null;syncSnapshot=null;guestManualUntil=0;nativeNeedsStart=true;nativeAccess=true;localMuted=false;syncProblem='';
       applyingUntil=0;lastPlaybackPublish=0;lastGuestCorrection=0;rutubeAd=false;mediaDuration=0;clearTimeout(overlayTimer);videoStage.classList.remove('controlsVisible');
       const frame=document.createElement('iframe');frame.id='room-frame';frame.title='Видео комнаты';frame.allow='autoplay; encrypted-media; fullscreen; picture-in-picture';frame.allowFullscreen=true;
@@ -1995,25 +2026,33 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
     }
     window.onYouTubeIframeAPIReady=bindRoomPlayers;
     window.addEventListener('message',e=>{
-      if(e.origin!=='https://rutube.ru'||e.source!==roomBox()?.contentWindow)return;
-      let m;try{m=typeof e.data==='string'?JSON.parse(e.data):e.data;}catch{return;}
-      if(m?.type==='player:ready')readyPlayer();
-      if(m?.type==='player:volumeChange'){localMuted=!!m.data?.muted||Number(m.data?.volume)===0;updatePlaybackControls();}
-      if(m?.type==='player:durationChange')mediaDuration=Number(m.data?.duration)||0;
-      if(m?.type==='player:rollState'){
-        rutubeAd=m.data?.state==='play';updatePlaybackControls();
-        if(rutubeAd&&hostHere()&&sample){
-          syncPlayback();
-        }
-        if(!rutubeAd){if(hostHere())tryApplyResume();else applyRoom(true);}
-        return;
-      }
-      if(rutubeAd)return;
-      if(m?.type==='player:currentTime')observed.pos=Number(m.data?.time);
-      if(m?.type==='player:changeState'&&['playing','paused','stopped'].includes(m.data?.state))observed.playing=m.data.state==='playing';
-      if(['player:currentTime','player:changeState'].includes(m?.type))observe(observed.playing,observed.pos);
-    });
-    setInterval(()=>{if(!roomState?.video||document.hidden)return;bindRoomPlayers();samplePlayers();if(!hostHere())applyRoom();},250);
+          if(e.origin!=='https://rutube.ru'||e.source!==roomBox()?.contentWindow)return;
+          let m;try{m=typeof e.data==='string'?JSON.parse(e.data):e.data;}catch{return;}
+          if(m?.type==='player:ready')readyPlayer();
+          if(m?.type==='player:volumeChange'){localMuted=!!m.data?.muted||Number(m.data?.volume)===0;updatePlaybackControls();}
+          if(m?.type==='player:durationChange')mediaDuration=Number(m.data?.duration)||0;
+          if(m?.type==='player:rollState'){
+            rutubeAd=m.data?.state==='play';updatePlaybackControls();
+            if(rutubeAd&&hostHere()&&sample){syncPlayback();}
+            if(!rutubeAd){
+              if(hostHere()){if(rutubeResumeTarget)retryRutubeResume();else tryApplyResume();}
+              else applyRoom(true);
+            }
+            return;
+          }
+          if(rutubeAd)return;
+          if(m?.type==='player:currentTime'){
+            const time=Number(m.data?.time);
+            if(rutubeResumeTarget){observeRutubeResumeTime(time);return;}
+            observed.pos=time;
+          }
+          if(m?.type==='player:changeState'&&['playing','paused','stopped'].includes(m.data?.state)){
+            observed.playing=m.data.state==='playing';
+            if(rutubeResumeTarget){if(observed.playing)retryRutubeResume();return;}
+          }
+          if(['player:currentTime','player:changeState'].includes(m?.type))observe(observed.playing,observed.pos);
+        });
+        setInterval(()=>{if(!roomState?.video||document.hidden)return;bindRoomPlayers();samplePlayers();if(!hostHere())applyRoom();},250);
     setInterval(syncPlayback,750);
     document.addEventListener('visibilitychange',()=>{if(!document.hidden&&roomState){roomRun('read');syncPlayback();}});
     window.addEventListener('online',()=>{if(roomState){roomRun('read');syncPlayback();}});
