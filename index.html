@@ -2647,7 +2647,7 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
     });
     byId('catalogLink').onclick=()=>{if(roomCreating)return;clearCatalog();byId('providerStage').hidden=true;byId('searchStage').hidden=true;byId('linkStage').hidden=false;byId('catalogBack').hidden=false;byId('catalogWordmark').hidden=true;byId('room-link').focus();};
     let friendNoticeCount=0,noticeTab='all',friendActivity={},publishedTitle='';
-    let inviteBusy=false,inviteOwner=null,inviteInbox=[],inviteSeen=new Set(),activeBannerInvite=null;
+    let inviteBusy=false,inviteOwner=null,inviteInbox=[],inviteSeen=new Set(),activeBannerInvite=null,inviteBannerTimer=null;
     const notificationSoundControl=byId('notificationSound');
     let soundEnabled=localStorage.getItem('loopa-notify-sound')!=='false';
     notificationSoundControl.checked=soundEnabled;
@@ -2686,6 +2686,7 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
     });
     function showInviteBanner(invite){
       if(!invite)return;
+      if(inviteBannerTimer!==null){clearTimeout(inviteBannerTimer);inviteBannerTimer=null;}
       activeBannerInvite=invite;
       const name=String(invite.name||'Друг');
       byId('roomInviteNoticeName').textContent=name;
@@ -2694,9 +2695,17 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
       byId('roomInviteNoticeMeta').textContent=inviteMetaText(invite);
       setInviteCover(byId('roomInviteNoticeCover'),byId('roomInviteNoticeImage'),invite.watch_image);
       byId('roomInviteNotice').hidden=false;
+      const bannerKey=inviteKey(invite);
+      inviteBannerTimer=setTimeout(()=>{
+        if(activeBannerInvite&&inviteKey(activeBannerInvite)===bannerKey)hideInviteBanner();
+      },3000);
       playInviteSound();
     }
-    function hideInviteBanner(){byId('roomInviteNotice').hidden=true;activeBannerInvite=null;}
+    function hideInviteBanner(){
+      if(inviteBannerTimer!==null){clearTimeout(inviteBannerTimer);inviteBannerTimer=null;}
+      byId('roomInviteNotice').hidden=true;
+      activeBannerInvite=null;
+    }
     async function handleInviteBanner(action){
       const invitation=activeBannerInvite;
       if(!invitation)return;
