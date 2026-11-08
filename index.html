@@ -2762,6 +2762,18 @@ html.telegram-miniapp .toast {
     byId('catalogLink').onclick=()=>{if(roomCreating)return;clearCatalog();byId('providerStage').hidden=true;byId('searchStage').hidden=true;byId('linkStage').hidden=false;byId('catalogBack').hidden=false;byId('catalogWordmark').hidden=true;byId('room-link').focus();};
     let friendNoticeCount=0,noticeTab='all',friendActivity={},publishedTitle='';
     let inviteBusy=false,inviteOwner=null,inviteInbox=[],inviteSeen=new Set(),activeBannerInvite=null,inviteBannerTimer=null;
+    // Preserve delivered notifications across video/player reloads and page restarts.
+    function inviteSeenStorageKey(owner){return 'loopa-invite-seen-v1:'+owner;}
+    function loadSeenInvites(owner){
+      try{
+        const entries=JSON.parse(localStorage.getItem(inviteSeenStorageKey(owner))||'[]');
+        return new Set(Array.isArray(entries)?entries.filter(x=>typeof x==='string').slice(-300):[]);
+      }catch{return new Set();}
+    }
+    function saveSeenInvites(owner){
+      if(!owner)return;
+      try{localStorage.setItem(inviteSeenStorageKey(owner),JSON.stringify(Array.from(inviteSeen).slice(-300)));}catch{}
+    }
     const notificationSoundControl=byId('notificationSound');
     let soundEnabled=true;
     try{soundEnabled=localStorage.getItem('loopa-notify-sound')!=='false';}catch{/* Storage may be restricted inside in-app browsers. */}
@@ -2933,10 +2945,11 @@ html.telegram-miniapp .toast {
       if(!owner||!client){inviteOwner=null;inviteInbox=[];inviteSeen.clear();hideInviteBanner();renderRoomNotices();updateUnifiedBadge();return;}
       if(inviteBusy)return;inviteBusy=true;
       try{const data=await inviteRPC('inbox');if(currentUser?.id!==owner)return;if(!Array.isArray(data))throw Error('Не удалось прочитать приглашения');
-        if(inviteOwner!==owner){inviteOwner=owner;inviteSeen.clear();}inviteInbox=data;syncDeferredInvites(data);
+        if(inviteOwner!==owner){inviteOwner=owner;inviteSeen=loadSeenInvites(owner);}inviteInbox=data;syncDeferredInvites(data);
         updateUnifiedBadge();renderRoomNotices();
         const fresh=data.find(x=>!inviteSeen.has(inviteKey(x))&&!isInviteDeferred(x));
         data.forEach(x=>inviteSeen.add(inviteKey(x)));
+        saveSeenInvites(owner);
         if(fresh)showInviteBanner(fresh);
         if(!data.length)hideInviteBanner();
       }catch(e){if(inviteDialog.open&&byId('shareRoomLink').hidden)byId('inviteHint').textContent=inviteError(e);}
