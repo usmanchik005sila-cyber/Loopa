@@ -2674,6 +2674,10 @@ html.telegram-miniapp .toast {
     });
     setInterval(async()=>{if(roomPoll||lastPage!=='rooms'||!roomState||document.hidden)return;roomPoll=true;try{await roomRun('read');}finally{roomPoll=false;}},1500);
 
+    // Initialize Telegram bridge before reading Mini App launch parameters.
+    // A temporal-dead-zone error here used to abort the rest of the app startup.
+    const telegramWebApp = window.Telegram?.WebApp || null;
+    const isTelegramMiniApp = !!telegramWebApp?.initData;
     let invitationBusy=false;
     let pendingInvite=new URL(location.href).searchParams.get('room');
     // BotFather Main Mini App direct links can carry startapp=room_<12-hex-code>.
@@ -3264,8 +3268,6 @@ html.telegram-miniapp .toast {
     let lastPage = 'home';
     // Telegram's WebApp bridge is UI-only here. Never use initDataUnsafe as proof
     // of identity: Mini App sign-in needs separate SERVER-side initData validation.
-    const telegramWebApp = window.Telegram?.WebApp || null;
-    const isTelegramMiniApp = !!telegramWebApp?.initData;
     function syncTelegramNavigation(){
       if(!isTelegramMiniApp)return;
       try{
