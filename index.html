@@ -2312,8 +2312,32 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
       byId('roomSheet').close();
     });
     let watchBaseHeight=0,watchWidth=0,watchKeyboardOpen=false,watchViewportTimer=0,watchViewportSettleTimer=0,watchLastHeight=0;
+    let watchDismissActive=false,watchDismissTimer=0;
+    const watchRoomWidth=()=>Math.min(document.documentElement.clientWidth||window.innerWidth,cinemaModeEnabled?1160:900);
     function watchNormalPlayer(height,width){
       return cinemaModeEnabled&&width>900 ? Math.min(width*9/16,height*.56) : Math.min(width*9/16,430);
+    }
+    function endWatchDismiss(){
+      watchDismissActive=false;
+      if(watchDismissTimer)clearTimeout(watchDismissTimer);
+      watchDismissTimer=0;
+    }
+    function beginWatchKeyboardDismiss(){
+      if(!watchBrowserIOS||!document.body.classList.contains('roomViewing')||watchDismissActive)return;
+      const viewport=window.visualViewport;
+      const currentHeight=viewport?.height||window.innerHeight;
+      const fullHeight=Math.max(watchBaseHeight||0,window.innerHeight||0,currentHeight);
+      if(fullHeight-currentHeight<70&&!watchKeyboardOpen)return;
+      watchDismissActive=true;
+      watchKeyboardOpen=false;
+      document.body.classList.remove('chatTyping');
+      const root=document.documentElement,roomWidth=watchRoomWidth();
+      root.style.setProperty('--watch-height',fullHeight+'px');
+      root.style.setProperty('--watch-player-height',watchNormalPlayer(fullHeight,roomWidth)+'px');
+      root.style.setProperty('--watch-player-width',roomWidth+'px');
+      root.style.setProperty('--watch-top','0px');
+      if(watchKeepBottom)watchLog.scrollTop=watchLog.scrollHeight;
+      watchDismissTimer=setTimeout(()=>{endWatchDismiss();scheduleWatchViewport();},850);
     }
     let watchKeepBottom=true;
     const watchLog=byId('chatLog'),watchField=byId('chatText');
@@ -2355,6 +2379,11 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
       const height=viewport?.height||window.innerHeight;
       if(viewport&&Math.abs(viewport.scale-1)>.02)return;
       const focused=document.activeElement===watchField;
+      if(watchDismissActive){
+        if(focused){endWatchDismiss();}
+        else if(height>=Math.max(0,watchBaseHeight-55)){endWatchDismiss();}
+        else return;
+      }
       if(width!==watchWidth){watchWidth=width;watchBaseHeight=Math.max(height,window.innerHeight);}
       if(!focused&&!watchKeyboardOpen)watchBaseHeight=height;
       // Retain the open state through blur until the keyboard actually retreats.
@@ -2387,6 +2416,7 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
     }
     function stopWatchViewport(){
       restoreWatchField();
+      endWatchDismiss();
       watchKeyboardOpen=false;
       if(watchViewportTimer)cancelAnimationFrame(watchViewportTimer);
       watchViewportTimer=0;
@@ -2426,8 +2456,8 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
     window.visualViewport?.addEventListener('scroll',scheduleWatchViewport);
     window.addEventListener('resize',scheduleWatchViewport);
     window.addEventListener('scroll',scheduleWatchViewport,{passive:true});
-    watchField.addEventListener('focus',scheduleWatchViewport);
-    watchField.addEventListener('blur',scheduleWatchViewport);
+    watchField.addEventListener('focus',()=>{endWatchDismiss();scheduleWatchViewport();});
+    watchField.addEventListener('blur',()=>{beginWatchKeyboardDismiss();scheduleWatchViewport();});
     syncWatchViewport();
     const tray=byId('emojiTray'), emojiOpen=byId('emojiOpen');
     function closeEmoji(){tray.hidden=true;emojiOpen.setAttribute('aria-expanded','false');}
