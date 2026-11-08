@@ -321,9 +321,7 @@
     .circle.profile-with-photo .top-profile-avatar{width:100%;height:100%;border-radius:inherit;object-fit:cover;}
     .circle.profile-with-photo .top-profile-initial{color:#252326;display:grid;place-items:center;width:100%;height:100%;background:#e4ddd7;}
     [data-page]{transform-origin:50% 12%;}
-    #content.page-crossfading{position:relative;}
-    #content>.page-transition-out{position:absolute;inset:0;z-index:2;pointer-events:none;}
-    #content>.page-transition-in{position:relative;z-index:1;}
+    #content>.page-transition-out{pointer-events:none;}
     @keyframes loopaPageArrive{
       from{opacity:0;transform:translate3d(0,12px,0) scale(.995)}
       to{opacity:1;transform:translate3d(0,0,0) scale(1)}
@@ -2209,7 +2207,7 @@ body[data-theme] .theme-choice .theme-check{color:var(--silver)}
     byId('saveAccess').onclick=async function(){this.disabled=true;try{await roomCall('access',{media:JSON.stringify({mode:byId('accessMode').value,ids:[...byId('pick').querySelectorAll('input:checked')].map(c=>c.value)})});byId('roomSheet').close();showToast('Доступ обновлён');}catch(err){showToast(err.message);}finally{this.disabled=false;}};
     function roomExit(){applyCinemaMode(false);clearRoomSignals();clearTimeout(roomPeopleTimer);peopleFlash.classList.remove('is-visible');watchPeerSession='';watchPeerSeen.clear();stopWatchViewport();document.body.classList.remove('roomViewing','chatTyping');closeCatalog(true);closeEmoji();byId("room-link").value="";byId('roomSheet').close();byId('chatText').value='';byId('chatLog').replaceChildren();roomEpoch++;syncSnapshot=null;roomState=null;roomUser=null;mountRoomPlayer('');byId('room-active').hidden=true;byId('room-lobby').hidden=false;byId('room-recent').replaceChildren();byId('room-note').textContent='';}
     async function roomCall(op,args={}){
-      if(!currentUser||!client){showPage('profile');showToast('Войди в аккаунт');return;}
+      if(!currentUser||!client){showPage('profile',()=>showToast('Войди в аккаунт'));return;}
       const u=currentUser.id, epoch=roomEpoch;
       const request=client.rpc('loopa_room16',{op,room:roomState?.code||'',...args});
       let response;
@@ -2272,7 +2270,7 @@ body[data-theme] .theme-choice .theme-check{color:var(--silver)}
       try{if(navigator.share)await navigator.share(invitation);else{await navigator.clipboard.writeText(url.href);showToast('Ссылка скопирована — отправь другу');}}
       catch(e){if(e.name!=='AbortError')showToast('Не удалось поделиться ссылкой');}
     };
-    if(pendingInvite)setTimeout(()=>{if(currentUser)acceptInvite();else{showPage('profile');showToast('Войди, чтобы присоединиться к комнате');}},1200);
+    if(pendingInvite)setTimeout(()=>{if(currentUser)acceptInvite();else{showPage('profile',()=>showToast('Войди, чтобы присоединиться к комнате'));}},1200);
     const catalogDialog=byId('catalog');
     let roomCreating=false;
     function closeCatalog(keepRoom=false){
@@ -2284,7 +2282,7 @@ body[data-theme] .theme-choice .theme-check{color:var(--silver)}
     function openCatalog(){catalogProviders();if(!catalogDialog.open)catalogDialog.showModal();byId('catalogOpen').setAttribute('aria-expanded','true');}
     async function createWithCatalog(button){
       if(roomCreating)return;
-      if(!currentUser||!client){showPage('profile');showToast('Войди в аккаунт');return;}
+      if(!currentUser||!client){showPage('profile',()=>showToast('Войди в аккаунт'));return;}
       roomExit();roomCreating=true;button.disabled=true;
       try{openCatalog();catalogBusy(true);showPage('rooms');await roomCall('create');if(!catalogDialog.open||!hostHere())return;}
       catch(e){closeCatalog(true);showPage('home');showToast(e.message);}
@@ -2708,7 +2706,7 @@ body[data-theme] .theme-choice .theme-check{color:var(--silver)}
     byId('catalogForm').onsubmit=e=>{e.preventDefault();searchCatalog(false);};
     byId('nextVideos').onclick=()=>searchCatalog(true);
     let lastPage = 'home';
-    let activePageCrossfade=null;
+    let activePageTransition=null;
     let roomPeerJourney=false; // Visiting someone's profile from a room must not end the room.
     const navigationReducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)');
     let nativeNavigationUpdating=false;
@@ -2733,45 +2731,52 @@ body[data-theme] .theme-choice .theme-check{color:var(--silver)}
         animation.oncancel=()=>{if(element._loopaAnimation===animation)element._loopaAnimation=null;};
       }
     }
-    function finishPageCrossfade(){
-      const transition=activePageCrossfade;
-      if(!transition)return;
-      transition.outgoingAnimation?.cancel();
-      transition.incomingAnimation?.cancel();
-      transition.outgoing.classList.remove('page-transition-out');
-      transition.incoming.classList.remove('page-transition-in');
-      transition.outgoing.inert=transition.previousInert;
-      if(transition.previousAriaHidden===null)transition.outgoing.removeAttribute('aria-hidden');
-      else transition.outgoing.setAttribute('aria-hidden',transition.previousAriaHidden);
-      transition.content.classList.remove('page-crossfading');
-      transition.content.style.minHeight=transition.previousMinHeight;
-      transition.outgoing.hidden=transition.outgoing.dataset.page!==lastPage;
-      transition.incoming.hidden=transition.incoming.dataset.page!==lastPage;
-      activePageCrossfade=null;
+    function restorePageTransition(transition){
+      transition.from.classList.remove('page-transition-out');
+      transition.from.inert=transition.previousInert;
+      if(transition.previousAriaHidden===null)transition.from.removeAttribute('aria-hidden');
+      else transition.from.setAttribute('aria-hidden',transition.previousAriaHidden);
+      if(transition.from._loopaAnimation===transition.animation)transition.from._loopaAnimation=null;
     }
-    function crossfadePages(outgoing,incoming){
-      if(outgoing._loopaAnimation){outgoing._loopaAnimation.cancel();outgoing._loopaAnimation=null;}
-      if(incoming._loopaAnimation){incoming._loopaAnimation.cancel();incoming._loopaAnimation=null;}
-      const content=byId('content');
-      const transition={outgoing,incoming,content,previousMinHeight:content.style.minHeight,previousAriaHidden:outgoing.getAttribute('aria-hidden'),previousInert:outgoing.inert===true};
-      activePageCrossfade=transition;
-      content.classList.add('page-crossfading');
-      outgoing.classList.add('page-transition-out');
-      incoming.classList.add('page-transition-in');
-      outgoing.setAttribute('aria-hidden','true');
-      outgoing.inert=true;
-      const stableHeight=Math.max(outgoing.scrollHeight,incoming.scrollHeight);
-      if(stableHeight)content.style.minHeight=stableHeight+'px';
+    function completePageTransition(transition){
+      if(activePageTransition!==transition)return;
+      activePageTransition=null;
+      if(transition.animation){
+        transition.animation.onfinish=null;
+        transition.animation.oncancel=null;
+        transition.animation.cancel();
+      }
+      restorePageTransition(transition);
+      transition.from.hidden=true;
+      showPageNow(transition.destination,true);
+      if(typeof transition.afterTransition==='function')transition.afterTransition();
+    }
+    function finishPendingPageTransition(){
+      if(activePageTransition)completePageTransition(activePageTransition);
+    }
+    function showPage(destination,afterTransition){
+      finishPendingPageTransition();
+      const changed=destination!==lastPage;
+      const fromPage=changed?Array.from(pages).find(page=>page.dataset.page===lastPage&&!page.hidden):null;
+      const toPage=Array.from(pages).find(page=>page.dataset.page===destination);
+      const canFadeOut=!!(changed&&fromPage&&toPage&&!navigationReducedMotion.matches
+        &&lastPage!=='rooms'&&lastPage!=='dm'&&destination!=='rooms'&&destination!=='dm'
+        &&typeof fromPage.animate==='function');
+      if(!canFadeOut){showPageNow(destination);if(typeof afterTransition==='function')afterTransition();return;}
+      if(fromPage._loopaAnimation){fromPage._loopaAnimation.cancel();fromPage._loopaAnimation=null;}
+      const transition={from:fromPage,destination,afterTransition,previousAriaHidden:fromPage.getAttribute('aria-hidden'),previousInert:fromPage.inert===true,animation:null};
+      activePageTransition=transition;
+      fromPage.classList.add('page-transition-out');
+      fromPage.setAttribute('aria-hidden','true');
+      fromPage.inert=true;
       try{
-        const outgoingAnimation=outgoing.animate([{opacity:1},{opacity:0}],{duration:240,easing:'ease-out',fill:'forwards'});
-        const incomingAnimation=incoming.animate([{opacity:0,transform:'translate3d(0,10px,0)'},{opacity:1,transform:'translate3d(0,0,0)'}],{duration:280,easing:'cubic-bezier(.22,.61,.36,1)',fill:'forwards'});
-        transition.outgoingAnimation=outgoingAnimation;
-        transition.incomingAnimation=incomingAnimation;
-        const track=(element,animation)=>{element._loopaAnimation=animation;animation.onfinish=()=>{if(element._loopaAnimation===animation)element._loopaAnimation=null;};animation.oncancel=()=>{if(element._loopaAnimation===animation)element._loopaAnimation=null;};};
-        track(outgoing,outgoingAnimation);
-        track(incoming,incomingAnimation);
-        Promise.all([outgoingAnimation.finished.catch(()=>{}),incomingAnimation.finished.catch(()=>{})]).then(()=>{if(activePageCrossfade===transition)finishPageCrossfade();});
-      }catch(error){finishPageCrossfade();}
+        const animation=fromPage.animate([{opacity:1},{opacity:0}],{duration:110,easing:'ease-in',fill:'forwards'});
+        transition.animation=animation;
+        fromPage._loopaAnimation=animation;
+        animation.onfinish=()=>completePageTransition(transition);
+        animation.oncancel=()=>{if(fromPage._loopaAnimation===animation)fromPage._loopaAnimation=null;};
+        animation.finished.catch(()=>{});
+      }catch(error){completePageTransition(transition);}
     }
     // Independent DM viewport prevents iOS Safari from scrolling the whole website
     // when focusing a text field, and returns to its normal size on keyboard dismissal.
@@ -2800,8 +2805,7 @@ body[data-theme] .theme-choice .theme-check{color:var(--silver)}
       document.documentElement.style.removeProperty('--dm-visual-top');
       document.documentElement.style.removeProperty('--dm-visual-height');
     }
-    function showPage(destination) {
-      finishPageCrossfade();
+    function showPageNow(destination,animateProfile=false) {
       if(lastPage==='messages'&&destination!=='messages')stopMessagesInbox();
       if(lastPage==='dm' && destination!=='dm')clearDirectMessageChannel();
       if(destination==='dm'&&lastPage!=='dm')setDmViewing(true);
@@ -2815,21 +2819,14 @@ body[data-theme] .theme-choice .theme-check{color:var(--silver)}
       if(destination==='rooms')roomPeerJourney=false;
       if(destination==='rooms' && !roomState && currentUser) roomRun('list');
       const changed = destination !== lastPage;
-      const toPage=Array.from(pages).find(page=>page.dataset.page===destination);
-      const fromPage=changed?Array.from(pages).find(page=>page.dataset.page===lastPage&&!page.hidden):null;
-      const canCrossfade=!!(changed&&fromPage&&toPage&&!navigationReducedMotion.matches
-        &&lastPage!=='rooms'&&lastPage!=='dm'&&destination!=='rooms'&&destination!=='dm'
-        &&typeof fromPage.animate==='function'&&typeof toPage.animate==='function');
       pages.forEach(page => {
-        const active=page===toPage;
-        const outgoing=canCrossfade&&page===fromPage;
-        if(!active&&!outgoing&&page._loopaAnimation){page._loopaAnimation.cancel();page._loopaAnimation=null;}
-        page.hidden=!(active||outgoing);
-        page.classList.remove('page-enter');
+        const active = page.dataset.page === destination;
+        if(!active && page._loopaAnimation){page._loopaAnimation.cancel();page._loopaAnimation=null;}
+        page.hidden = !active;
+        page.classList.remove('page-enter','page-transition-out');
+        if (active && changed && (destination!=='profile'||animateProfile)) animateContent(page, destination==='rooms'||destination==='dm');
       });
-      lastPage=destination;
-      if(canCrossfade)crossfadePages(fromPage,toPage);
-      else if(toPage&&changed&&destination!=='profile')animateContent(toPage,destination==='rooms'||destination==='dm');
+      lastPage = destination;
       tabs.forEach(tab => {
         const active = tab.dataset.go === (destination==='rooms'?'home':(destination==='friend-profile'?'friends':(destination==='dm'?(dmPageReturn==='messages'?'messages':'friends'):destination)));
         tab.classList.toggle('active', active);
@@ -3621,7 +3618,7 @@ body[data-theme] .theme-choice .theme-check{color:var(--silver)}
       if (trigger) trigger.setAttribute('aria-label',safeCount+' новых заявок');
     }
     function openRequestsDialog() {
-      if (!currentUser) { showPage('profile'); showToast('Войди в аккаунт, чтобы посмотреть заявки'); return; }
+      if (!currentUser) { showPage('profile',()=>showToast('Войди в аккаунт, чтобы посмотреть заявки')); return; }
       byId('requests-overlay').hidden=false;
       pollInvites();renderRoomNotices();
       refreshFriendLists();
@@ -3791,7 +3788,7 @@ body[data-theme] .theme-choice .theme-check{color:var(--silver)}
       }
       if(event.target.closest('[data-open-blacklist]')){
         document.querySelectorAll('.friend-actions-menu').forEach(item=>item.hidden=true);
-        showPage('profile'); openSettings('privacy'); return;
+        showPage('profile',()=>openSettings('privacy')); return;
       }
       if(!event.target.closest('.friend-actions')) document.querySelectorAll('.friend-actions-menu').forEach(item=>item.hidden=true);
     });
@@ -3960,10 +3957,7 @@ body[data-theme] .theme-choice .theme-check{color:var(--silver)}
       // Top-right avatar is a shortcut to personal details, not the settings overview.
       // Guests still see the regular login/registration screen.
       if (button.id === 'top-profile-button') {
-        navigateSmoothly(()=>{
-          showPage('profile');
-          if(currentUser)openSettings('account');
-        });
+        navigateSmoothly(()=>showPage('profile',()=>{if(currentUser)openSettings('account');}));
         return;
       }
       if (button.dataset.go) navigateSmoothly(()=>showPage(button.dataset.go));
@@ -4257,10 +4251,11 @@ body[data-theme] .theme-choice .theme-check{color:var(--silver)}
     // Recovery link from Supabase opens the site with a recovery session.
     // Ask for a new password rather than leaving the account signed in without changing it.
     function passwordRecovery() {
-      showPage('profile');
-      openSettings('account');
-      byId('recovery-form').hidden = false;
-      feedback('profile-feedback','Введите новый пароль, чтобы завершить восстановление доступа.');
+      showPage('profile',()=>{
+        openSettings('account');
+        byId('recovery-form').hidden = false;
+        feedback('profile-feedback','Введите новый пароль, чтобы завершить восстановление доступа.');
+      });
     }
     byId('recovery-form').addEventListener('submit', async (event) => {
       event.preventDefault();
