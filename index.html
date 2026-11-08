@@ -1158,6 +1158,18 @@ body[data-theme].roomViewing #room-active #chatText{background:var(--loopa-input
 body[data-theme].roomViewing #room-active #chatText::placeholder{color:var(--muted)}
 body[data-theme].roomViewing #room-active #chatForm #roomChatSend{background:var(--loopa-accent-bg)!important;color:var(--loopa-accent-ink)!important}
 body[data-theme] .theme-choice .theme-check{color:var(--silver)}
+
+/* Personal playback checkpoint: compact prompt above the room conversation. */
+#resumeBanner[hidden]{display:none!important}
+#resumeBanner{display:flex;align-items:center;gap:10px;flex:none;margin:8px 0 10px;padding:11px 12px;border:1px solid #ffffff20;border-radius:15px;background:linear-gradient(125deg,#ffffff15,#ffffff06);color:#f0eff2;font:13px system-ui}
+#resumeBanner .resumeCopy{display:flex;flex:1;min-width:0;flex-direction:column;gap:3px}
+#resumeBanner .resumeCopy strong{font-size:13px;font-weight:600}
+#resumeBanner .resumeCopy small{font-size:11px;color:#b6b3be}
+#resumeBanner button{flex:none;border:1px solid #ffffff25;background:#e6e6e9;color:#19191d;border-radius:10px;padding:9px 12px;font:600 12px system-ui;cursor:pointer}
+#resumeBanner #resumeDismiss{width:32px;height:32px;padding:0;border-radius:50%;background:#ffffff12;color:#d8d8dc;font-size:19px;font-weight:400}
+body.roomViewing #resumeBanner{margin:0 -14px;padding:10px 14px;border-radius:0;border-inline:0;border-top:0;background:#161619}
+body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
+@media(max-width:360px){#resumeBanner{gap:6px}#resumeBanner button{padding:8px 9px;font-size:11px}}
 </style>
 </head>
 <body>
@@ -1626,6 +1638,90 @@ body[data-theme] .theme-choice .theme-check{color:var(--silver)}
     });
     const loopaSeek=byId('loopaSeek');
     const formatVideoTime=seconds=>{const n=Math.max(0,Math.floor(Number(seconds)||0));return n>=3600?`${Math.floor(n/3600)}:${String(Math.floor(n%3600/60)).padStart(2,'0')}:${String(n%60).padStart(2,'0')}`:`${Math.floor(n/60)}:${String(n%60).padStart(2,'0')}`;};
+
+    // Resume v1: personal, account-scoped checkpoints stored on this device.
+    // Only the room owner may apply a checkpoint, and never while a peer is online.
+    const resumeStorageKey=()=>currentUser?.id?'loopa-resume-v1:'+currentUser.id:null;
+    const resumeBanner=document.createElement('div');
+    resumeBanner.id='resumeBanner';
+    resumeBanner.hidden=true;
+    resumeBanner.setAttribute('role','group');
+    resumeBanner.setAttribute('aria-label','Продолжить просмотр');
+    resumeBanner.innerHTML='<span class="resumeCopy"><strong>Продолжить просмотр?</strong><small id="resumePosition"></small></span><button type="button" id="resumeApply">Продолжить</button><button type="button" id="resumeDismiss" aria-label="Скрыть предложение">×</button>';
+    byId('chatLog').before(resumeBanner);
+    let resumePrompt=null,resumeRestorePending=null,resumePlayerReady=false;
+    function readResumeCheckpoints(){
+      const key=resumeStorageKey();if(!key)return [];
+      try{
+        const parsed=JSON.parse(localStorage.getItem(key)||'[]');
+        return Array.isArray(parsed)?parsed.filter(x=>x&&typeof x.video==='string'&&Number.isFinite(x.pos)&&x.pos>=20&&Number.isFinite(x.savedAt)):[];
+      }catch{return [];}
+    }
+    function readSavedResume(video){
+      if(!video)return null;
+      const found=readResumeCheckpoints().find(x=>x.video===video);
+      return found&&Date.now()-found.savedAt<90*86400000?found:null;
+    }
+    function saveResumeCheckpoint(){
+      if(!roomState?.video||!resumeStorageKey()||rutubeAd||!sample)return;
+      const age=performance.now()-sample.now;
+      if(age<0||age>5000||!Number.isFinite(sample.pos))return;
+      const pos=Math.max(0,sample.pos+(sample.playing?Math.min(5,age/1000):0));
+      if(pos<20||pos>360000)return;
+      const duration=Number.isFinite(mediaDuration)?mediaDuration:0;
+      let entries=readResumeCheckpoints().filter(x=>x.video!==roomState.video);
+      const completed=duration>30&&(pos>=duration-12||pos>=duration*.98);
+      if(!completed)entries.unshift({video:roomState.video,pos:Math.round(pos),duration:Math.round(duration),room:roomState.code,savedAt:Date.now()});
+      try{localStorage.setItem(resumeStorageKey(),JSON.stringify(entries.slice(0,20)));}catch{}
+    }
+    function hideResumePrompt(){
+      resumePrompt=null;
+      resumeBanner.hidden=true;
+    }
+    function roomIsSolo(data){
+      return Array.isArray(data?.members)&&!data.members.some(m=>m.id!==data.host&&m.online);
+    }
+    function offerSavedResume(data){
+      hideResumePrompt();
+      if(!currentUser||!data?.video||data.host!==currentUser.id||!roomIsSolo(data))return;
+      const record=readSavedResume(data.video);
+      if(!record)return;
+      const serverPos=Number(data.pos)||0;
+      // Never rewind an already more advanced room timeline.
+      if(record.pos<=serverPos+8)return;
+      resumePrompt={user:currentUser.id,code:data.code,video:data.video,pos:record.pos,epoch:roomEpoch};
+      byId('resumePosition').textContent='Остановились на '+formatVideoTime(record.pos);
+      resumeBanner.hidden=false;
+    }
+    function tryApplyResume(){
+      const target=resumeRestorePending;
+      if(!target)return;
+      if(!roomState||!currentUser||!hostHere()||!roomIsSolo(roomState)
+        ||target.user!==currentUser.id||target.code!==roomState.code
+        ||target.video!==roomState.video||target.epoch!==roomEpoch){
+        resumeRestorePending=null;return;
+      }
+      if(!resumePlayerReady||rutubeAd)return;
+      resumeRestorePending=null;
+      // Reuse existing host transport, server RPC and guest synchronization.
+      void runTransportAction({seconds:target.pos,playing:false});
+    }
+    byId('resumeDismiss').addEventListener('click',hideResumePrompt);
+    byId('resumeApply').addEventListener('click',()=>{
+      const choice=resumePrompt;
+      if(!choice)return;
+      if(!hostHere()||!roomIsSolo(roomState)||choice.user!==currentUser?.id
+        ||choice.code!==roomState?.code||choice.video!==roomState?.video
+        ||choice.epoch!==roomEpoch){
+        hideResumePrompt();showToast('Просмотр уже изменился. Перемотка отменена');return;
+      }
+      resumeRestorePending=choice;
+      hideResumePrompt();
+      tryApplyResume();
+    });
+    setInterval(saveResumeCheckpoint,10000);
+    document.addEventListener('visibilitychange',()=>{if(document.hidden)saveResumeCheckpoint();});
+    window.addEventListener('pagehide',saveResumeCheckpoint);
     let seekingTimeline=false;
     function refreshTransport(){
       const playing=!!sample?.playing;
@@ -1831,9 +1927,11 @@ body[data-theme] .theme-choice .theme-check{color:var(--silver)}
     // v85: do not force captions via unsupported IFrame API "track" settings.
     // Let the YouTube player honor its own caption preferences and native CC menu.
     function readyPlayer(){
+      resumePlayerReady=true;tryApplyResume();
       syncPlayback();updatePlaybackControls();
     }
     function mountRoomPlayer(url){
+      resumePlayerReady=false;resumeRestorePending=null;hideResumePrompt();
       sample=null;observed={playing:false,pos:0};pending=null;ytPlayer=null;vkPlayer=null;syncSnapshot=null;guestManualUntil=0;nativeNeedsStart=true;nativeAccess=true;localMuted=false;syncProblem='';
       applyingUntil=0;lastPlaybackPublish=0;lastGuestCorrection=0;rutubeAd=false;mediaDuration=0;clearTimeout(overlayTimer);videoStage.classList.remove('controlsVisible');
       const frame=document.createElement('iframe');frame.id='room-frame';frame.title='Видео комнаты';frame.allow='autoplay; encrypted-media; fullscreen; picture-in-picture';frame.allowFullscreen=true;
@@ -2205,7 +2303,7 @@ body[data-theme] .theme-choice .theme-check{color:var(--silver)}
     roomSheet.addEventListener('click',e=>{if(e.target===roomSheet&&outsideSheet(e))roomSheet.close();});
 
     byId('saveAccess').onclick=async function(){this.disabled=true;try{await roomCall('access',{media:JSON.stringify({mode:byId('accessMode').value,ids:[...byId('pick').querySelectorAll('input:checked')].map(c=>c.value)})});byId('roomSheet').close();showToast('Доступ обновлён');}catch(err){showToast(err.message);}finally{this.disabled=false;}};
-    function roomExit(){applyCinemaMode(false);clearRoomSignals();clearTimeout(roomPeopleTimer);peopleFlash.classList.remove('is-visible');watchPeerSession='';watchPeerSeen.clear();stopWatchViewport();document.body.classList.remove('roomViewing','chatTyping');closeCatalog(true);closeEmoji();byId("room-link").value="";byId('roomSheet').close();byId('chatText').value='';byId('chatLog').replaceChildren();roomEpoch++;syncSnapshot=null;roomState=null;roomUser=null;mountRoomPlayer('');byId('room-active').hidden=true;byId('room-lobby').hidden=false;byId('room-recent').replaceChildren();byId('room-note').textContent='';}
+    function roomExit(){saveResumeCheckpoint();resumeRestorePending=null;hideResumePrompt();applyCinemaMode(false);clearRoomSignals();clearTimeout(roomPeopleTimer);peopleFlash.classList.remove('is-visible');watchPeerSession='';watchPeerSeen.clear();stopWatchViewport();document.body.classList.remove('roomViewing','chatTyping');closeCatalog(true);closeEmoji();byId("room-link").value="";byId('roomSheet').close();byId('chatText').value='';byId('chatLog').replaceChildren();roomEpoch++;syncSnapshot=null;roomState=null;roomUser=null;mountRoomPlayer('');byId('room-active').hidden=true;byId('room-lobby').hidden=false;byId('room-recent').replaceChildren();byId('room-note').textContent='';}
     async function roomCall(op,args={}){
       if(!currentUser||!client){showPage('profile',()=>showToast('Войди в аккаунт'));return;}
       const u=currentUser.id, epoch=roomEpoch;
@@ -2223,6 +2321,7 @@ body[data-theme] .theme-choice .theme-check{color:var(--silver)}
       const prev=roomState;
       if(op==='read'&&prev&&data.changed<prev.changed)return;
       if(prev?.code===data.code && data.server_time<prev.server_time)return;
+      if(prev?.video&&(prev.code!==data.code||prev.video!==data.video))saveResumeCheckpoint();
       byId('room-active').classList.toggle('choosing',!data.video);
       document.body.classList.toggle('roomViewing',!!data.video&&lastPage==='rooms');
       if(lastPage==='rooms')syncWatchViewport();
@@ -2236,6 +2335,8 @@ body[data-theme] .theme-choice .theme-check{color:var(--silver)}
       byId('room-status').textContent=!data.video?'Ведущий выбирает видео':data.playing?'Идёт просмотр':'На паузе';
       if(data.video&&(!prev||prev.video!==data.video||op==='join'))historyCall('record',{room_code:data.code});
       if(prev?.video!==data.video)mountRoomPlayer(data.video?roomMedia(data.video):'');
+      if(data.video&&(!prev||prev.video!==data.video||op==='join'))offerSavedResume(data);
+      else if(resumePrompt&&(!roomIsSolo(data)||resumePrompt.code!==data.code||resumePrompt.video!==data.video))hideResumePrompt();
       updatePlaybackControls();
       if(!data.video&&hostHere()&&!roomCreating&&!catalogDialog.open)openCatalog();
 
@@ -2473,7 +2574,7 @@ body[data-theme] .theme-choice .theme-check{color:var(--silver)}
       for(const [id,limit] of [['room-recent',2],['homeRecent',2]]){const parent=byId(id);parent.replaceChildren();
         for(const item of items.slice(0,limit)){const button=document.createElement('button');button.type='button';button.className='historyCard';
           const image=videoCover(item);if(image){const img=document.createElement('img');img.src=image;img.alt='';img.loading='lazy';img.onerror=()=>img.hidden=true;button.append(img);}
-          const text=document.createElement('span'),small=document.createElement('small'),title=document.createElement('strong'),hint=document.createElement('span');small.textContent=id==='homeRecent'?'Вы смотрели':'Недавний просмотр';title.textContent=item.title||'Видео';hint.textContent='Вернуться в комнату →';text.append(small,title,hint);button.append(text);
+          const text=document.createElement('span'),small=document.createElement('small'),title=document.createElement('strong'),hint=document.createElement('span');small.textContent=id==='homeRecent'?'Вы смотрели':'Недавний просмотр';title.textContent=item.title||'Видео';const saved=readSavedResume(item.video);hint.textContent=saved?'Сохранено: '+formatVideoTime(saved.pos)+' · Открыть комнату':'Вернуться в комнату →';text.append(small,title,hint);button.append(text);
           button.onclick=async()=>{button.disabled=true;try{showPage('rooms');await roomCall('join',{room:item.code});}catch(e){showToast('Не удалось войти: комната закрыта или доступ изменился');}finally{button.disabled=false;}};parent.append(button);
         }
         if(!items.length&&id==='room-recent'){const empty=document.createElement('p');empty.className='noticeEmpty';empty.textContent='Здесь появятся два последних видео';parent.append(empty);}
