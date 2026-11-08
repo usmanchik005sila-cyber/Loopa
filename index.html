@@ -2947,7 +2947,15 @@ html.telegram-miniapp .toast {
       try{const data=await inviteRPC('inbox');if(currentUser?.id!==owner)return;if(!Array.isArray(data))throw Error('Не удалось прочитать приглашения');
         if(inviteOwner!==owner){inviteOwner=owner;inviteSeen=loadSeenInvites(owner);}inviteInbox=data;syncDeferredInvites(data);
         updateUnifiedBadge();renderRoomNotices();
-        const fresh=data.find(x=>!inviteSeen.has(inviteKey(x))&&!isInviteDeferred(x));
+        // Atomically claim first-time notifications on the server. This avoids duplicates
+        // in Telegram Mini App even when WebView storage is discarded on restart.
+        const {data:claims,error:claimError}=data.length
+          ?await client.rpc('loopa_claim_invite_notices')
+          :{data:[],error:null};
+        if(claimError)throw claimError;
+        if(currentUser?.id!==owner)return;
+        const claimedIds=new Set((Array.isArray(claims)?claims:[]).map(x=>String(x.id)));
+        const fresh=data.find(x=>claimedIds.has(String(x.id))&&!inviteSeen.has(inviteKey(x))&&!isInviteDeferred(x));
         data.forEach(x=>inviteSeen.add(inviteKey(x)));
         saveSeenInvites(owner);
         if(fresh)showInviteBanner(fresh);
