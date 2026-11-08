@@ -2713,13 +2713,16 @@ body[data-theme] .theme-choice .theme-check{color:var(--silver)}
       // new pages over each other on rapid navigation, so do not snapshot the DOM.
       update();
     }
-    function animateContent(element) {
+    function animateContent(element, preserveGeometry=false) {
       if (!element || element.hidden || navigationReducedMotion.matches) return;
-      // Fade only the *new* content in place: no translated duplicates or ghost layers.
+      // Fade the incoming page in place; only standard pages get a small lift.
       if(element._loopaAnimation){element._loopaAnimation.cancel();element._loopaAnimation=null;}
       if (typeof element.animate === 'function') {
-        const animation=element.animate([{opacity:0},{opacity:1}],{
-          duration:185,easing:'ease-out',fill:'none'
+        const keyframes=preserveGeometry
+          ? [{opacity:0},{opacity:1}]
+          : [{opacity:0,transform:'translate3d(0,7px,0)'},{opacity:1,transform:'translate3d(0,0,0)'}];
+        const animation=element.animate(keyframes,{
+          duration:230,easing:'cubic-bezier(.2,.8,.2,1)',fill:'none'
         });
         element._loopaAnimation=animation;
         animation.onfinish=()=>{if(element._loopaAnimation===animation)element._loopaAnimation=null;};
@@ -2772,7 +2775,7 @@ body[data-theme] .theme-choice .theme-check{color:var(--silver)}
         if(!active && page._loopaAnimation){page._loopaAnimation.cancel();page._loopaAnimation=null;}
         page.hidden = !active;
         page.classList.remove('page-enter');
-        if (active && changed && destination!=='profile') animateContent(page);
+        if (active && changed && destination!=='profile') animateContent(page, destination==='rooms'||destination==='dm');
       });
       lastPage = destination;
       tabs.forEach(tab => {
