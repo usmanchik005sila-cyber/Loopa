@@ -1681,6 +1681,10 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
       resumePrompt=null;
       resumeBanner.hidden=true;
     }
+    function showResumePromptIfReady(){
+      if(!resumePrompt||!resumePlayerReady)return;
+      resumeBanner.hidden=false;
+    }
     function roomIsSolo(data){
       return Array.isArray(data?.members)&&!data.members.some(m=>m.id!==data.host&&m.online);
     }
@@ -1693,7 +1697,7 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
       // Offer the actual measured checkpoint; the solo host chooses explicitly.
       resumePrompt={user:currentUser.id,code:data.code,video:data.video,pos:record.pos,epoch:roomEpoch};
       byId('resumePosition').textContent='Остановились на '+formatVideoTime(record.pos);
-      resumeBanner.hidden=false;
+      showResumePromptIfReady();
     }
     function tryApplyResume(){
       const target=resumeRestorePending;
@@ -1717,21 +1721,24 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
         ||choice.epoch!==roomEpoch){
         hideResumePrompt();showToast('Просмотр уже изменился. Перемотка отменена');return;
       }
-      hideResumePrompt();
-      // iOS Safari can render a black YouTube iframe when a paused seek is
-      // issued before the native player has actually begun playback. Load the
-      // embed at the saved timestamp instead, leaving native Play to the user.
       if(roomState.video.includes('youtube.com/embed/')){
         const seconds=Math.max(0,Math.floor(choice.pos));
-        const embed=new URL(roomMedia(roomState.video));
-        embed.searchParams.set('start',String(seconds));
-        embed.searchParams.delete('autoplay');
-        mountRoomPlayer(embed.toString());
-        sample={pos:seconds,playing:false,now:performance.now()};
-        pending={op:'pause',seconds,video:roomState.video,code:roomState.code,epoch:roomEpoch};
-        flushPlayback();
+        const videoId=new URL(roomState.video).pathname.match(/^\/embed\/([\w-]{11})/)?.[1];
+        if(!resumePlayerReady||!ytPlayer?.loadVideoById||!videoId){
+          showToast('Плеер ещё загружается. Попробуй ещё раз');
+          return;
+        }
+        try{ytPlayer.loadVideoById({videoId,startSeconds:seconds});}
+        catch(e){showToast('Не удалось продолжить видео. Попробуй ещё раз');return;}
+        hideResumePrompt();
+        applyingUntil=performance.now()+1200;
+        sample={pos:seconds,playing:true,now:performance.now()};
+        pending={op:'play',seconds,video:roomState.video,code:roomState.code,epoch:roomEpoch};
+        void flushPlayback();
+        updatePlaybackControls();
         return;
       }
+      hideResumePrompt();
       resumeRestorePending=choice;
       tryApplyResume();
     });
@@ -1943,7 +1950,7 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
     // v85: do not force captions via unsupported IFrame API "track" settings.
     // Let the YouTube player honor its own caption preferences and native CC menu.
     function readyPlayer(){
-      resumePlayerReady=true;tryApplyResume();
+      resumePlayerReady=true;showResumePromptIfReady();tryApplyResume();
       syncPlayback();updatePlaybackControls();
     }
     function mountRoomPlayer(url){
