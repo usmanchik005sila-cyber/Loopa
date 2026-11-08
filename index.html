@@ -13,6 +13,12 @@
   <meta name="loopa-version" content="v94">
   <meta name="loopa-build" content="v97-telegram-secure-auth">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script>
+if(window.Telegram?.WebApp?.initData){
+  document.documentElement.classList.add('loopa-tg-booting');
+  setTimeout(()=>document.documentElement.classList.remove('loopa-tg-booting'),3000);
+}
+</script>
 
 <script>
     try{const m=localStorage.getItem('loopa-wallpaper-motion');document.documentElement.dataset.wallpaperExplicit=String(m==='on');document.documentElement.dataset.wallpaperMotion=m==='off'?'off':'on';}catch{document.documentElement.dataset.wallpaperExplicit='false';document.documentElement.dataset.wallpaperMotion='on';}
@@ -1264,6 +1270,15 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
   padding-bottom:max(12px, var(--loopa-tg-safe-bottom, 0px)) !important;
 }
 
+/* Brand transition after the native Telegram splash; invisible in Safari/Chrome. */
+#loopaTgSplash{display:none}
+html.loopa-tg-booting #loopaTgSplash{
+ display:flex;position:fixed;inset:0;z-index:2147483640;align-items:center;
+ justify-content:center;flex-direction:column;gap:16px;background:#090a0c;color:#f4f0ef;pointer-events:none
+}
+#loopaTgSplash .splashMark{font:400 clamp(46px,12vw,70px)/1 Georgia,"Times New Roman",serif;letter-spacing:.085em}
+#loopaTgSplash .splashTagline{font:500 11px/1.5 system-ui;letter-spacing:.22em;color:#a7a5a7;text-transform:uppercase}
+#loopaTgSplash .splashLine{height:1px;width:72px;background:linear-gradient(90deg,transparent,#c7c3c3,transparent)}
 /* Telegram Mini App: account linking to keep a single LOOPA identity. */
 .tma-auth-box{border:1px solid #ffffff30;border-radius:15px;background:#ffffff08;padding:14px 16px;margin:14px 0 18px}
 .tma-auth-box strong{font:600 13px/1.4 system-ui;color:#f4f0ef}
@@ -1284,6 +1299,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
 </style>
 </head>
 <body>
+<div id="loopaTgSplash" aria-hidden="true"><span class="splashMark">LOOPA</span><span class="splashLine"></span><span class="splashTagline">смотри вместе. чувствуй ближе.</span></div>
   <svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden" xmlns="http://www.w3.org/2000/svg">
     <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></symbol>
     <symbol id="i-room" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9 6 3-6 3z"/></symbol>
@@ -3495,6 +3511,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
         });
       }catch(error){tgRecordDiagnostic('back-button-listener-error',error);}
       try{telegramWebApp.ready?.();tgReadyCalled=true;tgRecordDiagnostic('ready-called');}catch(error){tgRecordDiagnostic('ready-error',error);}
+      setTimeout(()=>document.documentElement.classList.remove('loopa-tg-booting'),420);
       tgRenderDiagnostics();
       setTimeout(()=>tgRecordDiagnostic('snapshot-500ms'),500);setTimeout(()=>tgRecordDiagnostic('snapshot-1800ms'),1800);setTimeout(()=>tgRecordDiagnostic('snapshot-4500ms'),4500);
     }
