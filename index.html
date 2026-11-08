@@ -2311,7 +2311,7 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
       applyCinemaMode(!cinemaModeEnabled);
       byId('roomSheet').close();
     });
-    let watchBaseHeight=0,watchWidth=0,watchKeyboardOpen=false,watchViewportTimer=0,watchCloseTimer=0,watchLastHeight=0;
+    let watchBaseHeight=0,watchWidth=0,watchKeyboardOpen=false,watchViewportTimer=0,watchViewportSettleTimer=0,watchLastHeight=0;
     function watchNormalPlayer(height,width){
       return cinemaModeEnabled&&width>900 ? Math.min(width*9/16,height*.56) : Math.min(width*9/16,430);
     }
@@ -2390,28 +2390,27 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
       watchKeyboardOpen=false;
       if(watchViewportTimer)cancelAnimationFrame(watchViewportTimer);
       watchViewportTimer=0;
-      if(watchCloseTimer)clearTimeout(watchCloseTimer);
-      watchCloseTimer=0;
+      if(watchViewportSettleTimer)clearTimeout(watchViewportSettleTimer);
+      watchViewportSettleTimer=0;
       watchLastHeight=window.visualViewport?.height||window.innerHeight;
     }
     function scheduleWatchViewport(){
           if(!document.body.classList.contains('roomViewing')||document.hidden)return;
           const viewportHeight=window.visualViewport?.height||window.innerHeight;
-          const keyboardClosing=watchKeyboardOpen&&(
-            document.activeElement!==watchField||viewportHeight>watchLastHeight+1
-          );
-          // Safari emits viewport resize events throughout its keyboard animation.
-          // Keep the compact layout during dismissal and snap it once the viewport settles.
-          if(watchBrowserIOS&&keyboardClosing){
+          const keyboardActive=watchKeyboardOpen||document.activeElement===watchField;
+          const keyboardViewportChanging=keyboardActive&&Math.abs(viewportHeight-watchLastHeight)>1;
+          // Safari emits viewport resize events throughout both keyboard transitions.
+          // Hold the chat layout steady, then apply one final size and bottom scroll.
+          if(watchBrowserIOS&&keyboardViewportChanging){
             if(watchViewportTimer){cancelAnimationFrame(watchViewportTimer);watchViewportTimer=0;}
-            if(watchCloseTimer)clearTimeout(watchCloseTimer);
-            watchCloseTimer=setTimeout(()=>{
-              watchCloseTimer=0;
+            if(watchViewportSettleTimer)clearTimeout(watchViewportSettleTimer);
+            watchViewportSettleTimer=setTimeout(()=>{
+              watchViewportSettleTimer=0;
               syncWatchViewport();
             },80);
             return;
           }
-          if(watchCloseTimer){clearTimeout(watchCloseTimer);watchCloseTimer=0;}
+          if(watchViewportSettleTimer){clearTimeout(watchViewportSettleTimer);watchViewportSettleTimer=0;}
           if(watchViewportTimer)return;
           watchViewportTimer=requestAnimationFrame(()=>{
             watchViewportTimer=0;
