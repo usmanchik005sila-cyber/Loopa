@@ -1086,6 +1086,8 @@ body.dmViewing .dm-screen,#dmLog,#dmForm{transition:none!important;animation:non
 #cinemaModeToggle[aria-pressed="true"] .cinemaModeSwitch:after{background:#18181b;transform:translateX(16px)}
 #cinemaModeToggle:focus-visible{outline:2px solid #efeff5;outline-offset:3px}
 body.roomViewing.cinemaMode{background:#000!important}
+html.telegram-miniapp:has(body.roomViewing.cinemaMode){background:#000!important}
+html.telegram-miniapp body.roomViewing.cinemaMode .top{background:#000!important;border-bottom-color:#000!important;box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
 body.roomViewing.cinemaMode #room-active{background:#000!important;box-shadow:none!important}
 body.roomViewing.cinemaMode #room-active .roomBar{background:linear-gradient(180deg,#0b0b0d,#000);border-bottom-color:#ffffff15}
 body.roomViewing.cinemaMode #videoStage{background:#000!important;box-shadow:0 14px 42px #000e;z-index:1}
@@ -2466,7 +2468,14 @@ html.telegram-miniapp .loopa-launch-tagline{animation:loopaLaunchReveal .64s .15
     function applyCinemaMode(enabled){
       cinemaModeEnabled=Boolean(enabled);
       document.body.classList.toggle('cinemaMode',cinemaModeEnabled);
-      document.querySelector('meta[name="theme-color"]')?.setAttribute('content',cinemaModeEnabled?'#000000':'#090a0c');
+      // theme-color alone does not recolor Telegram's native iOS header.
+      const chromeColor=cinemaModeEnabled?'#000000':'#090a0c';
+      document.querySelector('meta[name="theme-color"]')?.setAttribute('content',chromeColor);
+      if(isTelegramMiniApp){
+        try{telegramWebApp.setHeaderColor?.(chromeColor);}catch(error){console.warn('LOOPA cinema header:',error);}
+        try{telegramWebApp.setBackgroundColor?.(chromeColor);}catch(error){console.warn('LOOPA cinema background:',error);}
+        try{telegramWebApp.setBottomBarColor?.(chromeColor);}catch(error){console.warn('LOOPA cinema bottom bar:',error);}
+      }
       cinemaButton.setAttribute('aria-pressed',String(cinemaModeEnabled));
       cinemaButton.querySelector('.cinemaModeCopy strong').textContent=cinemaModeEnabled?'Выключить режим кинотеатра':'Режим кинотеатра';
       scheduleWatchViewport();
@@ -3590,8 +3599,10 @@ html.telegram-miniapp .loopa-launch-tagline{animation:loopaLaunchReveal .64s .15
         }
         if(tgDiagnosticsEnabled){tgDiagPanel.hidden=false;tgRecordDiagnostic('diagnostics-opened-by-url');}
       }
-      try{telegramWebApp.setHeaderColor?.('#090a0c');}catch(error){tgRecordDiagnostic('setHeaderColor-error',error);}
-      try{telegramWebApp.setBackgroundColor?.('#090a0c');}catch(error){tgRecordDiagnostic('setBackgroundColor-error',error);}
+      const initialTelegramColor=cinemaModeEnabled?'#000000':'#090a0c';
+      try{telegramWebApp.setHeaderColor?.(initialTelegramColor);}catch(error){tgRecordDiagnostic('setHeaderColor-error',error);}
+      try{telegramWebApp.setBackgroundColor?.(initialTelegramColor);}catch(error){tgRecordDiagnostic('setBackgroundColor-error',error);}
+      try{telegramWebApp.setBottomBarColor?.(initialTelegramColor);}catch(error){tgRecordDiagnostic('setBottomBarColor-error',error);}
       try{telegramWebApp.expand?.();tgRecordDiagnostic('expand-called');}catch(error){tgRecordDiagnostic('expand-error',error);}
       // Fullscreen remains opt-in at the Telegram client level; log the result without changing the request timing.
       const syncTelegramFullscreen=(eventName='fullscreenChanged',detail)=>{
