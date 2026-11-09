@@ -2810,7 +2810,7 @@ html.telegram-miniapp .loopa-launch-splash.is-hidden{opacity:0;visibility:hidden
     byId('shareRoomLink').onclick=async()=>{
       if(!roomState)return;
       const url=new URL(location.href);url.search='';url.hash='';url.searchParams.set('room',roomState.code);
-      const invitation={title:'Комната LOOPA',text:'🎬 Смотри со мной в LOOPA!\n\nПрисоединяйся к комнате — включим видео вместе 🍿',url:url.href};
+      const invitation={title:'Комната LOOPA',text:'🎬 Смотри со мной в LOOPA! 🍿\n\n'+url.href};
       try{
         if(isTelegramMiniApp&&typeof telegramWebApp.shareMessage==='function'){
           try{
@@ -2821,18 +2821,19 @@ html.telegram-miniapp .loopa-launch-splash.is-hidden{opacity:0;visibility:hidden
             }
           }catch(e){console.warn('LOOPA Telegram share fallback:',e.message);}
         }
-        if(isTelegramMiniApp&&telegramWebApp.openTelegramLink){
-          // Telegram iOS sometimes converts ASCII spaces to literal '+' in
-          // t.me/share/url text. Use non-breaking Unicode spaces in the brief
-          // fallback caption so no '+' or '%20' space encodings are present.
-          // Keep the working room URL exactly as before.
-          const caption='🎬 Смотри со мной в LOOPA! 🍿'.replace(/ /g,'\u00a0');
-          const share='https://t.me/share/url?url='
-            +encodeURIComponent(telegramRoomUrl(roomState.code))
-            +'&text='+encodeURIComponent(caption);
-          telegramWebApp.openTelegramLink(share);
+        if(isTelegramMiniApp){
+          // The t.me/share/url form prepends its url parameter before its text.
+          // Share one ordered text payload instead so the invitation stays on top.
+          const shareText='🎬 Смотри со мной в LOOPA! 🍿'.replace(/ /g,'\u00a0')
+            +'\n\n'+telegramRoomUrl(roomState.code);
+          if(navigator.share){
+            try{await navigator.share({title:'Комната LOOPA',text:shareText});return;}
+            catch(error){if(error.name==='AbortError')return;}
+          }
+          await navigator.clipboard.writeText(shareText);
+          showToast('Приглашение скопировано — вставь его в чат');
         }else if(navigator.share)await navigator.share(invitation);
-        else{await navigator.clipboard.writeText(url.href);showToast('Ссылка скопирована — отправь другу');}
+        else{await navigator.clipboard.writeText(invitation.text);showToast('Приглашение скопировано — вставь его в чат');}
       }
       catch(e){if(e.name!=='AbortError')showToast('Не удалось поделиться ссылкой');}
     };
