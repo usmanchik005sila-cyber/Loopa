@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+<path d="M112 187v-75h75M325 112h75v75M400 325v75h-75M187 400h-75v-75" fill="none" stroke="#F4F0EF" stroke-opacity=".45" stroke-width="6" stroke-linecap="square"/>
+<path d="M207 177v158h112" fill="none" stroke="#F4F0EF" stroke-width="29" stroke-linejoin="miter" stroke-linecap="square"/>
+</svg>
