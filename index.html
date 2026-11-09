@@ -2822,11 +2822,10 @@ html.telegram-miniapp .loopa-launch-splash.is-hidden{opacity:0;visibility:hidden
           }catch(e){console.warn('LOOPA Telegram share fallback:',e.message);}
         }
         if(isTelegramMiniApp&&telegramWebApp.openTelegramLink){
-          // Telegram's iOS share handler may display '+' literally when URLSearchParams
-          // serializes spaces as form-encoded plus signs. Use %20 URI encoding instead.
-          const share='https://t.me/share/url?url='
-            +encodeURIComponent(telegramRoomUrl(roomState.code))
-            +'&text='+encodeURIComponent(invitation.text);
+          // Telegram iOS may show literal plus signs in the optional share text,
+          // even when spaces are URI-encoded. Share only the room URL here.
+          // The native shareMessage path above retains the polished message.
+          const share='https://t.me/share/url?url='+encodeURIComponent(telegramRoomUrl(roomState.code));
           telegramWebApp.openTelegramLink(share);
         }else if(navigator.share)await navigator.share(invitation);
         else{await navigator.clipboard.writeText(url.href);showToast('Ссылка скопирована — отправь другу');}
