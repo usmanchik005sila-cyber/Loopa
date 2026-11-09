@@ -4841,7 +4841,7 @@ html.telegram-miniapp .loopa-launch-splash.is-hidden{opacity:0;visibility:hidden
       try{
         const response=await telegramMiniRequest('login');
         if(response.status==='unlinked'){
-          note.textContent='Для будущего автовхода сначала войди в свой профиль привычным способом, затем в «Личных данных» нажми «Привязать этот профиль».';
+          note.textContent='Этот Telegram ещё не привязан к LOOPA. Если у тебя уже есть профиль, войди в него и привяжи Telegram в «Личных данных». Для нового профиля выбери «Регистрация» → «Telegram».';
           return;
         }
         if(response.status!=='login_ready'||!response.token_hash){
