@@ -2752,7 +2752,12 @@ html.telegram-miniapp .loopa-launch-splash.is-hidden{opacity:0;visibility:hidden
       else if(resumePrompt&&(!roomIsSolo(data)||resumePrompt.code!==data.code||resumePrompt.video!==data.video))hideResumePrompt();
       updatePlaybackControls();
       if(!data.video&&hostHere()&&!roomCreating&&!catalogDialog.open)openCatalog();
-
+      if(op==='join'){
+        clearJoinedRoomInvitation(data.code);
+        // The backend has already accepted the matching invite in the same
+        // transaction as joining; immediately refresh badges and notices.
+        void pollInvites();
+      }
     }
     async function roomRun(op,args){try{await roomCall(op,args);}catch(e){byId('room-note').textContent=e.message;}}
     document.addEventListener('click',async e=>{
@@ -2785,9 +2790,31 @@ html.telegram-miniapp .loopa-launch-splash.is-hidden{opacity:0;visibility:hidden
     if(!/^[a-f0-9]{12}$/i.test(pendingInvite||''))pendingInvite=null;
     async function acceptInvite(){
       if(!pendingInvite||!currentUser||invitationBusy)return;
-      invitationBusy=true;const code=pendingInvite;pendingInvite=null;
-      showPage('rooms');await roomRun('join',{room:code});
-      const clean=new URL(location.href);clean.searchParams.delete('room');history.replaceState(null,'',clean);invitationBusy=false;
+      invitationBusy=true;
+      const code=pendingInvite.toUpperCase();
+      try{
+        showPage('rooms');
+        // A Telegram direct link can point to a private room: accepting the
+        // matching in-app invite first grants access, unlike a raw room join.
+        let matchingInvite=null;
+        try{
+          const incoming=await inviteRPC('inbox');
+          if(Array.isArray(incoming))
+            matchingInvite=incoming.find(item=>String(item.code||'').toUpperCase()===code);
+        }catch(error){console.warn('LOOPA invite lookup:',error.message);}
+        if(matchingInvite){
+          try{await inviteRPC('accept',{invitation:matchingInvite.id});}
+          catch(error){console.warn('LOOPA invite accept:',error.message);}
+        }
+        // Use the throwing RPC so a failed join never dismisses a pending invite.
+        await roomCall('join',{room:code});
+        if(roomState?.code!==code)return;
+        pendingInvite=null;
+        const clean=new URL(location.href);
+        clean.searchParams.delete('room');
+        history.replaceState(null,'',clean);
+      }catch(error){byId('room-note').textContent=error.message||'Не удалось войти в комнату';}
+      finally{invitationBusy=false;}
     }
     // Telegram sharing and bot notifications are authenticated server-side.
     async function loopaBotAction(action,payload={}){
@@ -2942,6 +2969,19 @@ html.telegram-miniapp .loopa-launch-splash.is-hidden{opacity:0;visibility:hidden
       byId('roomInviteNotice').hidden=true;
       activeBannerInvite=null;
     }
+    function clearJoinedRoomInvitation(code){
+      const joined=String(code||'').toUpperCase();
+      if(!joined)return;
+      if(activeBannerInvite&&String(activeBannerInvite.code||'').toUpperCase()===joined)
+        hideInviteBanner();
+      const remaining=inviteInbox.filter(item=>String(item.code||'').toUpperCase()!==joined);
+      if(remaining.length!==inviteInbox.length){
+        inviteInbox=remaining;
+        syncDeferredInvites(remaining);
+        renderRoomNotices();
+        updateUnifiedBadge();
+      }
+    }
     async function handleInviteBanner(action){
       const invitation=activeBannerInvite;
       if(!invitation)return;
@@ -3060,7 +3100,10 @@ html.telegram-miniapp .loopa-launch-splash.is-hidden{opacity:0;visibility:hidden
       if(!owner||!client){inviteOwner=null;inviteInbox=[];inviteSeen.clear();hideInviteBanner();renderRoomNotices();updateUnifiedBadge();return;}
       if(inviteBusy)return;inviteBusy=true;
       try{const data=await inviteRPC('inbox');if(currentUser?.id!==owner)return;if(!Array.isArray(data))throw Error('Не удалось прочитать приглашения');
-        if(inviteOwner!==owner){inviteOwner=owner;inviteSeen=loadSeenInvites(owner);}inviteInbox=data;syncDeferredInvites(data);
+        // Never show an invitation for the room the user is already in.
+        // Also covers an inbox request which started just before a Telegram join.
+        const available=data.filter(item=>String(item.code||'').toUpperCase()!==String(roomState?.code||'').toUpperCase());
+        if(inviteOwner!==owner){inviteOwner=owner;inviteSeen=loadSeenInvites(owner);}inviteInbox=available;syncDeferredInvites(available);
         updateUnifiedBadge();renderRoomNotices();
         // Atomically claim first-time notifications on the server. This avoids duplicates
         // in Telegram Mini App even when WebView storage is discarded on restart.
@@ -3070,11 +3113,11 @@ html.telegram-miniapp .loopa-launch-splash.is-hidden{opacity:0;visibility:hidden
         if(claimError)throw claimError;
         if(currentUser?.id!==owner)return;
         const claimedIds=new Set((Array.isArray(claims)?claims:[]).map(x=>String(x.id)));
-        const fresh=data.find(x=>claimedIds.has(String(x.id))&&!inviteSeen.has(inviteKey(x))&&!isInviteDeferred(x));
-        data.forEach(x=>inviteSeen.add(inviteKey(x)));
+        const fresh=available.find(x=>claimedIds.has(String(x.id))&&!inviteSeen.has(inviteKey(x))&&!isInviteDeferred(x));
+        available.forEach(x=>inviteSeen.add(inviteKey(x)));
         saveSeenInvites(owner);
         if(fresh)showInviteBanner(fresh);
-        if(!data.length)hideInviteBanner();
+        if(!available.length||String(activeBannerInvite?.code||'').toUpperCase()===String(roomState?.code||'').toUpperCase())hideInviteBanner();
       }catch(e){if(inviteDialog.open&&byId('shareRoomLink').hidden)byId('inviteHint').textContent=inviteError(e);}
       finally{inviteBusy=false;}
     }
