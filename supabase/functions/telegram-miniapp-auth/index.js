@@ -148,7 +148,7 @@ Deno.serve(async (request) => {
         // Mini App, based on HMAC-verified Telegram initData (never initDataUnsafe).
         // Existing profiles must be linked separately; do not merge them silently.
         const email = internalEmail(telegramId);
-        const passwordBytes = crypto.getRandomValues(new Uint8Array(48));
+        const passwordBytes = crypto.getRandomValues(new Uint8Array(32));
         const password = Array.from(passwordBytes, b => b.toString(16).padStart(2, "0")).join("");
         const { data: created, error: createError } = await admin.auth.admin.createUser({
           email, password, email_confirm: true,
