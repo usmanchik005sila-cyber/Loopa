@@ -60,9 +60,9 @@ async function miniAppAction(request,token){
       type:"article",id:crypto.randomUUID(),title:"LOOPA — совместный просмотр",
       description:"Приглашение в твою комнату",
       input_message_content:{
-        message_text:"<b>🎬 Смотри со мной в LOOPA! 🍿</b>\n\n"+roomLink(code),
+        message_text:"<b><i>🎬 Смотри со мной в LOOPA! 🍿</i></b>\n\n"+roomLink(code),
         parse_mode:"HTML",
-        link_preview_options:{is_disabled:true}
+        link_preview_options:{is_disabled:false}
       },
       reply_markup:{inline_keyboard:[[{text:"🎞 Открыть комнату",url:roomLink(code)}]]}
     },
