@@ -141,8 +141,39 @@ Deno.serve(async (request) => {
     }
 
     const admin = adminClient();
-    if (body.action === "login") {
-      const link = await lookup(admin, telegramId);
+    if (body.action === "login" || body.action === "register") {
+      let link = await lookup(admin, telegramId);
+      if (!link && body.action === "register") {
+        // Create a distinct LOOPA profile only after explicit registration in the
+        // Mini App, based on HMAC-verified Telegram initData (never initDataUnsafe).
+        // Existing profiles must be linked separately; do not merge them silently.
+        const email = internalEmail(telegramId);
+        const passwordBytes = crypto.getRandomValues(new Uint8Array(48));
+        const password = Array.from(passwordBytes, b => b.toString(16).padStart(2, "0")).join("");
+        const { data: created, error: createError } = await admin.auth.admin.createUser({
+          email, password, email_confirm: true,
+          user_metadata: { display_name: "Участник LOOPA" },
+        });
+        if (createError || !created?.user?.id) {
+          // Concurrent attempts or an existing internal email must not mint a
+          // session unless this Telegram ID is already mapped to that user.
+          link = await lookup(admin, telegramId);
+          if (!link) return reply({ error: "registration_unavailable" }, 409);
+        } else {
+          const createdId = created.user.id;
+          const { error: bindError } = await admin.from("telegram_miniapp_links")
+            .insert({ telegram_id: telegramId, user_id: createdId });
+          if (bindError) {
+            // The new identity is not yet exposed to the browser. Prevent orphan
+            // profiles if another request linked the Telegram ID concurrently.
+            await admin.auth.admin.deleteUser(createdId).catch(() => {});
+            link = await lookup(admin, telegramId);
+            if (!link) return reply({ error: "registration_unavailable" }, 409);
+          } else {
+            link = { telegram_id: telegramId, user_id: createdId };
+          }
+        }
+      }
       if (!link) return reply({ status: "unlinked" });
 
       const { data: userResponse, error: userError } =
