@@ -1332,7 +1332,34 @@ html.telegram-miniapp .loopa-launch-tagline{animation:loopaLaunchReveal .64s .15
 #tgViewportDiagnostics .tgDiagActions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 #tgViewportDiagnostics #tgDiagCopyStatus{color:#bdbbc2;font-size:12px}
 </style>
-</head>
+  <style id="cinema-black-safe-area-styles">
+      /* Cinema mode: make the entire page surface behind Telegram/iOS safe areas black. */
+      html:has(body.roomViewing.cinemaMode),
+      body.roomViewing.cinemaMode,
+      body.roomViewing.cinemaMode .app {
+        background:#000!important;
+        background-image:none!important;
+      }
+      body.roomViewing.cinemaMode .scenery {
+        display:none!important;
+      }
+      body.roomViewing.cinemaMode .top {
+        background:#000!important;
+        background-image:none!important;
+        border-color:#000!important;
+        box-shadow:none!important;
+        backdrop-filter:none!important;
+        -webkit-backdrop-filter:none!important;
+      }
+      body.roomViewing.cinemaMode #room-active,
+      body.roomViewing.cinemaMode #videoStage,
+      body.roomViewing.cinemaMode .roomChat,
+      body.roomViewing.cinemaMode #chatForm {
+        background:#000!important;
+        background-image:none!important;
+      }
+    </style>
+    </head>
 <body>
   <svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden" xmlns="http://www.w3.org/2000/svg">
     <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></symbol>
