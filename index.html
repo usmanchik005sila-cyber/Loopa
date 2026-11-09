@@ -4976,7 +4976,11 @@ html.telegram-miniapp .loopa-launch-splash.is-hidden{opacity:0;visibility:hidden
       byId('telegramAuthTitle').textContent=linkExisting?'Привязать Telegram':(authMode==='signup'?'Привязать Telegram к LOOPA':'Войти через Telegram');
       byId('telegramAuthDescription').textContent=linkExisting
         ?'Подтверди аккаунт Telegram, чтобы потом входить в этот же профиль LOOPA без Google. Друзья и комнаты останутся на месте.'
-        :'Подтверди свой Telegram-аккаунт. Если ты здесь впервые, LOOPA создаст профиль автоматически — без SMS и пароля.';
+        :isTelegramMiniApp
+          ?(authMode==='signup'
+            ?'Создать отдельный профиль LOOPA для этого Telegram-аккаунта или войти в уже привязанный. Если у тебя уже есть профиль LOOPA, войди в него и привяжи Telegram в настройках.'
+            :'Войди в ранее привязанный к этому Telegram профиль LOOPA. Если это новый аккаунт Telegram, переключись на «Регистрация».')
+          :'Подтверди свой Telegram-аккаунт. Если ты здесь впервые, LOOPA создаст профиль автоматически — без SMS и пароля.';
       byId('telegramAuthContinue').textContent=linkExisting?'Привязать Telegram':(authMode==='signup'?'Продолжить регистрацию':'Продолжить через Telegram');
       feedback('telegramAuthError','');
       telegramDialog.showModal();
@@ -4995,6 +4999,41 @@ html.telegram-miniapp .loopa-launch-splash.is-hidden{opacity:0;visibility:hidden
       button.disabled=true;
       feedback('telegramAuthError','');
       try{
+        // Inside Telegram Mini App use the signed initData bridge, not an
+        // external OAuth deep link (which can hang inside Telegram's iOS WebView).
+        if(isTelegramMiniApp&&telegramWebApp?.initData){
+          if(telegramLinkExisting){
+            if(!currentUser)throw new Error('Сначала войди в существующий аккаунт LOOPA.');
+            const {data,error}=await client.auth.getSession();
+            if(error||!data?.session?.access_token)throw new Error('Сначала войди в LOOPA.');
+            const linked=await telegramMiniRequest('link',data.session.access_token);
+            if(!['linked','already_linked'].includes(linked.status))throw new Error('Не удалось привязать Telegram.');
+            telegramMiniLinked=true;
+            byId('tmaMiniLinkBox').hidden=true;
+            telegramDialog.close();
+            showToast('Telegram привязан к профилю LOOPA');
+            return;
+          }
+          if(telegramMiniBusy)throw new Error('Авторизация Telegram уже выполняется.');
+          telegramMiniBusy=true;
+          try{
+            const action=authMode==='signup'?'register':'login';
+            const response=await telegramMiniRequest(action);
+            if(response.status==='unlinked')
+              throw new Error('Этот Telegram ещё не зарегистрирован в LOOPA. Выбери «Регистрация» и продолжи через Telegram.');
+            if(response.status!=='login_ready'||!response.token_hash)
+              throw new Error('Не удалось войти через Telegram. Закрой Mini App и открой заново.');
+            const {data,error}=await client.auth.verifyOtp({token_hash:response.token_hash,type:'magiclink'});
+            if(error||!data?.user)throw error||new Error('Не удалось создать сессию LOOPA.');
+            currentUser=data.user;
+            telegramMiniLinked=true;
+            telegramDialog.close();
+            await displayAccount(data.user);
+            await acceptInvite();
+            showToast(action==='register'?'LOOPA готова — добро пожаловать!':'Вход через Telegram выполнен');
+            return;
+          }finally{telegramMiniBusy=false;}
+        }
         const redirect=new URL(SITE_URL);
         if(pendingInvite)redirect.searchParams.set('room',pendingInvite);
         if(telegramLinkExisting && !currentUser)throw new Error('Сначала войди в существующий аккаунт LOOPA.');
