@@ -771,6 +771,8 @@ body.roomViewing #room-active{transition:none!important}
  border:1px solid #ffffff48!important;pointer-events:auto!important}
 #playbackHint{position:absolute;top:8px;left:10px;max-width:60%;font:11px/1.35 system-ui;color:#f0f0f2;
  text-shadow:0 1px 4px #000;pointer-events:none}
+ #videoStage.playbackStatus #playbackHint{max-width:calc(100% - 24px);padding:8px 10px;border:1px solid #ffffff35;
+  border-radius:11px;background:#101014e8;box-shadow:0 3px 12px #0008;white-space:normal}
 #playbackHint:empty{display:none!important}
 body.roomViewing .roomChat #chatLog{scroll-behavior:auto!important;overscroll-behavior:contain}
 @media(max-width:360px){#playbackControls .transport57 button[data-step="-10"]{left:23%}
@@ -900,7 +902,7 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
 #videoStage #loopaTimeline,
 #videoStage #playbackControls .transport57{display:none!important}
 #videoStage #playbackControls{display:none!important;pointer-events:none!important;opacity:0!important;background:transparent!important}
-#videoStage.syncIssue #playbackControls{display:block!important;opacity:1!important}
+#videoStage.playbackStatus #playbackControls{display:block!important;opacity:1!important;visibility:visible!important}
 #videoStage.syncIssue #guestResync:not([hidden]){pointer-events:auto!important}
 /* LOOPA v86 — message privacy, same quiet glass language as room settings */
 .dm-privacy-entry{gap:11px;min-height:69px;transition:border-color .18s ease,background .18s ease}
@@ -1709,6 +1711,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
   <textarea id="tgDiagOutput" readonly aria-label="Отчёт диагностики Telegram"></textarea>
   <div class="tgDiagActions"><button id="tgDiagCopy" type="button">Скопировать отчёт</button><span id="tgDiagCopyStatus" role="status"></span></div>
 </div>
+  <script src="./assets/room-watch-reliability.js"></script>
   <script defer>
     'use strict';
     const SUPABASE_URL = 'https://wnubqzwsvclvcvozibtc.supabase.co';
@@ -1728,32 +1731,13 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
     let roomState=null, roomUser=null, roomEpoch=0, roomClock=0, roomPoll=false, vkPlayer=null, ytPlayer=null;
     let guestManualUntil=0;
     let syncSnapshot=null,syncBusy=false,syncRtt=0,syncProblem='',nativeNeedsStart=true,nativeAccess=true,localMuted=false,overlayTimer=0;
+    let playerIssue=null,playerReadyTimer=0,playerBindingFailed=false;
     let applyingUntil=0,lastPlaybackPublish=0,lastGuestCorrection=0,rutubeAd=false,mediaDuration=0;
     const roomBox=()=>byId('room-frame');
-    function roomMedia(raw){
-      const u=new URL(raw.trim()), h=u.hostname.replace(/^(www\.|m\.)/,''), q=u.searchParams;
-      if(u.protocol!=='https:') throw Error('Нужна ссылка HTTPS');
-      let id;
-      if(['youtu.be','youtube.com'].includes(h)){
-        id=h==='youtu.be'?u.pathname.slice(1):q.get('v')||u.pathname.match(/^\/(?:shorts|embed|live)\/([^/]+)/)?.[1];
-        if(/^[\w-]{11}$/.test(id||'')) return 'https://www.youtube.com/embed/'+id+'?enablejsapi=1&playsinline=1&controls=1&fs=1&origin='+encodeURIComponent(location.origin);
-      }
-      if(h==='rutube.ru'){
-        id=u.pathname.match(/^\/(?:video|play\/embed|shorts)\/([a-f\d]{32})\/?$/i)?.[1];
-        if(id)return 'https://rutube.ru/play/embed/'+id+'/';
-      }
-      if(['vk.com','vk.ru','vkvideo.ru'].includes(h)){
-        const pair=(q.get('z')||u.pathname).match(/(?:video|clip)(-?\d+)_(\d+)/);
-        const oid=pair?.[1]||q.get('oid'), vid=pair?.[2]||q.get('id');
-        if(/^-?\d+$/.test(oid||'')&&/^\d+$/.test(vid||''))return 'https://vkvideo.ru/video_ext.php?oid='+oid+'&id='+vid+'&js_api=1'+(q.get('hash')?'&hash='+encodeURIComponent(q.get('hash')):'');
-      }
-      throw Error('Вставь прямую ссылку на ролик YouTube, VK Видео или RUTUBE.');
-    }
+    const roomMedia=raw=>LOOPAWatchReliability.normalizeMedia(raw,location.origin);
     function positionNow(){
       if(!syncSnapshot)return sample?.pos||Number(roomState?.pos)||0;
-      const elapsed=(performance.now()-syncSnapshot.received)/1000;
-      // Never invent an indefinitely advancing position when the host disappears.
-      return Math.max(0,syncSnapshot.pos+(syncSnapshot.playing?Math.max(0,elapsed):0));
+      return LOOPAWatchReliability.snapshotPosition(syncSnapshot,performance.now());
     }
     function desiredPlaying(){return !!syncSnapshot?.playing;}
     function sendRutube(type,data={}){roomBox()?.contentWindow?.postMessage(JSON.stringify({type,data}),'https://rutube.ru');}
@@ -1766,18 +1750,18 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       }else if(vkPlayer){if(seek)vkPlayer.seek(pos);playing?vkPlayer.play():vkPlayer.pause();}
     }
     function applyRoom(force=false){
-      if(!roomState?.video||rutubeAd||hostHere()||!syncSnapshot)return;
+      if(!roomState?.video||rutubeAd||hostHere()||!LOOPAWatchReliability.isSnapshotFresh(syncSnapshot,performance.now()))return;
       const now=performance.now(),pos=positionNow(),playing=desiredPlaying();
       const measured=sample?sample.pos+(sample.playing?Math.min(1.8,(now-sample.now)/1000):0):null;
-      const seek=force||((now>=guestManualUntil)&&(measured===null||Math.abs(measured-pos)>.8));
-      const stateMismatch=!sample||sample.playing!==playing;
-      if(!seek&&!stateMismatch)return;
-      if(!force&&now-lastGuestCorrection<1100)return;
+      const correction=LOOPAWatchReliability.correctionDecision({force,now,lastCorrection:lastGuestCorrection,manualUntil:guestManualUntil,measured,target:pos,currentPlaying:sample?.playing,desiredPlaying:playing});
+      if(!correction.apply)return;
       applyingUntil=now+1200;lastGuestCorrection=now;
-      commandPlayer(pos,playing,seek);
+      commandPlayer(pos,playing,correction.seek);
     }
-    async function syncPlayback(){
-      if(syncBusy||!client||!roomState?.video||document.hidden)return;
+    let forceResyncAfterSync=false;
+    async function syncPlayback({forceCorrection=false}={}){
+      if(syncBusy){if(forceCorrection)forceResyncAfterSync=true;return;}
+      if(!client||!roomState?.video||document.hidden)return;
       const epoch=roomEpoch,code=roomState.code,video=roomState.video,host=hostHere();
       const now=performance.now();
       // Do not republish extrapolated room time as if it were measured media time.
@@ -1794,21 +1778,29 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
         syncProblem='';
         if(!host&&data?.ready&&data.video===video){
           const age=Number(data.age),pos=Number(data.pos);
-          if(!Number.isFinite(age)||!Number.isFinite(pos))return;
-          const fresh=age<3.5;
+          if(!Number.isFinite(age)||!Number.isFinite(pos)){syncProblem=LOOPAWatchReliability.syncMessage({ready:true,age});syncSnapshot=null;return;}
+          const fresh=LOOPAWatchReliability.isFreshSample(age);
           if(fresh){
             syncSnapshot={pos:pos+(data.playing?age+Math.min(1,syncRtt/2000):0),playing:!!data.playing,received,expires:received+3500};
-            applyRoom();
-          }else{syncProblem='Ведущий переподключается · просмотр продолжается';}
-        }else if(!host&&!data?.ready){syncProblem='Ждём ведущего · просмотр продолжается';}
-      }catch(e){if(epoch===roomEpoch)syncProblem=['PGRST202','42883'].includes(e.code)?'Нужно обновить SQL синхронизации':'Нет связи с синхронизацией';}
-      finally{syncBusy=false;updatePlaybackControls();}
+            syncProblem='';
+            applyRoom(forceCorrection||forceResyncAfterSync);
+          }else{syncProblem=LOOPAWatchReliability.syncMessage({ready:true,age});syncSnapshot=null;}
+        }else if(!host&&data?.ready&&data.video!==video){syncProblem=LOOPAWatchReliability.syncMessage({ready:'video-mismatch'});syncSnapshot=null;}
+        else if(!host&&!data?.ready){syncProblem=LOOPAWatchReliability.syncMessage({ready:false});syncSnapshot=null;}
+      }catch(e){if(epoch===roomEpoch)syncProblem=LOOPAWatchReliability.syncMessage({errorCode:e?.code||'NETWORK'});}
+      finally{
+        const forceCorrectionAfterWait=forceCorrection||forceResyncAfterSync;
+        forceResyncAfterSync=false;syncBusy=false;
+        if(forceCorrectionAfterWait&&!hostHere()&&LOOPAWatchReliability.isSnapshotFresh(syncSnapshot,performance.now()))applyRoom(true);
+        updatePlaybackControls();
+      }
     }
     function hostHere(){return roomState && roomState.host===currentUser?.id;}
     function observe(playing,pos){
       if(!roomState?.video||!Number.isFinite(pos)||pos<0||typeof playing!=='boolean'||rutubeAd)return;
       const now=performance.now(),previous=sample;
       sample={playing,pos,now};
+      if(playing&&playerIssue?.kind!=='autoplay-sound')clearPlayerIssue();
       // Save a precise checkpoint on pause or a deliberate seek, not just every 10s.
       const expected=previous?previous.pos+(previous.playing?Math.max(0,(now-previous.now)/1000):0):pos;
       if(previous&&((previous.playing&&!playing)||Math.abs(pos-expected)>3))saveResumeCheckpoint();
@@ -2133,6 +2125,15 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       sendRoomSignal('mode-state',{host:currentUser.id,enabled:sharedMode});
     });
 
+    function setPlayerIssue(issue){
+      playerIssue=issue||null;
+      updatePlaybackControls();
+    }
+    function clearPlayerIssue(kind){
+      if(kind&&playerIssue?.kind!==kind)return;
+      playerIssue=null;
+      updatePlaybackControls();
+    }
     function updatePlaybackControls(){
       if(!roomState)return;
       const active=!!roomState.video,host=hostHere();
@@ -2148,14 +2149,16 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       byId('roomToggle').hidden=true;
       refreshTransport();
       // Preserve manual re-sync exclusively for real problems, not during playback.
-      const needsResync=!host&&!rutubeAd&&!!syncProblem;
+      const needsResync=!host&&!rutubeAd&&!!syncProblem&&playerIssue?.kind!=='error';
       byId('guestResync').hidden=!needsResync;
       videoStage.classList.toggle('syncIssue',needsResync);
+      const playbackMessage=playerIssue?.message||(rutubeAd?'На RUTUBE идёт реклама. Дождись её окончания — просмотр продолжится автоматически.':syncProblem);
+      videoStage.classList.toggle('playbackStatus',!!playbackMessage);
       playbackControls.querySelectorAll('[data-step]').forEach(b=>{
         b.disabled=rutubeAd||!canControl;
         b.title=b.getAttribute('aria-label');
       });
-      byId('playbackHint').textContent=syncProblem||(rutubeAd?'Реклама RUTUBE':'');
+      byId('playbackHint').textContent=playbackMessage||'';
       const frame=roomBox();if(frame){frame.style.pointerEvents='';frame.tabIndex=0;}
       videoStage.classList.toggle('nativeAccess',rutubeAd);
       videoStage.classList.toggle('guestVideo',!host);
@@ -2169,7 +2172,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
     playbackControls.addEventListener('click',async e=>{
       const b=e.target.closest('button');if(!b||!roomState?.video||rutubeAd)return;
       if(e.detail)b.blur();revealControls();
-      if(b.id==='guestResync'){guestManualUntil=0;applyRoom(true);updatePlaybackControls();return;}
+      if(b.id==='guestResync'){guestManualUntil=0;await syncPlayback({forceCorrection:true});updatePlaybackControls();return;}
       if(b.id==='loopaFullscreen')return;
       const host=hostHere();if(!host&&(!sharedMode||!sharedSignalReady))return;
       const fresh=sample&&performance.now()-sample.now<1800;
@@ -2200,27 +2203,50 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
     // v85: do not force captions via unsupported IFrame API "track" settings.
     // Let the YouTube player honor its own caption preferences and native CC menu.
     function readyPlayer(){
+      clearTimeout(playerReadyTimer);playerReadyTimer=0;
+      if(playerIssue?.kind==='ready-timeout')clearPlayerIssue('ready-timeout');
       resumePlayerReady=true;showResumePromptIfReady();tryApplyResume();
       syncPlayback();updatePlaybackControls();
     }
     function mountRoomPlayer(url){
       resumePlayerReady=false;resumeRestorePending=null;cancelRutubeResume();hideResumePrompt();
+      clearTimeout(playerReadyTimer);playerReadyTimer=0;playerIssue=null;playerBindingFailed=false;
       sample=null;observed={playing:false,pos:0};pending=null;ytPlayer=null;vkPlayer=null;syncSnapshot=null;guestManualUntil=0;nativeNeedsStart=true;nativeAccess=true;localMuted=false;syncProblem='';
       applyingUntil=0;lastPlaybackPublish=0;lastGuestCorrection=0;rutubeAd=false;mediaDuration=0;clearTimeout(overlayTimer);videoStage.classList.remove('controlsVisible');
       const frame=document.createElement('iframe');frame.id='room-frame';frame.title='Видео комнаты';frame.allow='autoplay; encrypted-media; fullscreen; picture-in-picture';frame.allowFullscreen=true;
-      roomBox().replaceWith(frame);frame.hidden=!url;if(!url)return;
+      roomBox().replaceWith(frame);frame.hidden=!url;if(!url){updatePlaybackControls();return;}
       frame.onload=()=>{if(frame===roomBox())bindRoomPlayers();};
       if(url.includes('youtube.com/embed/')){const u=new URL(url);u.searchParams.set('controls','1');u.searchParams.set('fs','1');url=u.toString();}
-      frame.src=url;updatePlaybackControls();
+      frame.src=url;
+      playerReadyTimer=setTimeout(()=>{
+        if(frame===roomBox()&&!resumePlayerReady&&!playerBindingFailed)
+          setPlayerIssue(LOOPAWatchReliability.playerReadyTimeout(LOOPAWatchReliability.providerFor(frame.src),hostHere()));
+      },15000);
+      updatePlaybackControls();
     }
     function bindRoomPlayers(){
-      const frame=roomBox();if(!frame?.src)return;
+      const frame=roomBox();if(!frame?.src||playerBindingFailed)return;
       if(frame.src.includes('youtube.com/')&&window.YT?.Player&&!ytPlayer){
-        ytPlayer=new YT.Player(frame,{events:{onReady:readyPlayer,onStateChange:samplePlayers,onAutoplayBlocked:()=>{nativeAccess=true;updatePlaybackControls();}}});
+        try{
+          ytPlayer=new YT.Player(frame,{events:{
+            onReady:readyPlayer,
+            onStateChange:samplePlayers,
+            onError:event=>setPlayerIssue(LOOPAWatchReliability.playerError('youtube',event?.data)),
+            onAutoplayBlocked:()=>{nativeAccess=true;setPlayerIssue(LOOPAWatchReliability.autoplayBlocked(hostHere()));}
+          }});
+        }catch(error){playerBindingFailed=true;setPlayerIssue(LOOPAWatchReliability.playerError('youtube'));}
       }else if(frame.src.includes('vkvideo.ru/')&&window.VK?.VideoPlayer&&!vkPlayer){
-        vkPlayer=VK.VideoPlayer(frame);
-        for(const [name,playing] of [['started',true],['resumed',true],['paused',false],['ended',false]])vkPlayer.on(name,()=>{if(frame===roomBox()){observed.playing=playing;samplePlayers();}});
-        vkPlayer.on('inited',()=>{if(frame===roomBox())readyPlayer();});
+        try{
+          vkPlayer=VK.VideoPlayer(frame);
+          for(const [name,playing] of [['started',true],['resumed',true],['paused',false],['ended',false]])vkPlayer.on(name,()=>{if(frame===roomBox()){observed.playing=playing;samplePlayers();}});
+          vkPlayer.on('inited',()=>{if(frame===roomBox())readyPlayer();});
+          try{vkPlayer.on('error',()=>setPlayerIssue(LOOPAWatchReliability.playerError('vk')));}catch{}
+          try{vkPlayer.on('autoplaySoundProhibited',()=>setPlayerIssue(LOOPAWatchReliability.autoplaySoundProhibited(hostHere())));}catch{}
+          try{vkPlayer.on('volumechange',event=>{
+            localMuted=!!event?.muted||Number(event?.volume)===0;
+            if(!localMuted&&playerIssue?.kind==='autoplay-sound')clearPlayerIssue('autoplay-sound');
+          });}catch{}
+        }catch(error){playerBindingFailed=true;setPlayerIssue(LOOPAWatchReliability.playerError('vk'));}
       }
     }
     function samplePlayers(){
@@ -2248,6 +2274,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
           if(e.origin!=='https://rutube.ru'||e.source!==roomBox()?.contentWindow)return;
           let m;try{m=typeof e.data==='string'?JSON.parse(e.data):e.data;}catch{return;}
           if(m?.type==='player:ready')readyPlayer();
+          if(m?.type==='player:error'){setPlayerIssue(LOOPAWatchReliability.playerError('rutube',m.data?.code));return;}
           if(m?.type==='player:volumeChange'){localMuted=!!m.data?.muted||Number(m.data?.volume)===0;updatePlaybackControls();}
           if(m?.type==='player:durationChange')mediaDuration=Number(m.data?.duration)||0;
           if(m?.type==='player:rollState'){
