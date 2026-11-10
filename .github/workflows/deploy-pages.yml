@@ -26,6 +26,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Verify project tests
+        run: node --test tests/*.test.cjs
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload site files
