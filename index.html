@@ -3932,30 +3932,109 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
         animation.finished.catch(()=>{});
       }catch(error){completePageTransition(transition);}
     }
-    // Independent DM viewport prevents iOS Safari from scrolling the whole website
-    // when focusing a text field, and returns to its normal size on keyboard dismissal.
-    let dmViewportFrame=0;
+    // Keep the DM screen aligned with Safari's visible viewport, but do not let
+    // transient visualViewport pans move it after the keyboard is dismissed.
+    const dmInput=byId('dmInput'),dmBrowserIOS=watchBrowserIOS;
+    let dmViewportFrame=0,dmViewportSettleTimer=0,dmKeyboardDismissTimer=0;
+    let dmViewportBaseHeight=0,dmKeyboardDismissActive=false;
+    function finishDmKeyboardDismiss(){
+      dmKeyboardDismissActive=false;
+      if(dmKeyboardDismissTimer)clearTimeout(dmKeyboardDismissTimer);
+      dmKeyboardDismissTimer=0;
+    }
+    function setDmViewportBox(top,height){
+      const root=document.documentElement;
+      root.style.setProperty('--dm-visual-top',Math.max(0,top)+'px');
+      root.style.setProperty('--dm-visual-height',Math.max(210,height)+'px');
+    }
+    function beginDmKeyboardDismiss(){
+      if(!dmBrowserIOS||!document.body.classList.contains('dmViewing')||dmKeyboardDismissActive)return;
+      const viewport=window.visualViewport;
+      const currentHeight=viewport?.height||window.innerHeight;
+      const fullHeight=Math.max(dmViewportBaseHeight||0,window.innerHeight||0,currentHeight);
+      if(fullHeight-currentHeight<70&&!document.body.classList.contains('dmKeyboardOpen'))return;
+      dmKeyboardDismissActive=true;
+      document.body.classList.remove('dmKeyboardOpen');
+      // Snap back immediately; ignore Safari's intermediate offsetTop/scroll events
+      // until the keyboard has fully retreated.
+      setDmViewportBox(0,fullHeight);
+      dmKeyboardDismissTimer=setTimeout(()=>{
+        finishDmKeyboardDismiss();
+        scheduleDmViewport();
+      },850);
+    }
     function updateDmViewport(){
       if(!document.body.classList.contains('dmViewing'))return;
       const viewport=window.visualViewport;
+      if(viewport&&Math.abs(viewport.scale-1)>.02)return;
       const height=viewport?.height||window.innerHeight;
-      const top=Math.max(0,viewport?.offsetTop||0);
-      document.documentElement.style.setProperty('--dm-visual-top',top+'px');
-      document.documentElement.style.setProperty('--dm-visual-height',Math.max(210,height)+'px');
-      document.body.classList.toggle('dmKeyboardOpen',window.innerHeight-height>120);
+      const focused=document.activeElement===dmInput;
+      const keyboardWasOpen=document.body.classList.contains('dmKeyboardOpen');
+      if(dmKeyboardDismissActive){
+        if(focused)finishDmKeyboardDismiss();
+        else if(height>=Math.max(0,dmViewportBaseHeight-55))finishDmKeyboardDismiss();
+        else return;
+      }
+      if(!focused&&!keyboardWasOpen)dmViewportBaseHeight=height;
+      const baseHeight=Math.max(dmViewportBaseHeight||0,height);
+      const reduced=baseHeight-height>120;
+      const keyboardOpen=reduced&&(focused||keyboardWasOpen);
+      document.body.classList.toggle('dmKeyboardOpen',keyboardOpen);
+      // Safari can report a stale positive visualViewport.offsetTop after blur.
+      // While typing, follow its layout scroll position; when closed, pin to zero.
+      const top=keyboardOpen?Math.max(0,window.scrollY||0):0;
+      if(!keyboardOpen)dmViewportBaseHeight=height;
+      setDmViewportBox(top,height);
     }
     function scheduleDmViewport(){
-      if(!document.body.classList.contains('dmViewing'))return;
-      cancelAnimationFrame(dmViewportFrame);
-      dmViewportFrame=requestAnimationFrame(updateDmViewport);
+      if(!document.body.classList.contains('dmViewing')||document.hidden)return;
+      const keyboardActive=dmKeyboardDismissActive
+        ||document.body.classList.contains('dmKeyboardOpen')
+        ||document.activeElement===dmInput;
+      if(dmBrowserIOS&&keyboardActive){
+        if(dmViewportFrame){cancelAnimationFrame(dmViewportFrame);dmViewportFrame=0;}
+        if(dmViewportSettleTimer)clearTimeout(dmViewportSettleTimer);
+        dmViewportSettleTimer=setTimeout(()=>{
+          dmViewportSettleTimer=0;
+          updateDmViewport();
+        },80);
+        return;
+      }
+      if(dmViewportSettleTimer){clearTimeout(dmViewportSettleTimer);dmViewportSettleTimer=0;}
+      if(dmViewportFrame)return;
+      dmViewportFrame=requestAnimationFrame(()=>{
+        dmViewportFrame=0;
+        updateDmViewport();
+      });
     }
     window.visualViewport?.addEventListener('resize',scheduleDmViewport);
     window.visualViewport?.addEventListener('scroll',scheduleDmViewport);
     window.addEventListener('resize',scheduleDmViewport);
+    dmInput.addEventListener('focus',()=>{
+      finishDmKeyboardDismiss();
+      scheduleDmViewport();
+    });
+    dmInput.addEventListener('blur',()=>{
+      beginDmKeyboardDismiss();
+      scheduleDmViewport();
+    });
+    document.addEventListener('visibilitychange',()=>{
+      if(!document.hidden)scheduleDmViewport();
+    });
     function setDmViewing(active){
-      if(active){document.body.classList.add('dmViewing');updateDmViewport();return;}
-      byId('dmInput').blur();
+      if(active){
+        finishDmKeyboardDismiss();
+        dmViewportBaseHeight=window.visualViewport?.height||window.innerHeight||0;
+        document.body.classList.add('dmViewing');
+        updateDmViewport();
+        return;
+      }
       document.body.classList.remove('dmViewing','dmKeyboardOpen');
+      dmInput.blur();
+      finishDmKeyboardDismiss();
+      if(dmViewportFrame)cancelAnimationFrame(dmViewportFrame);
+      if(dmViewportSettleTimer)clearTimeout(dmViewportSettleTimer);
+      dmViewportFrame=0;dmViewportSettleTimer=0;dmViewportBaseHeight=0;
       document.documentElement.style.removeProperty('--dm-visual-top');
       document.documentElement.style.removeProperty('--dm-visual-height');
     }
