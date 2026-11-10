@@ -945,6 +945,26 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
 #dm-policy-dialog .dm-policy-save:disabled{opacity:.55;cursor:wait}
 #dm-policy-feedback{margin:12px 0 0}
 @media(prefers-reduced-motion:reduce){.dm-choice-card,.dm-privacy-entry{transition:none}}
+.safety-dialog{position:fixed;top:50%;left:50%;right:auto;bottom:auto;transform:translate(-50%,-50%);margin:0;box-sizing:border-box;width:min(470px,calc(100vw - 24px));max-height:min(82dvh,720px);overflow:auto;padding:20px;border:1px solid #ffffff29;border-radius:24px;background:radial-gradient(ellipse at 10% 0%,#ffffff0c,transparent 75%),linear-gradient(145deg,#222225,#111114);color:#f0f0f1;box-shadow:0 26px 90px #000c;font:inherit}
+.safety-dialog::backdrop{background:#000b;backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
+.safety-dialog h2{font:600 clamp(20px,5vw,25px)/1.2 system-ui;margin:0 0 8px;letter-spacing:-.6px}
+.safety-dialog p{color:#b7b7be;font:13px/1.6 system-ui}
+.safety-dialog .field{margin:15px 0}
+.safety-dialog select,.safety-dialog textarea{display:block;width:100%;box-sizing:border-box;margin-top:8px;padding:12px;border:1px solid #ffffff27;border-radius:13px;background:#17171a;color:#f4f4f5;font:14px/1.5 system-ui}
+.safety-dialog textarea{min-height:88px;resize:vertical}
+.safety-dialog-actions{display:flex;gap:9px;margin-top:18px}
+.safety-dialog-actions button{flex:1;min-height:46px;border:1px solid #ffffff22;border-radius:13px;background:#ffffff0c;color:#f3f3f4;font:600 13px system-ui;cursor:pointer}
+.safety-dialog-actions .primary{background:#ededee;color:#19191b}
+.safety-dialog-actions .danger{border-color:#9a49494d;color:#ffc6c6}
+.safety-dialog-actions button:disabled{opacity:.5;cursor:wait}
+.safety-dialog .safety-check{display:flex;align-items:flex-start;gap:10px;color:#e2e2e5;font:13px/1.5 system-ui;margin:15px 0}
+.safety-dialog .safety-check input{flex:none;margin:3px 0 0;accent-color:#e8e8ea}
+.safety-report-user{margin-top:13px;width:100%;min-height:43px;border:1px solid #ffffff20;border-radius:13px;background:#ffffff08;color:#c8c2c5;font:12px system-ui;cursor:pointer}
+.dm-header #dmReportUser{margin-left:auto;min-width:38px;width:38px;height:38px;border:1px solid #ffffff20;border-radius:50%;background:#ffffff08;color:#ddd;font:20px system-ui}
+.dm-message-report{display:block;margin:4px 0 0 auto;padding:2px 5px;border:0;border-radius:7px;background:transparent;color:#aaa;font:11px/1.3 system-ui;cursor:pointer}
+.dm-message-report:hover,.dm-message-report:focus-visible{background:#ffffff13;color:#fff}
+.safety-delete-entry{display:block;width:100%;margin:12px 0 4px;padding:13px 14px;text-align:left;border:1px solid #a34d4d44;border-radius:14px;background:#681f1f18;color:#efbaba;font:600 13px system-ui;cursor:pointer}
+.safety-delete-entry small{display:block;margin-top:5px;color:#b9a5a5;font:11px/1.45 system-ui}
 
 /* LOOPA v87 — people, private messages and invitations */
 .friend-person{cursor:pointer}
@@ -972,7 +992,7 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
 .dm-header{display:flex;align-items:center;gap:11px;padding:12px 14px;border-bottom:1px solid #ffffff20;flex:none}
 .dm-header button{border:0;background:none;color:#e9e9ec;font:25px system-ui;min-width:35px;height:40px;cursor:pointer}
 .dm-header .friend-avatar{width:38px;height:38px;flex:none;overflow:hidden}
-.dm-header-info{display:grid;gap:2px;min-width:0}
+.dm-header-info{display:grid;gap:2px;min-width:0;flex:1}
 .dm-header-info strong{font:600 15px system-ui;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dm-header-info small{font:11px system-ui;color:#aaa}
 .dm-log{flex:1;min-height:110px;overflow:auto;overscroll-behavior:contain;display:flex;flex-direction:column;gap:16px;padding:16px 12px 22px}
@@ -1476,6 +1496,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
             <button class="main" id="friendPageWrite" type="button">Написать</button>
             <button id="friendPageInvite" type="button">Пригласить</button>
           </div>
+          <button class="safety-report-user" id="friendPageReport" type="button">Пожаловаться на пользователя</button>
           <p class="friend-profile-description">Общее время в LOOPA синхронизируется при входе пользователя. Статистика доступна только друзьям.</p>
           <p id="friend-profile-missing" hidden></p>
         </div>
@@ -1483,7 +1504,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       <section data-page="dm" hidden>
         <div class="eyebrow">ЛИЧНОЕ ОБЩЕНИЕ</div>
         <div class="dm-screen">
-          <div class="dm-header"><button id="dmBack" aria-label="Назад к профилю" type="button">‹</button><div id="dmPeerAvatar"></div><div class="dm-header-info"><strong id="dmPeerName">Собеседник</strong><small>Личные сообщения LOOPA</small></div></div>
+          <div class="dm-header"><button id="dmBack" aria-label="Назад к профилю" type="button">‹</button><div id="dmPeerAvatar"></div><div class="dm-header-info"><strong id="dmPeerName">Собеседник</strong><small>Личные сообщения LOOPA</small></div><button id="dmReportUser" type="button" aria-label="Пожаловаться на пользователя" title="Пожаловаться">⋯</button></div>
           <div class="dm-log" id="dmLog" aria-live="polite"><p class="dm-empty">Загрузка переписки…</p></div>
           <p id="dm-error" role="status" hidden></p>
           <form id="dmForm" class="dm-composer"><textarea id="dmInput" aria-label="Сообщение" placeholder="Сообщение…" maxlength="2000" rows="1" enterkeyhint="send" required></textarea><button id="dmSend" type="submit" aria-label="Отправить сообщение">↑</button></form>
@@ -1605,6 +1626,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
             <button class="action" id="recovery-submit" type="submit">Обновить пароль</button>
           </form>
           <button class="action secondary" type="button" id="sign-out">Выйти из аккаунта</button>
+          <button class="safety-delete-entry" type="button" id="request-account-deletion">Запросить удаление аккаунта<small>Запрос увидит только владелец LOOPA; отправка не удаляет данные автоматически.</small></button>
         </div>
           </div>
           <div id="settings-privacy" hidden>
@@ -1624,6 +1646,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
                   <span class="dm-entry-copy"><strong>Личные сообщения</strong><small>Кто может писать мне</small></span>
                   <span class="dm-entry-value" id="dm-policy-summary">Все</span><span class="linked-entry-chevron" aria-hidden="true">›</span>
                 </button>
+                <p class="privacy-section-note">Для новых профилей по умолчанию выбраны сообщения только от друзей. Существующие настройки не меняются автоматически.</p>
                 <div class="privacy-item"><span class="privacy-item-icon"><svg><use href="#i-room"/></svg></span><span class="privacy-item-body"><strong>Приглашения в комнаты</strong><small>Кто сможет присылать приглашения</small><select id="room-invite-policy" class="privacy-select" disabled><option value="everyone">Все пользователи</option><option value="friends" selected>Только друзья</option><option value="nobody">Никто</option></select></span></div>
                 <div class="privacy-item privacy-blocks"><span class="privacy-item-icon"><svg><use href="#i-lock"/></svg></span><span class="privacy-item-body"><strong>Заблокированные</strong><small>Пользователи не смогут отправлять заявки и приглашения</small><div id="blocked-users-list" class="blocked-users-list"><span class="friends-empty">Загрузка списка…</span></div></span></div>
                 <p id="communication-feedback" class="auth-feedback" role="status" aria-live="polite" hidden></p>
@@ -1703,9 +1726,42 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       <label class="dm-choice"><input type="radio" name="dm-policy" value="everyone" checked><span class="dm-choice-card"><span class="dm-choice-icon"><svg aria-hidden="true"><use href="#i-users"/></svg></span><span class="dm-choice-text"><strong>Все пользователи</strong><small>Любой пользователь LOOPA сможет тебе написать</small></span><span class="dm-choice-check" aria-hidden="true">✓</span></span></label>
       <label class="dm-choice"><input type="radio" name="dm-policy" value="friends"><span class="dm-choice-card"><span class="dm-choice-icon"><svg aria-hidden="true"><use href="#i-lock"/></svg></span><span class="dm-choice-text"><strong>Только друзья</strong><small>Написать смогут лишь люди из твоих друзей</small></span><span class="dm-choice-check" aria-hidden="true">✓</span></span></label>
     </div>
-    <p class="dm-policy-helper" id="dm-policy-helper">По умолчанию разрешены сообщения от всех пользователей.</p>
+    <p class="dm-policy-helper" id="dm-policy-helper">Для новых профилей по умолчанию выбраны друзья; настройки существующих профилей не меняются.</p>
     <button class="action dm-policy-save" type="button" id="dm-policy-save">Сохранить выбор</button>
     <p id="dm-policy-feedback" class="auth-feedback" role="status" aria-live="polite" hidden></p>
+  </dialog>
+  <dialog id="user-report-dialog" class="safety-dialog" aria-labelledby="user-report-title" aria-describedby="user-report-description">
+    <div class="dm-dialog-top"><span>БЕЗОПАСНОСТЬ LOOPA</span><button type="button" id="user-report-close" aria-label="Закрыть">×</button></div>
+    <h2 id="user-report-title">Пожаловаться</h2>
+    <p id="user-report-context">Жалоба будет отправлена владельцу LOOPA.</p>
+    <p id="user-report-description">Жалобу не увидят другие пользователи. Для жалобы на сообщение LOOPA сохранит его идентификатор, но не будет создавать отдельную копию текста.</p>
+    <form id="user-report-form">
+      <label class="field">Причина
+        <select id="user-report-reason" required>
+          <option value="" selected disabled>Выбери причину</option>
+          <option value="harassment">Оскорбления или травля</option>
+          <option value="spam">Спам</option>
+          <option value="threats">Угрозы</option>
+          <option value="scam">Обман или мошенничество</option>
+          <option value="other">Другое</option>
+        </select>
+      </label>
+      <label class="field">Комментарий <small>(необязательно, до 500 символов)</small>
+        <textarea id="user-report-details" maxlength="500" placeholder="Не указывай пароль, код входа или другие секреты."></textarea>
+      </label>
+      <div class="safety-dialog-actions"><button type="button" id="user-report-cancel">Отмена</button><button class="primary" type="submit" id="user-report-submit">Отправить</button></div>
+      <p id="user-report-feedback" class="auth-feedback" role="status" aria-live="polite" hidden></p>
+    </form>
+  </dialog>
+  <dialog id="account-delete-dialog" class="safety-dialog" aria-labelledby="account-delete-title" aria-describedby="account-delete-description">
+    <div class="dm-dialog-top"><span>ЗАПРОС ВЛАДЕЛЬЦУ LOOPA</span><button type="button" id="account-delete-close" aria-label="Закрыть">×</button></div>
+    <h2 id="account-delete-title">Запросить удаление аккаунта?</h2>
+    <p id="account-delete-description">В закрытой очереди сохранятся ID профиля, время и статус запроса. Он не удалит аккаунт или данные автоматически. После ручной обработки ты можешь потерять доступ к профилю, друзьям, перепискам, комнатам и прогрессу.</p>
+    <form id="account-delete-form">
+      <label class="safety-check"><input id="account-delete-ack" type="checkbox" required><span>Я понимаю, что отправляю запрос владельцу, а не удаляю аккаунт сразу.</span></label>
+      <div class="safety-dialog-actions"><button type="button" id="account-delete-cancel">Отмена</button><button class="danger" type="submit" id="account-delete-submit" disabled>Отправить запрос</button></div>
+      <p id="account-delete-feedback" class="auth-feedback" role="status" aria-live="polite" hidden></p>
+    </form>
   </dialog>
   <dialog id="telegramAuthDialog" class="telegram-auth-dialog" aria-labelledby="telegramAuthTitle" aria-describedby="telegramAuthDescription">
     <div class="telegram-dialog-head"><span class="telegram-dialog-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 3 2.9 10.5c-.7.3-.7 1.2.1 1.5l4.6 1.5 1.8 5.4c.2.7 1 .9 1.5.3l2.7-2.8 4.6 3.4c.6.4 1.4.1 1.5-.6L22 4.2c.1-.8-.3-1.4-1-1.2Z" fill="#36aee2" stroke="none"/><path d="m8 13.5 10.8-7.1-8.4 9.8" fill="none" stroke="#fff" stroke-width="1.2" stroke-linecap="round"/></svg></span><button id="telegramAuthClose" type="button" aria-label="Закрыть">×</button></div>
@@ -4121,6 +4177,47 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       finally{byId('privacy-reset').disabled=false;}
     });
     byId('privacy-signout').addEventListener('click',()=>byId('sign-out').click());
+    const accountDeleteDialog=byId('account-delete-dialog');
+    byId('request-account-deletion').addEventListener('click',()=>{
+      if(!currentUser||!client){showToast('Сначала войди в профиль LOOPA.');return;}
+      byId('account-delete-ack').checked=false;
+      byId('account-delete-submit').disabled=true;
+      feedback('account-delete-feedback','');
+      if(!accountDeleteDialog.open)accountDeleteDialog.showModal();
+    });
+    byId('account-delete-ack').addEventListener('change',event=>{
+      byId('account-delete-submit').disabled=!event.target.checked;
+    });
+    const closeAccountDelete=()=>{if(accountDeleteDialog.open)accountDeleteDialog.close();};
+    byId('account-delete-close').addEventListener('click',closeAccountDelete);
+    byId('account-delete-cancel').addEventListener('click',closeAccountDelete);
+    accountDeleteDialog.addEventListener('click',event=>{
+      if(event.target===accountDeleteDialog)closeAccountDelete();
+    });
+    byId('account-delete-form').addEventListener('submit',async event=>{
+      event.preventDefault();
+      const owner=currentUser?.id;
+      if(!owner||!client||!byId('account-delete-ack').checked)return;
+      const submit=byId('account-delete-submit');submit.disabled=true;
+      feedback('account-delete-feedback','');
+      try{
+        const {data,error}=await client.rpc('loopa_request_account_deletion');
+        if(error)throw error;
+        if(currentUser?.id!==owner)return;
+        const status=data?.status;
+        if(!['submitted','already_pending'].includes(status))throw Error('Не удалось подтвердить запрос.');
+        closeAccountDelete();
+        const ref=String(data?.request_id||'').slice(0,8);
+        showToast(status==='already_pending'
+          ?'Запрос уже находится у владельца LOOPA'
+          :'Запрос отправлен владельцу'+(ref?' · '+ref:''));
+      }catch(err){
+        const message=String(err?.message||'');
+        feedback('account-delete-feedback',/loopa_request_account_deletion|schema cache|does not exist/i.test(message)
+          ?'Запрос пока не подключён. Владелец должен применить SQL-настройку безопасности.'
+          :errorText(err),true);
+      }finally{if(currentUser?.id===owner)submit.disabled=!byId('account-delete-ack').checked;}
+    });
     // Direct messages: store the user's preference on their Supabase profile.
     // Message-write permissions must also be enforced server-side when DMs ship.
     let dmPolicyValue='everyone',dmPolicyReady=false;
@@ -4129,8 +4226,8 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
     function refreshDmPolicyView(){
       byId('dm-policy-summary').textContent=dmPolicyLabel(dmPolicyValue);
       byId('dm-policy-helper').textContent=dmPolicyReady
-        ?'Изменение сохранится в профиле LOOPA и будет учитываться при запуске личных сообщений.'
-        :'Для сохранения настройки сначала добавь поле dm_policy в Supabase (SQL для v86).';
+        ?'Для новых профилей по умолчанию выбраны друзья. Сохранённые настройки существующих профилей не меняются.'
+        :'Примени SQL-настройку безопасности: новые профили получат вариант «Только друзья», существующие настройки останутся прежними.';
     }
     function setDmPolicyView(value,ready){
       dmPolicyValue=value==='friends'?'friends':'everyone';
@@ -4361,6 +4458,59 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
     // Server-side policies (LOOPA_v87_setup.sql) enforce who may send/read.
     let profilePeer=null,dmPeer=null,dmChannel=null,dmHistory=[],dmBusy=false;
     let profilePageReturn='friends',dmPageReturn='friend-profile',friendProfileRequest=0;
+    let safetyReportTargetUserId=null,safetyReportMessageRef=null;
+    const safetyReportDialog=byId('user-report-dialog');
+    function openSafetyReport({userId,messageId=null,displayName='пользователя'}={}){
+      if(!currentUser||!client){showToast('Войди в профиль, чтобы отправить жалобу.');return;}
+      if(!userId||userId===currentUser.id){showToast('На свой профиль пожаловаться нельзя.');return;}
+      const ref=messageId==null?null:String(messageId);
+      if(ref!==null&&(!ref||ref.length>128)){showToast('Не удалось определить сообщение для жалобы.');return;}
+      safetyReportTargetUserId=userId;
+      safetyReportMessageRef=ref;
+      byId('user-report-context').textContent=ref
+        ?'Жалоба на сообщение от '+(displayName||'пользователя')+'.'
+        :'Жалоба на профиль '+(displayName||'пользователя')+'.';
+      byId('user-report-details').value='';
+      byId('user-report-reason').value='';
+      byId('user-report-submit').disabled=false;
+      feedback('user-report-feedback','');
+      if(!safetyReportDialog.open)safetyReportDialog.showModal();
+    }
+    const closeSafetyReport=()=>{if(safetyReportDialog.open)safetyReportDialog.close();};
+    byId('user-report-close').addEventListener('click',closeSafetyReport);
+    byId('user-report-cancel').addEventListener('click',closeSafetyReport);
+    safetyReportDialog.addEventListener('click',event=>{
+      if(event.target===safetyReportDialog)closeSafetyReport();
+    });
+    safetyReportDialog.addEventListener('close',()=>{
+      safetyReportTargetUserId=null;safetyReportMessageRef=null;
+    });
+    byId('user-report-form').addEventListener('submit',async event=>{
+      event.preventDefault();
+      const actor=currentUser?.id,target=safetyReportTargetUserId,ref=safetyReportMessageRef;
+      if(!actor||!target||!client)return;
+      const submit=byId('user-report-submit');submit.disabled=true;
+      feedback('user-report-feedback','');
+      try{
+        const {data,error}=await client.rpc('loopa_submit_user_report',{
+          p_target_user:target,
+          p_message_ref:ref,
+          p_reason:byId('user-report-reason').value,
+          p_details:byId('user-report-details').value.trim()||null
+        });
+        if(error)throw error;
+        if(currentUser?.id!==actor)return;
+        const status=data?.status;
+        if(!['submitted','already_open'].includes(status))throw Error('Не удалось подтвердить отправку жалобы.');
+        closeSafetyReport();
+        showToast(status==='already_open'?'Эта жалоба уже отправлена':'Жалоба передана владельцу LOOPA');
+      }catch(err){
+        const message=String(err?.message||'');
+        feedback('user-report-feedback',/loopa_submit_user_report|loopa_dm_messages_v87|schema cache|does not exist/i.test(message)
+          ?'Жалобы пока не подключены. Владелец должен применить SQL-настройку безопасности.'
+          :errorText(err),true);
+      }finally{if(currentUser?.id===actor)submit.disabled=false;}
+    });
     function prettyUsage(seconds){
       const mins=Math.floor(Math.max(0,Number(seconds)||0)/60);
       return mins>=60?`${Math.floor(mins/60)} ч ${mins%60} мин`:`${mins} мин`;
@@ -4431,6 +4581,9 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
     }
     byId('friendPageBack').onclick=()=>showPage(profilePageReturn==='rooms'&&roomState?'rooms':(profilePageReturn==='messages'?'messages':'friends'));
     byId('friendPageWrite').onclick=()=>{if(profilePeer)openDirectMessage(profilePeer);};
+    byId('friendPageReport').onclick=()=>{
+      if(profilePeer)openSafetyReport({userId:profilePeer.id,displayName:profilePeer.display_name||'пользователя'});
+    };
     byId('friendPageInvite').onclick=async()=>{
       if(!profilePeer||!currentUser)return;
       const peer=profilePeer.id,button=byId('friendPageInvite');button.disabled=true;
@@ -4558,6 +4711,12 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
           const text=document.createElement('span');text.textContent=msg.body;
           const time=document.createElement('time');time.dateTime=msg.created_at;time.textContent=new Date(msg.created_at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
           bubble.append(text,time);
+          if(!mine){
+            const report=document.createElement('button');report.type='button';report.className='dm-message-report';
+            report.textContent='⚑';report.title='Пожаловаться на сообщение';report.setAttribute('aria-label','Пожаловаться на сообщение');
+            report.onclick=()=>openSafetyReport({userId:msg.sender_id,messageId:msg.id,displayName:who.display_name||'пользователя'});
+            bubble.append(report);
+          }
           row.append(ava,bubble);wrap.append(row);
         });log.append(wrap);
       }
@@ -4587,6 +4746,9 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
     byId('dmBack').onclick=()=>{
       clearDirectMessageChannel();
       showPage(dmPageReturn==='friend-profile'?'friend-profile':(dmPageReturn==='messages'?'messages':'friends'));
+    };
+    byId('dmReportUser').onclick=()=>{
+      if(dmPeer)openSafetyReport({userId:dmPeer.id,displayName:dmPeer.display_name||'пользователя'});
     };
     byId('dmForm').addEventListener('submit',async event=>{
       event.preventDefault();
