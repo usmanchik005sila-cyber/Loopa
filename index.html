@@ -960,6 +960,9 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
 .safety-dialog .safety-check{display:flex;align-items:flex-start;gap:10px;color:#e2e2e5;font:13px/1.5 system-ui;margin:15px 0}
 .safety-dialog .safety-check input{flex:none;margin:3px 0 0;accent-color:#e8e8ea}
 .safety-report-user{margin-top:13px;width:100%;min-height:43px;border:1px solid #ffffff20;border-radius:13px;background:#ffffff08;color:#c8c2c5;font:12px system-ui;cursor:pointer}
+.safety-support-link{display:block;text-decoration:none}
+.auth-help-link{margin:18px 4px 0;color:#a8a3a5;font-size:12px;line-height:1.5;text-align:center}
+.auth-help-link a{color:#eee;text-underline-offset:3px}
 .dm-header #dmReportUser{margin-left:auto;min-width:38px;width:38px;height:38px;border:1px solid #ffffff20;border-radius:50%;background:#ffffff08;color:#ddd;font:20px system-ui}
 .dm-message-report{display:block;margin:4px 0 0 auto;padding:2px 5px;border:0;border-radius:7px;background:transparent;color:#aaa;font:11px/1.3 system-ui;cursor:pointer}
 .dm-message-report:hover,.dm-message-report:focus-visible{background:#ffffff13;color:#fff}
@@ -1576,6 +1579,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
             </details>
           </details>
           <p id="auth-feedback" class="auth-feedback" role="status" aria-live="polite" hidden></p>
+          <p class="auth-help-link">Нужна помощь? <a href="https://t.me/loopasupport" target="_blank" rel="noopener noreferrer">@loopasupport</a></p>
         </div>
         <div id="settings-home" class="settings-overview" hidden>
           <div class="panel glass guest-save-panel" id="guest-save-panel" hidden>
@@ -1662,6 +1666,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
                 <button class="privacy-action" type="button" id="privacy-reset">Сменить пароль по электронной почте →</button>
                 <p id="privacy-feedback" class="auth-feedback" role="status" aria-live="polite" hidden></p>
                 <button class="privacy-action" type="button" id="privacy-signout">Выйти из аккаунта →</button>
+                <a class="privacy-action safety-support-link" href="https://t.me/loopasupport" target="_blank" rel="noopener noreferrer">Связаться с поддержкой · @loopasupport →</a>
               </div>
               <p class="privacy-section-note">Статус обновляется, пока LOOPA открыта на активной вкладке; отключение активности скрывает и последнее посещение. Фотографии аватара по-прежнему доступны по публичной ссылке.</p>
             </div>

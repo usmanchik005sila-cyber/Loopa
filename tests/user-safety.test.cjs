@@ -61,6 +61,8 @@ test("users can report a profile and an incoming DM", () => {
 test("retention guide stays an unconfirmed operator draft", () => {
   assert.match(setup, /publicly readable/i);
   assert.match(setup, /not\*\* the user-facing privacy policy/i);
+  assert.match(setup, /@loopasupport/);
+  assert.match(html, /https:\/\/t\.me\/loopasupport/);
   assert.match(setup, /no reliable automatic deletion schedule/i);
-  assert.match(setup, /do not present a retention promise or support address/i);
+  assert.match(setup, /do not present a retention promise/i);
 });

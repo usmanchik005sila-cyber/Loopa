@@ -1,6 +1,6 @@
 # LOOPA: setup for reports and account deletion requests
 
-This operator guide is committed to a public repository and is therefore publicly readable; it is **not** the user-facing privacy policy. It contains no support contact and does not set retention periods. Do not publish a privacy-policy statement until the owner confirms the actual periods and support contact.
+This operator guide is committed to a public repository and is therefore publicly readable; it is **not** the user-facing privacy policy. The owner confirmed `@loopasupport` as the support contact. Retention periods are not approved, so no privacy-policy text is published.
 
 ## Deployment order
 
@@ -84,4 +84,4 @@ Before writing or publishing a policy, the owner must confirm:
 - the support contact and how users can reach it;
 - whether deletion means immediate removal, staged removal, or removal with a stated backup exception.
 
-Until those facts are confirmed, do not present a retention promise or support address in the app.
+Until retention facts are confirmed, do not present a retention promise in the app. The confirmed support contact may be shown separately.
