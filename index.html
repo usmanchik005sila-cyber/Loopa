@@ -1597,7 +1597,8 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
               <p class="panel-note">ЛИЧНОЕ ПРОСТРАНСТВО</p><h2>Конфиденциальность</h2>
               <p class="privacy-section-note">Решай, кто сможет видеть твою активность и взаимодействовать с тобой в LOOPA.</p>
               <div class="privacy-group"><h3>ВИДИМОСТЬ</h3>
-                <div class="privacy-item"><span class="privacy-item-icon"><svg><use href="#i-person"/></svg></span><span class="privacy-item-body"><strong>Показывать активность</strong><small>Все пользователи LOOPA смогут видеть онлайн и последнее посещение</small></span><label class="presence-switch" aria-label="Показывать активность"><input id="presence-visible" type="checkbox" checked disabled><span class="presence-switch-track"></span></label></div>
+                <div class="privacy-item"><span class="privacy-item-icon"><svg><use href="#i-person"/></svg></span><span class="privacy-item-body"><strong>Показывать активность</strong><small>Только друзья видят, когда ты в сети и когда заходил в LOOPA</small></span><label class="presence-switch" aria-label="Показывать активность"><input id="presence-visible" type="checkbox" checked disabled><span class="presence-switch-track"></span></label></div>
+                <div class="privacy-item"><span class="privacy-item-icon"><svg><use href="#i-person"/></svg></span><span class="privacy-item-body"><strong>Показывать просмотр друзьям</strong><small>Друзья видят «В комнате» или «Смотрит видео». Приватные комнаты защищены.</small></span><label class="presence-switch" aria-label="Показывать просмотр друзьям"><input id="presence-share-room" type="checkbox" checked disabled><span class="presence-switch-track"></span></label></div>
                 <div class="privacy-item"><span class="privacy-item-icon"><svg><use href="#i-arrow"/></svg></span><span class="privacy-item-body"><strong>Мой статус</strong><small id="presence-status">Подключаем статус…</small></span><span id="presence-indicator" class="presence-dot" aria-hidden="true"></span></div>
                 <p id="presence-feedback" class="auth-feedback" role="status" aria-live="polite" hidden></p>
               </div>
@@ -4087,6 +4088,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       presenceReady = false;
       presenceUserId = null;
       byId('presence-visible').disabled = true;
+      byId('presence-share-room').disabled = true;
       presenceStatus('Войдите в аккаунт, чтобы видеть статус');
       feedback('presence-feedback','');
     }
@@ -4096,7 +4098,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       try {
         const {error} = await client.from('user_presence').upsert({user_id:currentUser.id,last_active_at:new Date().toISOString()},{onConflict:'user_id'});
         if (error) throw error;
-        if (byId('presence-visible').checked) presenceStatus('В сети · видно всем пользователям',true);
+        if (byId('presence-visible').checked) presenceStatus('В сети · видно только друзьям',true);
         else presenceStatus('Активность скрыта');
       } catch(e) {
         presenceStatus('Не удалось обновить статус');
@@ -4109,15 +4111,17 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       presenceUserId = user.id;
       presenceStatus('Загружаем настройки…');
       try {
-        const {data,error} = await client.from('user_presence').select('visible,last_active_at').eq('user_id',user.id).maybeSingle();
+        const {data,error} = await client.from('user_presence').select('visible,share_room_activity,last_active_at').eq('user_id',user.id).maybeSingle();
         if (error) throw error;
         if (presenceUserId !== user.id) return;
         if (!data) {
-          const {error:insertError} = await client.from('user_presence').insert({user_id:user.id,visible:true});
+          const {error:insertError} = await client.from('user_presence').insert({user_id:user.id,visible:true,share_room_activity:true});
           if (insertError) throw insertError;
         }
         byId('presence-visible').checked = data?.visible ?? true;
+        byId('presence-share-room').checked = data?.share_room_activity ?? true;
         byId('presence-visible').disabled = false;
+        byId('presence-share-room').disabled = false;
         presenceReady = true;
         await heartbeatPresence();
         presenceTimer = setInterval(heartbeatPresence,30000);
@@ -4134,12 +4138,26 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       try {
         const {error} = await client.from('user_presence').update({visible:desired}).eq('user_id',currentUser.id);
         if (error) throw error;
-        presenceStatus(desired ? 'В сети · видно всем пользователям' : 'Активность скрыта',desired);
-        feedback('presence-feedback',desired?'Теперь твоя активность видна пользователям LOOPA.':'Твоя активность и последнее посещение скрыты.');
+        presenceStatus(desired ? 'В сети · видно только друзьям' : 'Активность скрыта',desired);
+        feedback('presence-feedback',desired?'Теперь только друзья видят твою активность.':'Твоя активность, просмотр и последнее посещение скрыты.');
       } catch(e) {
         this.checked = !desired;
         feedback('presence-feedback',errorText(e),true);
       } finally {this.disabled = false;}
+    });
+    byId('presence-share-room').addEventListener('change',async function(){
+      if(!client || !currentUser || !presenceReady)return;
+      const desired=this.checked;
+      this.disabled=true;
+      feedback('presence-feedback','');
+      try{
+        const {error}=await client.from('user_presence').update({share_room_activity:desired}).eq('user_id',currentUser.id);
+        if(error)throw error;
+        feedback('presence-feedback',desired?'Друзья смогут видеть, когда ты в комнате или смотришь видео.':'Просмотр и нахождение в комнате скрыты от друзей.');
+      }catch(e){
+        this.checked=!desired;
+        feedback('presence-feedback',errorText(e),true);
+      }finally{this.disabled=false;}
     });
     document.addEventListener('visibilitychange',()=>{
       if (document.visibilityState === 'visible') {
@@ -4216,7 +4234,8 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       profilePeer={...profile};
       byId('friendPageName').textContent=profile.display_name||'Пользователь LOOPA';
       byId('friendPageAvatar').replaceChildren(avatarForUser(profile));
-      byId('friendPageStatus').textContent=presence?.label||'Статус недоступен';
+      const pageActivity=friendActivity[profile.id];
+      byId('friendPageStatus').textContent=pageActivity?(pageActivity.private?'В сети · В приватной комнате':pageActivity.state==='watching'?'В сети · Смотрит видео':'В сети · В комнате'):(presence?.label||'Статус недоступен');
       byId('friendPageTime').textContent='Загружаем…';
       byId('friendPageJoined').textContent='—';
       byId('friend-profile-missing').hidden=true;
@@ -4232,7 +4251,8 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
         if(requestId!==friendProfileRequest||profilePeer?.id!==profile.id)return;
         if(p.data){profilePeer={...p.data};byId('friendPageName').textContent=p.data.display_name||'Пользователь LOOPA';byId('friendPageAvatar').replaceChildren(avatarForUser(p.data));}
         const status=prs?.[profile.id];
-        byId('friendPageStatus').textContent=status?.label||presence?.label||'Статус скрыт';
+        const liveActivity=friendActivity[profile.id];
+        byId('friendPageStatus').textContent=liveActivity?(liveActivity.private?'В сети · В приватной комнате':liveActivity.state==='watching'?'В сети · Смотрит видео':'В сети · В комнате'):(status?.label||presence?.label||'Статус скрыт');
         if(stats.error){
           byId('friendPageTime').textContent='—';
           byId('friend-profile-missing').textContent='Для общей статистики выполни дополнительный SQL LOOPA v88 в Supabase.';
@@ -4491,10 +4511,14 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
         });
       }
       if(buttons?.some(x=>x.menu)&&friendActivity[profile.id]){
-        const activity=friendActivity[profile.id];text.textContent=activity.private?'В сети · В приватной комнате':'В сети · Сейчас смотрит';
-        if(!activity.private){const title=document.createElement('div');title.className='watchTitle';title.textContent=activity.title;detail.append(title);}
-        const join=document.createElement('button');join.type='button';join.className='watchJoin';join.textContent=activity.private?'Приватная комната':'Присоединиться';
-        join.onclick=async()=>{if(activity.private){showToast('Друг смотрит в приватной комнате. Войти можно по приглашению');return;}if(roomState&&!confirm('Перейти к просмотру друга?'))return;join.disabled=true;try{const {data,error}=await client.rpc('loopa_activity26',{action:'join',peer:profile.id});if(error)throw error;showPage('rooms');await roomRun('join',{room:data.code});}catch(e){showToast(e.message);}finally{join.disabled=false;}};detail.append(join);
+        const activity=friendActivity[profile.id];
+        const watching=activity.state==='watching';
+        text.textContent=activity.private?'В сети · В приватной комнате':(watching?'В сети · Смотрит видео':'В сети · В комнате');
+        if(watching&&!activity.private&&activity.title){const title=document.createElement('div');title.className='watchTitle';title.textContent=activity.title;detail.append(title);}
+        if(watching){
+          const join=document.createElement('button');join.type='button';join.className='watchJoin';join.textContent=activity.private?'Приватная комната':'Присоединиться';
+          join.onclick=async()=>{if(activity.private){showToast('Друг смотрит в приватной комнате. Войти можно по приглашению');return;}if(roomState&&!confirm('Перейти к просмотру друга?'))return;join.disabled=true;try{const {data,error}=await client.rpc('loopa_activity26',{action:'join',peer:profile.id});if(error)throw error;showPage('rooms');await roomRun('join',{room:data.code});}catch(e){showToast(e.message);}finally{join.disabled=false;}};detail.append(join);
+        }
       }
       for (const action of (buttons || [])) {
         if (action.menu) {
@@ -4550,6 +4574,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       if (friendSessionId === currentUser.id) return;
       friendSessionId=currentUser.id;
       friendRelations=[];
+      friendActivity={};
       clearInterval(friendAutoRefresh);
       friendAutoRefresh=setInterval(()=>{
         if (document.visibilityState==='visible') refreshFriendLists();
@@ -4615,7 +4640,9 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
         }
         if (currentUser?.id !== owner) return;
         const activityResult=await client.rpc('loopa_activity26',{action:'friends'});
-        if(currentUser?.id!==owner)return;friendActivity=Object.fromEntries((activityResult.data||[]).map(x=>[x.id,x]));
+        if(currentUser?.id!==owner)return;
+        if(activityResult.error)throw activityResult.error;
+        friendActivity=Object.fromEntries((activityResult.data||[]).map(x=>[x.id,x]));
         const accepted=friendRelations.filter(rel=>rel.status==='accepted');
         const received=friendRelations.filter(rel=>rel.status==='pending' && rel.receiver_id===owner);
         const sent=friendRelations.filter(rel=>rel.status==='pending' && rel.sender_id===owner);
