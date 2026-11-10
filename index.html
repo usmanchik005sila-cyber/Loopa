@@ -1268,65 +1268,53 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
   padding-bottom:max(12px, var(--loopa-tg-safe-bottom, 0px)) !important;
 }
 
-/* LOOPA Private Cinema: dark, deliberate Telegram launch screen. */
+/* LOOPA Private Cinema: restrained, seamless WebView loading screen. */
     .loopa-launch-splash{display:none}
     html.telegram-miniapp .loopa-launch-splash{
-     position:fixed;inset:0;z-index:100000;isolation:isolate;
-     display:grid;place-items:center;overflow:hidden;
-     background:#090a0c;color:#f4f0ef;pointer-events:none;
-     opacity:1;visibility:visible;transition:opacity .42s ease,visibility .42s ease;
+      position:fixed;inset:0;z-index:100000;isolation:isolate;
+      display:grid;place-items:center;overflow:hidden;
+      background:#090a0c;color:#fff;pointer-events:none;
+      opacity:1;visibility:visible;
+      transition:opacity .38s ease,visibility .38s ease;
     }
-    html.telegram-miniapp .loopa-launch-splash::before{
-     content:"";position:absolute;inset:0;pointer-events:none;
-     background:radial-gradient(ellipse 60% 38% at 50% 42%,rgba(210,202,193,.055),transparent 78%),
-       radial-gradient(ellipse 100% 76% at 50% 50%,transparent 45%,rgba(0,0,0,.28) 100%);
+    html.telegram-miniapp .loopa-launch-splash.is-hidden{
+      opacity:0;visibility:hidden;
     }
-    html.telegram-miniapp .loopa-launch-splash.is-hidden{opacity:0;visibility:hidden}
     .loopa-launch-content{
-     position:relative;display:flex;flex-direction:column;align-items:center;
-     width:min(100%,430px);padding:36px 28px;text-align:center;
+      display:flex;flex-direction:column;align-items:center;
+      width:min(100%,430px);padding:36px 28px;
+      text-align:center;transform:translateY(-2vh);
     }
-    .loopa-launch-icon{display:block;width:56px!important;height:56px!important;margin:0 0 21px;opacity:.94}
     .loopa-launch-mark{
-     display:block;font:normal clamp(40px,11vw,52px)/1 Georgia,"Times New Roman",serif;
-     letter-spacing:.15em;text-indent:.15em;color:#f4f0ef;
-     text-shadow:0 0 35px rgba(255,255,255,.09);
+      display:block;color:#fff;
+      font:650 clamp(43px,11vw,52px)/1.1 -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+      letter-spacing:.065em;text-indent:.065em;
+      -webkit-font-smoothing:antialiased;
     }
     .loopa-launch-tagline{
-     display:block;margin-top:14px;font:500 10px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-     letter-spacing:.27em;text-indent:.27em;color:#c2bcb8;
+      display:block;margin-top:11px;color:#9b9ba0;
+      font:500 10px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+      letter-spacing:.26em;text-indent:.26em;
     }
-    .loopa-launch-rule{
-     display:block;width:42px;height:1px;margin:24px 0 18px;
-     background:linear-gradient(90deg,transparent,#d6d2d0a6,transparent);
+    .loopa-launch-dots{
+      display:flex;align-items:center;justify-content:center;
+      gap:9px;margin-top:25px;height:8px;
     }
-    .loopa-launch-status{display:block;font:400 12px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#aaa6a7;letter-spacing:.025em}
-    .loopa-launch-progress{
-     position:relative;display:block;width:112px;height:2px;overflow:hidden;margin-top:17px;
-     border-radius:999px;background:rgba(255,255,255,.13);
+    .loopa-launch-dots i{
+      display:block;width:5px;height:5px;border-radius:50%;
+      background:#fff;opacity:.22;transform:scale(.82);
+      animation:loopaLaunchDot 1.5s ease-in-out infinite;
     }
-    .loopa-launch-progress::after{
-     content:"";position:absolute;inset:0 auto 0 0;width:35%;border-radius:inherit;
-     background:linear-gradient(90deg,rgba(228,221,215,.24),#eee9e4,rgba(228,221,215,.36));
-     box-shadow:0 0 10px rgba(238,233,228,.24);animation:loopaLaunchProgress 1.35s cubic-bezier(.45,.05,.55,.95) infinite;
+    .loopa-launch-dots i:nth-child(2){animation-delay:.22s}
+    .loopa-launch-dots i:nth-child(3){animation-delay:.44s}
+    @keyframes loopaLaunchDot{
+      0%,65%,100%{opacity:.22;transform:scale(.82)}
+      27%{opacity:1;transform:scale(1)}
     }
-    html.telegram-miniapp .loopa-launch-icon{animation:loopaLaunchReveal .54s ease-out both}
-    html.telegram-miniapp .loopa-launch-mark{animation:loopaLaunchReveal .58s .07s ease-out both}
-    html.telegram-miniapp .loopa-launch-tagline,
-    html.telegram-miniapp .loopa-launch-rule,
-    html.telegram-miniapp .loopa-launch-status,
-    html.telegram-miniapp .loopa-launch-progress{animation:loopaLaunchReveal .64s .15s ease-out both}
-    @keyframes loopaLaunchProgress{from{transform:translateX(-115%)}to{transform:translateX(330%)}}
-    @keyframes loopaLaunchReveal{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
     @media(prefers-reduced-motion:reduce){
-     html.telegram-miniapp .loopa-launch-splash{transition:none}
-     html.telegram-miniapp .loopa-launch-icon,
-     html.telegram-miniapp .loopa-launch-mark,
-     html.telegram-miniapp .loopa-launch-tagline,
-     html.telegram-miniapp .loopa-launch-rule,
-     html.telegram-miniapp .loopa-launch-status,
-     html.telegram-miniapp .loopa-launch-progress{animation:none!important}
-     .loopa-launch-progress::after{animation:none;width:35%;transform:none;opacity:.72}
+      html.telegram-miniapp .loopa-launch-splash{transition:none}
+      .loopa-launch-dots i{animation:none;opacity:.6;transform:none}
+      .loopa-launch-dots i:first-child{opacity:1}
     }
     /* Telegram Mini App: account linking to keep a single LOOPA identity. */
 .tma-auth-box{border:1px solid #ffffff30;border-radius:15px;background:#ffffff08;padding:14px 16px;margin:14px 0 18px}
@@ -1392,15 +1380,9 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
   <!-- Inside-WebView splash; Telegram's native pre-WebView splash is managed in BotFather. -->
      <div id="loopaLaunchSplash" class="loopa-launch-splash" role="status" aria-live="polite" aria-label="Загрузка LOOPA">
        <div class="loopa-launch-content">
-         <svg class="loopa-launch-icon" viewBox="0 0 512 512" aria-hidden="true" focusable="false">
-           <path d="M112 187v-75h75M325 112h75v75M400 325v75h-75M187 400h-75v-75" fill="none" stroke="#F4F0EF" stroke-opacity=".62" stroke-width="7" stroke-linecap="square"/>
-           <path d="M207 177v158h112" fill="none" stroke="#F4F0EF" stroke-width="29" stroke-linejoin="miter" stroke-linecap="square"/>
-         </svg>
-         <span class="loopa-launch-mark">LOOPA</span>
-         <span class="loopa-launch-tagline">PRIVATE CINEMA</span>
-         <span class="loopa-launch-rule" aria-hidden="true"></span>
-         <span class="loopa-launch-status">Подготавливаем кинозал</span>
-         <span class="loopa-launch-progress" role="progressbar" aria-label="Загрузка" aria-valuemin="0" aria-valuemax="100"></span>
+         <span class="loopa-launch-mark" aria-hidden="true">LOOPA</span>
+         <span class="loopa-launch-tagline" aria-hidden="true">PRIVATE CINEMA</span>
+         <div class="loopa-launch-dots" aria-hidden="true"><i></i><i></i><i></i></div>
        </div>
      </div>
      <div class="app">
