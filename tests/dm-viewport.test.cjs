@@ -5,16 +5,17 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const html = fs.readFileSync(path.resolve(__dirname, "..", "index.html"), "utf8");
-const startMarker = "const dmInput=byId('dmInput'),dmBrowserIOS=watchBrowserIOS;";
+const startMarker = "const dmInput=byId('dmInput'),dmBrowserIOS=watchBrowserIOS&&!document.documentElement.classList.contains('telegram-miniapp');";
 const endMarker = "function scheduleDmViewport(){";
 const start = html.indexOf(startMarker);
 const end = html.indexOf(endMarker, start);
 assert.notEqual(start, -1, "DM viewport controller should remain in the page");
 assert.notEqual(end, -1, "DM viewport controller should end before its scheduler");
 
-function createController() {
+function createController({ telegramMiniApp = false } = {}) {
   const styles = new Map();
   const classes = new Set(["dmViewing"]);
+  const htmlClasses = new Set(telegramMiniApp ? ["telegram-miniapp"] : []);
   const input = {};
   const bodyClassList = {
     contains: (name) => classes.has(name),
@@ -32,7 +33,10 @@ function createController() {
     byId: () => input,
     document: {
       body: { classList: bodyClassList },
-      documentElement: { style: { setProperty: (name, value) => styles.set(name, value) } },
+      documentElement: {
+        classList: { contains: (name) => htmlClasses.has(name) },
+        style: { setProperty: (name, value) => styles.set(name, value) },
+      },
       activeElement: null,
     },
     window: { innerHeight: 844, scrollY: 0, visualViewport: viewport },
@@ -43,7 +47,7 @@ function createController() {
   const source = html.slice(start, end)
     + "\nthis.dmViewportTest = { updateDmViewport, beginDmKeyboardDismiss, isDismissActive: () => dmKeyboardDismissActive };";
   vm.runInNewContext(source, sandbox);
-  return { ...sandbox, classes, input, styles, viewport };
+  return { ...sandbox, classes, htmlClasses, input, styles, viewport };
 }
 
 test("iOS DM keyboard dismissal snaps to full height and ignores intermediate viewport pans", () => {
@@ -80,4 +84,20 @@ test("iOS DM keyboard dismissal snaps to full height and ignores intermediate vi
   assert.equal(dmViewportTest.isDismissActive(), false);
   assert.equal(styles.get("--dm-visual-top"), "0px");
   assert.equal(styles.get("--dm-visual-height"), "790px");
+});
+
+test("Telegram Mini App does not use Safari scroll offsets for DM positioning", () => {
+  const controller = createController({ telegramMiniApp: true });
+  const { document, window, input, styles, viewport, dmViewportTest } = controller;
+
+  document.activeElement = input;
+  window.scrollY = 86;
+  viewport.height = 500;
+  dmViewportTest.updateDmViewport();
+  assert.equal(styles.get("--dm-visual-top"), "0px");
+  assert.equal(styles.get("--dm-visual-height"), "500px");
+
+  document.activeElement = null;
+  dmViewportTest.beginDmKeyboardDismiss();
+  assert.equal(dmViewportTest.isDismissActive(), false);
 });
