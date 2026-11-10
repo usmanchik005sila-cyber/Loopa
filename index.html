@@ -580,6 +580,12 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
 
 #auth-guest{max-width:440px;margin-left:auto;margin-right:auto;padding:25px 22px}
 #auth-guest h2{font-size:26px;line-height:1.2;letter-spacing:-.6px}.auth-intro{font-size:14px!important;margin:10px 0 22px!important;color:#999!important}
+.auth-mode-note{font-size:12px;line-height:1.5;color:#aaa5ad;margin:2px 2px 14px}
+.guest-save-panel{padding:15px 16px;margin:0 0 12px;border:1px solid #ffffff24;background:linear-gradient(135deg,#ffffff10,#ffffff04)}
+.guest-save-panel .panel-note{margin:0 0 7px;color:#cfcbd2;font-size:10px;letter-spacing:.16em}
+.guest-save-panel h3{margin:0;font-size:16px;line-height:1.35}
+.guest-save-panel p{margin:7px 0 12px;color:#aaa5ad;font-size:12px;line-height:1.5}
+.guest-save-panel button{width:100%;min-height:42px;border:1px solid #ffffff2b;border-radius:12px;background:#eeeeef;color:#151518;font:600 13px system-ui}
 #auth-guest .auth-switch{margin-bottom:18px;border-radius:13px;gap:4px;padding:4px}
 #auth-guest .auth-switch button{padding:10px 8px;font-size:14px;border-radius:9px}
 #auth-guest .auth-methods{gap:9px;margin:0}
@@ -1491,7 +1497,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
         <div class="panel glass" id="auth-guest" hidden>
           <p class="panel-note">АККАУНТ LOOPA</p>
           <h2>Добро пожаловать в LOOPA.</h2>
-          <p class="auth-intro">Создай аккаунт или войди, чтобы смотреть вместе с близкими.</p>
+          <p class="auth-intro">Вход откроет существующий профиль, регистрация создаст новый. Если уже смотришь как гость, не выходи из него — открой профиль и привяжи способ входа.</p>
           <div class="tma-auth-box" id="tmaMiniGuest" hidden>
             <strong>LOOPA внутри Telegram</strong>
             <p id="tmaMiniGuestText" role="status" aria-live="polite">Проверяем быстрый вход…</p>
@@ -1501,6 +1507,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
             <button type="button" data-auth-mode="login" aria-pressed="false">Вход</button>
             <button type="button" data-auth-mode="signup" class="selected" aria-pressed="true">Регистрация</button>
           </div>
+          <p class="auth-mode-note" id="auth-mode-note" role="status">Регистрация создаёт новый профиль. Чтобы открыть существующий, выбери «Вход».</p>
           <div class="auth-methods">
             <button class="auth-method telegram" id="auth-telegram" type="button"><span class="auth-mark" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3 2.9 10.5c-.7.3-.7 1.2.1 1.5l4.6 1.5 1.8 5.4c.2.7 1 .9 1.5.3l2.7-2.8 4.6 3.4c.6.4 1.4.1 1.5-.6L22 4.2c.1-.8-.3-1.4-1-1.2Z" fill="#36aee2" stroke="none"/><path d="m8 13.5 10.8-7.1-8.4 9.8" fill="none" stroke="#fff" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Через Telegram<small>Без пароля и SMS</small></span></button>
             <button class="auth-method" id="auth-google" type="button"><span class="auth-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path fill="#4285F4" d="M21.6 12.23c0-.71-.06-1.39-.18-2.05H12v3.88h5.38a4.6 4.6 0 0 1-2 3.02v2.51h3.23c1.89-1.74 2.99-4.3 2.99-7.36Z"/><path fill="#34A853" d="M12 22c2.7 0 4.96-.9 6.61-2.41l-3.23-2.51c-.9.6-2.04.97-3.38.97-2.6 0-4.8-1.76-5.59-4.12H3.07v2.59A10 10 0 0 0 12 22Z"/><path fill="#FBBC05" d="M6.41 13.93A6 6 0 0 1 6.1 12c0-.67.11-1.32.31-1.93V7.48H3.07A10 10 0 0 0 2 12c0 1.61.39 3.14 1.07 4.52l3.34-2.59Z"/><path fill="#EA4335" d="M12 5.95c1.47 0 2.79.5 3.82 1.49l2.87-2.87A9.6 9.6 0 0 0 12 2a10 10 0 0 0-8.93 5.48l3.34 2.59C7.2 7.71 9.4 5.95 12 5.95Z"/></svg></span><span>Через Google</span></button>
@@ -1511,7 +1518,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
               <div id="auth-code-panel" hidden><label class="field">Код из SMS<input id="auth-code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="000000"></label><button class="action" id="auth-sms-verify" type="submit">Подтвердить и войти</button></div>
             </form>
             <button class="auth-method" id="auth-guest-open" type="button" aria-expanded="false" aria-controls="auth-guest-form"><span class="auth-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8" r="3.5"/><path d="M5 21v-2a7 7 0 0 1 14 0v2" stroke-linecap="round"/></svg></span><span>Как гость</span></button>
-            <form id="auth-guest-form" hidden><label class="field">Твоё имя<input id="auth-guest-name" autocomplete="nickname" maxlength="40" required placeholder="Как к тебе обращаться"></label><p class="field-note">Гостевой профиль доступен в этом браузере. После выхода или очистки данных восстановить его не получится.</p><button class="action" id="auth-guest-submit" type="submit">Продолжить как гость</button></form>
+            <form id="auth-guest-form" hidden><label class="field">Твоё имя<input id="auth-guest-name" autocomplete="nickname" maxlength="40" required placeholder="Как к тебе обращаться"></label><p class="field-note">Гостевой профиль пока привязан к этому браузеру. После создания привяжи Google или Telegram в настройках — так его можно будет открыть на другом устройстве. До привязки не выходи из аккаунта и не очищай данные браузера.</p><button class="action" id="auth-guest-submit" type="submit">Продолжить как гость</button></form>
           </div>
           <details class="auth-email-fallback" id="auth-icloud-details"><summary><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m4 7 8 6 8-6"/></svg><span>Через iCloud Почту</span><span class="auth-chevron" aria-hidden="true">›</span></summary>
             <form id="auth-icloud-form">
@@ -1550,6 +1557,12 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
           <p id="auth-feedback" class="auth-feedback" role="status" aria-live="polite" hidden></p>
         </div>
         <div id="settings-home" class="settings-overview" hidden>
+          <div class="panel glass guest-save-panel" id="guest-save-panel" hidden>
+            <p class="panel-note">ГОСТЕВОЙ ПРОФИЛЬ</p>
+            <h3>Сохрани доступ к профилю LOOPA</h3>
+            <p>Сейчас профиль зависит от этой сессии браузера. Привяжи Google или Telegram — друзья, комнаты и прогресс останутся на этом профиле и будут доступны после входа на другом устройстве.</p>
+            <button type="button" id="guest-save-button">Привязать способ входа</button>
+          </div>
           <button class="settings-user glass settings-profile-shortcut" id="settings-profile-shortcut" type="button" aria-label="Открыть личные данные">
             <div class="settings-mini-avatar" id="settings-mini-avatar" aria-hidden="true">L</div>
             <div class="settings-user-text"><h2 id="settings-user-name">Профиль LOOPA</h2><p id="settings-user-email"></p></div>
@@ -1632,7 +1645,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
             <div class="panel glass" id="privacy-linked-panel" hidden>
               <p class="panel-note">ДОСТУП К ПРОФИЛЮ</p>
               <h2>Привязанные аккаунты</h2>
-              <p class="privacy-section-note">Подключи дополнительный способ входа к текущему профилю LOOPA. Это необязательно: Google и Telegram по-прежнему можно использовать для создания разных аккаунтов.</p>
+              <p class="privacy-section-note">Привязка добавляет способ входа к этому профилю и сохраняет его ID. «Вход» открывает существующий профиль, а «Регистрация» создаёт новый. Если провайдер уже привязан к другому профилю, LOOPA не объединит их автоматически.</p>
               <div class="linked-account-row">
                 <span class="linked-account-brand linked-google-brand" aria-hidden="true">G</span>
                 <div class="linked-account-copy"><strong>Google</strong><small id="google-connect-status">Проверяем подключение…</small></div>
@@ -1644,7 +1657,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
             <button type="button" id="telegram-connect-button">Привязать</button>
           </div>
               <p id="linked-account-feedback" class="auth-feedback" role="status" aria-live="polite" hidden></p>
-              <p class="privacy-section-note">Уже существующий отдельный аккаунт другого сервиса нельзя просто прикрепить сюда. Данные разных профилей автоматически не объединяются.</p>
+              <p class="privacy-section-note">Некоторые системные окна Google или Telegram могут показать домен Supabase вида *.supabase.co. Адрес loopacinema.ru останется адресом LOOPA и возврата после входа, но не заменит хост авторизации. Собственный домен Supabase — платное дополнение; эта настройка его не включает.</p>
             </div>
           </div>
           <div id="settings-theme" hidden>
@@ -1712,6 +1725,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
   <div class="tgDiagActions"><button id="tgDiagCopy" type="button">Скопировать отчёт</button><span id="tgDiagCopyStatus" role="status"></span></div>
 </div>
   <script src="./assets/room-watch-reliability.js"></script>
+  <script src="./assets/account-continuity.js"></script>
   <script defer>
     'use strict';
     const SUPABASE_URL = 'https://wnubqzwsvclvcvozibtc.supabase.co';
@@ -1803,7 +1817,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       if(playing&&playerIssue?.kind!=='autoplay-sound')clearPlayerIssue();
       // Save a precise checkpoint on pause or a deliberate seek, not just every 10s.
       const expected=previous?previous.pos+(previous.playing?Math.max(0,(now-previous.now)/1000):0):pos;
-      if(previous&&((previous.playing&&!playing)||Math.abs(pos-expected)>3))saveResumeCheckpoint();
+      if(previous&&((previous.playing&&!playing)||Math.abs(pos-expected)>3))saveResumeCheckpoint(true);
       if(previous?.playing!==playing)revealControls();
       if(nativeNeedsStart&&playing&&!localMuted){nativeNeedsStart=false;nativeAccess=false;revealControls();}
       if(!hostHere()){
@@ -1853,9 +1867,10 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
     const loopaSeek=byId('loopaSeek');
     const formatVideoTime=seconds=>{const n=Math.max(0,Math.floor(Number(seconds)||0));return n>=3600?`${Math.floor(n/3600)}:${String(Math.floor(n%3600/60)).padStart(2,'0')}:${String(n%60).padStart(2,'0')}`:`${Math.floor(n/60)}:${String(n%60).padStart(2,'0')}`;};
 
-    // Resume v1: personal, account-scoped checkpoints stored on this device.
-    // Only the room owner may apply a checkpoint, and never while a peer is online.
-    const resumeStorageKey=()=>currentUser?.id?'loopa-resume-v1:'+currentUser.id:null;
+    // Personal resume points stay keyed by the stable Supabase user ID on-device
+    // and are mirrored to a row protected by auth.uid() for cross-device access.
+    const resumeStorageKeyFor=userId=>userId?'loopa-resume-v1:'+userId:null;
+    const resumeStorageKey=()=>resumeStorageKeyFor(currentUser?.id);
     const resumeBanner=document.createElement('div');
     resumeBanner.id='resumeBanner';
     resumeBanner.hidden=true;
@@ -1865,29 +1880,110 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
     byId('chatLog').before(resumeBanner);
     let resumePrompt=null,resumeRestorePending=null,resumePlayerReady=false;
     let rutubeResumeTarget=null,rutubeResumeAttempts=0,rutubeResumeTimer=0,rutubeResumeLastSeek=0;
-    function readResumeCheckpoints(){
-      const key=resumeStorageKey();if(!key)return [];
+    const resumeCloudWriteAt=new Map(),resumeCloudWritePending=new Map(),resumeCloudWriteQueued=new Map(),resumeCloudErrorShown=new Set();
+    function readResumeCheckpoints(userId=currentUser?.id){
+      const key=resumeStorageKeyFor(userId);if(!key)return [];
       try{
         const parsed=JSON.parse(localStorage.getItem(key)||'[]');
-        return Array.isArray(parsed)?parsed.filter(x=>x&&typeof x.video==='string'&&Number.isFinite(x.pos)&&x.pos>=20&&Number.isFinite(x.savedAt)):[];
+        return LOOPAAAccountContinuity.mergeResumeCheckpoints(parsed,[],Date.now());
       }catch{return [];}
     }
-    function readSavedResume(video){
-      if(!video)return null;
-      const found=readResumeCheckpoints().find(x=>x.video===video);
-      return found&&Date.now()-found.savedAt<90*86400000?found:null;
+    function writeResumeCheckpoints(userId,entries){
+      const key=resumeStorageKeyFor(userId);if(!key)return;
+      try{localStorage.setItem(key,JSON.stringify(entries.slice(0,20)));}catch{}
     }
-    function saveResumeCheckpoint(){
-      if(!roomState?.video||!resumeStorageKey()||rutubeAd||!sample)return;
+    function readSavedResume(video,userId=currentUser?.id){
+      if(!video)return null;
+      return readResumeCheckpoints(userId).find(x=>x.video===video)||null;
+    }
+    function resumeCloudErrorMessage(error){
+      if(error?.code==='42P01'||error?.code==='PGRST205')
+        return 'Облачное сохранение ещё не настроено. Пока точка просмотра останется на этом устройстве.';
+      return 'Не удалось синхронизировать точку просмотра. Проверь подключение; локальная копия сохранена.';
+    }
+    function reportResumeCloudError(userId,video,error){
+      const key=userId+'|'+video;
+      if(resumeCloudErrorShown.has(key)||currentUser?.id!==userId)return;
+      resumeCloudErrorShown.add(key);
+      if(!document.hidden)showToast(resumeCloudErrorMessage(error));
+    }
+    function markResumeCloudSaved(userId,record){
+      const entries=readResumeCheckpoints(userId);
+      const current=entries.find(x=>x.video===record.video);
+      if(!current||current.savedAt!==record.savedAt||current.pos!==record.pos)return;
+      current.cloud=true;
+      writeResumeCheckpoints(userId,entries);
+    }
+    async function writeResumeCloud(record,userId,force=false){
+      if(!client||!userId||currentUser?.id!==userId)return false;
+      const key=userId+'|'+record.video;
+      if(resumeCloudWritePending.has(key)){
+        const queued=resumeCloudWriteQueued.get(key);
+        if(!queued||record.savedAt>queued.record.savedAt)resumeCloudWriteQueued.set(key,{record,userId,force});
+        return resumeCloudWritePending.get(key).then(()=>{
+          const latest=resumeCloudWriteQueued.get(key);
+          if(!latest)return true;
+          resumeCloudWriteQueued.delete(key);
+          return writeResumeCloud(latest.record,latest.userId,latest.force);
+        });
+      }
+      if(!force&&Date.now()-(resumeCloudWriteAt.get(key)||0)<15000)return false;
+      resumeCloudWriteAt.set(key,Date.now());
+      const pending=(async()=>{
+        const {error}=await client.from('loopa_resume_points').upsert({
+          user_id:userId,media:record.video,position_seconds:Math.round(record.pos),
+          duration_seconds:Math.round(record.duration||0)
+        },{onConflict:'user_id,media'});
+        if(error)throw error;
+        resumeCloudErrorShown.delete(key);
+        if(currentUser?.id===userId)markResumeCloudSaved(userId,record);
+        return true;
+      })().catch(error=>{reportResumeCloudError(userId,record.video,error);return false;})
+        .finally(()=>{
+          resumeCloudWritePending.delete(key);
+          if(!resumeCloudWriteQueued.has(key))return;
+          const latest=resumeCloudWriteQueued.get(key);
+          resumeCloudWriteQueued.delete(key);
+          void writeResumeCloud(latest.record,latest.userId,latest.force);
+        });
+      resumeCloudWritePending.set(key,pending);
+      return pending;
+    }
+    async function deleteResumeCloud(video,userId){
+      if(!client||!userId||currentUser?.id!==userId)return;
+      try{
+        const {error}=await client.from('loopa_resume_points').delete()
+          .eq('user_id',userId).eq('media',video);
+        if(error)throw error;
+        resumeCloudErrorShown.delete(userId+'|'+video);
+      }catch(error){reportResumeCloudError(userId,video,error);}
+    }
+    async function readResumeCloud(video,userId){
+      if(!client||!userId||currentUser?.id!==userId)return null;
+      const cutoff=new Date(Date.now()-LOOPAAAccountContinuity.CHECKPOINT_TTL_MS).toISOString();
+      const {data,error}=await client.from('loopa_resume_points')
+        .select('media,position_seconds,duration_seconds,updated_at')
+        .eq('user_id',userId).eq('media',video).gte('updated_at',cutoff).maybeSingle();
+      if(error)throw error;
+      return LOOPAAAccountContinuity.normalizeResumeCheckpoint(data,Date.now(),true);
+    }
+    function saveResumeCheckpoint(forceCloud=false){
+      const userId=currentUser?.id;
+      if(!roomState?.video||!userId||rutubeAd||!sample)return;
       const age=performance.now()-sample.now;
       if(age<0||age>5000||!Number.isFinite(sample.pos))return;
       const pos=Math.max(0,sample.pos+(sample.playing?Math.min(5,age/1000):0));
       if(pos<20||pos>360000)return;
       const duration=Number.isFinite(mediaDuration)?mediaDuration:0;
-      let entries=readResumeCheckpoints().filter(x=>x.video!==roomState.video);
+      const saved=readResumeCheckpoints(userId);
+      let entries=saved.filter(x=>x.video!==roomState.video);
       const completed=duration>30&&(pos>=duration-12||pos>=duration*.98);
-      if(!completed)entries.unshift({video:roomState.video,pos:Math.round(pos),duration:Math.round(duration),room:roomState.code,savedAt:Date.now()});
-      try{localStorage.setItem(resumeStorageKey(),JSON.stringify(entries.slice(0,20)));}catch{}
+      const record={video:roomState.video,pos:Math.round(pos),duration:Math.round(duration),room:roomState.code,savedAt:Date.now(),cloud:false};
+      if(!completed)entries.unshift(record);
+      writeResumeCheckpoints(userId,entries);
+      if(completed){
+        if(saved.some(x=>x.video===record.video))void deleteResumeCloud(record.video,userId);
+      }else void writeResumeCloud(record,userId,forceCloud);
     }
     function hideResumePrompt(){
       resumePrompt=null;
@@ -1900,15 +1996,29 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
     function roomIsSolo(data){
       return Array.isArray(data?.members)&&!data.members.some(m=>m.id!==data.host&&m.online);
     }
-    function offerSavedResume(data){
+    async function offerSavedResume(data){
       hideResumePrompt();
       if(!currentUser||!data?.video||data.host!==currentUser.id||!roomIsSolo(data))return;
-      const record=readSavedResume(data.video);
+      const userId=currentUser.id,epoch=roomEpoch,local=readSavedResume(data.video,userId);
+      let remote=null;
+      try{remote=await readResumeCloud(data.video,userId);}
+      catch(error){
+        reportResumeCloudError(userId,data.video,error);
+      }
+      if(currentUser?.id!==userId||roomEpoch!==epoch||roomState?.code!==data.code
+        ||roomState?.video!==data.video||!hostHere()||!roomIsSolo(roomState))return;
+      const record=LOOPAAAccountContinuity.mergeResumeCheckpoints(
+        local?[local]:[],remote?[remote]:[],Date.now()
+      )[0];
       if(!record)return;
+      if(record.cloud)writeResumeCheckpoints(userId,
+        LOOPAAAccountContinuity.mergeResumeCheckpoints(readResumeCheckpoints(userId),[record],Date.now()));
+      else void writeResumeCloud(record,userId,true);
       // Server time can keep advancing after the host closes their player.
       // Offer the actual measured checkpoint; the solo host chooses explicitly.
       resumePrompt={user:currentUser.id,code:data.code,video:data.video,pos:record.pos,epoch:roomEpoch};
-      byId('resumePosition').textContent='Остановились на '+formatVideoTime(record.pos);
+      byId('resumePosition').textContent='Остановились на '+formatVideoTime(record.pos)
+        +(record.cloud?' · сохранено в профиле':' · сохранено на этом устройстве');
       showResumePromptIfReady();
     }
     function rutubeResumeContextValid(target){
@@ -1984,9 +2094,9 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       resumeRestorePending=choice;
       tryApplyResume();
     });
-    setInterval(saveResumeCheckpoint,10000);
-    document.addEventListener('visibilitychange',()=>{if(document.hidden)saveResumeCheckpoint();});
-    window.addEventListener('pagehide',saveResumeCheckpoint);
+    setInterval(()=>saveResumeCheckpoint(false),10000);
+    document.addEventListener('visibilitychange',()=>{if(document.hidden)saveResumeCheckpoint(true);});
+    window.addEventListener('pagehide',()=>saveResumeCheckpoint(true));
     let seekingTimeline=false;
     function refreshTransport(){
       const playing=!!sample?.playing;
@@ -2799,7 +2909,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
     roomSheet.addEventListener('click',e=>{if(e.target===roomSheet&&outsideSheet(e))roomSheet.close();});
 
     byId('saveAccess').onclick=async function(){this.disabled=true;try{await roomCall('access',{media:JSON.stringify({mode:byId('accessMode').value,ids:[...byId('pick').querySelectorAll('input:checked')].map(c=>c.value)})});byId('roomSheet').close();showToast('Доступ обновлён');}catch(err){showToast(err.message);}finally{this.disabled=false;}};
-    function roomExit(){saveResumeCheckpoint();resumeRestorePending=null;clearChatReply();hideResumePrompt();applyCinemaMode(false);cinemaPlayerRatio=1;finishCinemaResize();clearRoomSignals();clearTimeout(roomPeopleTimer);peopleFlash.classList.remove('is-visible');watchPeerSession='';watchPeerSeen.clear();stopWatchViewport();document.body.classList.remove('roomViewing','chatTyping');closeCatalog(true);closeEmoji();byId("room-link").value="";byId('roomSheet').close();byId('chatText').value='';byId('chatLog').replaceChildren();roomEpoch++;syncSnapshot=null;roomState=null;roomUser=null;mountRoomPlayer('');byId('room-active').hidden=true;byId('room-lobby').hidden=false;byId('room-recent').replaceChildren();byId('room-note').textContent='';}
+    function roomExit(){saveResumeCheckpoint(true);resumeRestorePending=null;clearChatReply();hideResumePrompt();applyCinemaMode(false);cinemaPlayerRatio=1;finishCinemaResize();clearRoomSignals();clearTimeout(roomPeopleTimer);peopleFlash.classList.remove('is-visible');watchPeerSession='';watchPeerSeen.clear();stopWatchViewport();document.body.classList.remove('roomViewing','chatTyping');closeCatalog(true);closeEmoji();byId("room-link").value="";byId('roomSheet').close();byId('chatText').value='';byId('chatLog').replaceChildren();roomEpoch++;syncSnapshot=null;roomState=null;roomUser=null;mountRoomPlayer('');byId('room-active').hidden=true;byId('room-lobby').hidden=false;byId('room-recent').replaceChildren();byId('room-note').textContent='';}
     async function roomCall(op,args={}){
       if(!currentUser||!client){showPage('profile',()=>showToast('Войди в аккаунт'));return;}
       const u=currentUser.id, epoch=roomEpoch;
@@ -2818,7 +2928,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       if(prev?.code!==data.code)clearChatReply();
       if(op==='read'&&prev&&data.changed<prev.changed)return;
       if(prev?.code===data.code && data.server_time<prev.server_time)return;
-      if(prev?.video&&(prev.code!==data.code||prev.video!==data.video))saveResumeCheckpoint();
+      if(prev?.video&&(prev.code!==data.code||prev.video!==data.video))saveResumeCheckpoint(true);
       byId('room-active').classList.toggle('choosing',!data.video);
       document.body.classList.toggle('roomViewing',!!data.video&&lastPage==='rooms');
       if(lastPage==='rooms')syncWatchViewport();
@@ -3327,7 +3437,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
           const text=document.createElement('span'),small=document.createElement('small'),title=document.createElement('strong'),hint=document.createElement('span');
           const image=videoCover(item);
           small.textContent=id==='homeRecent'?'Вы смотрели':'Недавний просмотр';title.textContent=item.title||'Видео';
-          const saved=readSavedResume(item.video);hint.textContent=saved?'Сохранено: '+formatVideoTime(saved.pos)+' · Открыть комнату':'Вернуться в комнату →';text.append(small,title,hint);
+      const saved=readSavedResume(item.video);hint.textContent=saved?'Сохранено: '+formatVideoTime(saved.pos)+(saved.cloud?' · профиль':' · это устройство')+' · Открыть комнату':'Вернуться в комнату →';text.append(small,title,hint);
           if(image){const img=document.createElement('img');img.src=image;img.alt='';img.loading='lazy';img.onerror=()=>{img.remove();if(rutubeVideoId(item.video))attachRutubeHistoryCover(item,button,text);};button.append(img);}
           button.append(text);
           button.onclick=async()=>{button.disabled=true;try{showPage('rooms');await roomCall('join',{room:item.code});}catch(e){showToast('Не удалось войти: комната закрыта или доступ изменился');}finally{button.disabled=false;}};
@@ -3888,6 +3998,9 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       byId('auth-name').required = mode === 'signup';
       byId('signup-hint').hidden = mode !== 'signup';
       byId('auth-submit').textContent = mode === 'signup' ? 'Создать аккаунт' : 'Войти';
+      byId('auth-mode-note').textContent = signup
+        ? 'Регистрация создаёт новый профиль. Чтобы открыть существующий, выбери «Вход». Гостевой профиль сначала нужно открыть и привязать в настройках.'
+        : 'Вход откроет уже созданный профиль. Если ты ещё не создавал аккаунт, переключись на «Регистрация».';
       byId('forgot-password').hidden = mode === 'signup';
       byId('auth-password').setAttribute('autocomplete', mode === 'signup' ? 'new-password' : 'current-password');
       feedback('auth-feedback','');
@@ -3990,6 +4103,10 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
     try {setTheme(localStorage.getItem('loopa-theme') || 'classic');}catch(e){setTheme('classic');}
     byId('settings-back').addEventListener('click',()=>navigateSmoothly(()=>linkedAccountsOpen?toggleLinkedAccounts(false):openSettings('home')));
     byId('open-linked-accounts').addEventListener('click',()=>navigateSmoothly(()=>toggleLinkedAccounts(true)));
+    byId('guest-save-button').addEventListener('click',()=>navigateSmoothly(()=>{
+      openSettings('privacy');
+      toggleLinkedAccounts(true);
+    }));
     byId('settings-profile-shortcut').addEventListener('click',()=>navigateSmoothly(()=>openSettings('account')));
     document.querySelectorAll('[data-settings]').forEach(button => button.addEventListener('click',()=>navigateSmoothly(()=>openSettings(button.dataset.settings))));
     document.querySelectorAll('[data-theme-choice]').forEach(button => button.addEventListener('click',()=>setTheme(button.dataset.themeChoice)));
@@ -4825,6 +4942,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       byId('settings-detail').hidden=true;
       byId('auth-loading').hidden = true;
       byId('auth-account').hidden = true;
+      byId('guest-save-panel').hidden = true;
       byId('auth-guest').hidden = false;
       byId('tmaMiniGuest').hidden = !isTelegramMiniApp;
       telegramMiniLinked = false;
@@ -4844,9 +4962,11 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       pollInvites();
       byId('auth-loading').hidden = true;
       byId('auth-guest').hidden = true;
+      byId('guest-save-panel').hidden = !user.is_anonymous;
       byId('auth-account').hidden = false;
       byId('tmaMiniLinkBox').hidden = !isTelegramMiniApp || telegramMiniLinked;
       if(isTelegramMiniApp && !telegramMiniLinked)void refreshTelegramMiniStatus(user.id);
+      if(isTelegramMiniApp&&telegramMiniLinked)byId('guest-save-panel').hidden=true;
       refreshTelegramLinkUI(user);
       openSettings('home');
       const savedName = user.user_metadata?.display_name || user.user_metadata?.full_name || user.user_metadata?.name || '';
@@ -5062,6 +5182,9 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
         if(response.status==='linked'){
           telegramMiniLinked=true;
           byId('tmaMiniLinkBox').hidden=true;
+          byId('guest-save-panel').hidden=true;
+          refreshTelegramLinkUI(currentUser);
+          if(linkedAccountsOpen)refreshLinkedAccounts();
         }else if(response.status==='claimed_by_another_profile'){
           const button=byId('tmaMiniLinkButton');
           button.disabled=true;
@@ -5088,6 +5211,8 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
         if(!['linked','already_linked'].includes(result.status))
           throw new Error('link_failed');
         telegramMiniLinked=true;
+        byId('guest-save-panel').hidden=true;
+        refreshTelegramLinkUI(currentUser);
         note.textContent='Профиль привязан. При следующем запуске войдёшь автоматически.';
         button.textContent='Telegram привязан';
         showToast('Быстрый вход через Telegram подключён');
@@ -5106,7 +5231,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
         || user.identities?.some(identity=>identity.provider===TELEGRAM_PROVIDER));
     }
     function refreshTelegramLinkUI(user){
-      const linked=telegramIsLinked(user),button=byId('telegram-connect-button');
+      const linked=telegramIsLinked(user)||(isTelegramMiniApp&&telegramMiniLinked),button=byId('telegram-connect-button');
       button.disabled=!user||linked;
       button.textContent=linked?'Подключён':'Привязать';
       byId('telegram-connect-status').textContent=linked?'Подключён к этому профилю LOOPA.':'Войти в этот же профиль через Telegram.';
@@ -5131,7 +5256,8 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
           ['google','google-connect-button','google-connect-status'],
           [TELEGRAM_PROVIDER,'telegram-connect-button','telegram-connect-status']
         ]){
-          const linked=identities.some(identity=>identity.provider===provider);
+          const linked=identities.some(identity=>identity.provider===provider)
+            ||(provider===TELEGRAM_PROVIDER&&isTelegramMiniApp&&telegramMiniLinked);
           const button=byId(buttonId);
           button.disabled=linked;
           button.textContent=linked?'Подключён':'Привязать';
@@ -5148,12 +5274,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
         if(error)throw error;
         if(data?.url)window.location.assign(data.url);
       }catch(error){
-        const raw=error?.message||'';
-        const message=/manual linking|linking is disabled|identity linking is disabled/i.test(raw)
-          ?'Включи Allow manual linking в Supabase → Authentication → Sign In / Providers.'
-          :/already (exists|registered|linked)|identity.*already|conflict/i.test(raw)
-            ?'Этот Google уже относится к другому аккаунту LOOPA. Два готовых профиля автоматически не объединяются.'
-            :errorText(error);
+        const message=LOOPAAAccountContinuity.identityLinkError(error,'Google')||errorText(error);
         feedback('linked-account-feedback',message,true);
         button.disabled=false;
       }
@@ -5238,6 +5359,8 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
           message='Telegram пока не подключён в Supabase → Authentication → Custom Providers. Сначала настрой Custom OIDC для Telegram.';
         }else if(/manual linking|linking is disabled|identity linking is disabled/i.test((error&&error.message)||'')){
           message='Для привязки включи Allow manual linking в Supabase → Authentication → Sign In / Providers.';
+        }else{
+          message=LOOPAAAccountContinuity.identityLinkError(error,'Telegram')||message;
         }
         feedback('telegramAuthError',message,true);
       }finally{button.disabled=false;}
@@ -5473,7 +5596,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
     });
     byId('sign-out').addEventListener('click',async () => {
       if (!client) return;
-      if(currentUser?.is_anonymous&&!confirm('Выйти из гостевого профиля? После выхода восстановить доступ к нему не получится.'))return;
+      if(currentUser?.is_anonymous&&!confirm('Гостевой профиль пока зависит от этой сессии. Чтобы открыть его на другом устройстве, сначала привяжи Google или Telegram. Всё равно выйти?'))return;
       byId('sign-out').disabled = true;
       const {error} = await client.auth.signOut();
       byId('sign-out').disabled = false;
@@ -5507,6 +5630,8 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
               else displayGuest();
             } else if (newUser && (event === 'USER_UPDATED' || event === 'SIGNED_IN')) {
               currentUser = newUser;
+              byId('guest-save-panel').hidden = !newUser.is_anonymous
+                || (isTelegramMiniApp && telegramMiniLinked);
               renderAvatar(newUser);
               refreshTelegramLinkUI(newUser);
               if(linkedAccountsOpen)refreshLinkedAccounts();
