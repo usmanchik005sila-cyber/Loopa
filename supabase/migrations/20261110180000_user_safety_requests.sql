@@ -17,9 +17,9 @@ $preflight$;
 -- A column default affects future inserts only. Existing DM choices remain
 -- exactly as stored; there is no UPDATE/backfill of profiles here.
 alter table public.profiles
-  add column if not exists dm_policy text default 'friends';
+  add column if not exists dm_policy text default 'everyone';
 alter table public.profiles
-  alter column dm_policy set default 'friends';
+  alter column dm_policy set default 'everyone';
 
 create or replace function public.loopa_dm_policy_new_profile_default_v1()
 returns trigger
@@ -28,7 +28,7 @@ set search_path = ''
 as $function$
 begin
   if new.dm_policy is null then
-    new.dm_policy := 'friends';
+    new.dm_policy := 'everyone';
   end if;
   return new;
 end

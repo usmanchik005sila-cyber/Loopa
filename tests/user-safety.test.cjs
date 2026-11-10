@@ -9,6 +9,10 @@ const migration = fs.readFileSync(
   path.join(root, "supabase/migrations/20261110180000_user_safety_requests.sql"),
   "utf8",
 );
+const dmDefaultMigration = fs.readFileSync(
+  path.join(root, "supabase/migrations/20261110190000_dm_policy_default_everyone.sql"),
+  "utf8",
+);
 const setup = fs.readFileSync(path.join(root, "supabase/USER_SAFETY_SETUP.md"), "utf8");
 
 test("report and deletion queues are closed to regular users", () => {
@@ -34,12 +38,22 @@ test("report RPC binds the reporter to auth and validates referenced messages", 
   assert.doesNotMatch(migration, /message_body|reported_message_text/i);
 });
 
-test("new DM default is friends-only without updating existing profiles", () => {
-  assert.match(migration, /add column if not exists dm_policy text default 'friends'/i);
-  assert.match(migration, /alter column dm_policy set default 'friends'/i);
+test("new profiles allow DMs from everyone and keep the privacy choice editable", () => {
+  assert.match(migration, /add column if not exists dm_policy text default 'everyone'/i);
+  assert.match(migration, /alter column dm_policy set default 'everyone'/i);
+  assert.match(migration, /new\.dm_policy := 'everyone'/i);
+  assert.match(dmDefaultMigration, /alter column dm_policy set default 'everyone'/i);
+  assert.match(dmDefaultMigration, /new\.dm_policy := 'everyone'/i);
+  assert.match(dmDefaultMigration, /before insert on public\.profiles/i);
+  assert.doesNotMatch(dmDefaultMigration, /update public\.profiles/i);
+  assert.match(html, /id="open-dm-policy"/);
+  assert.match(html, /value="everyone"/);
+  assert.match(html, /value="friends"/);
+  assert.match(html, /update\(\{dm_policy:choice\}\)/);
+  assert.match(html, /Новые профили по умолчанию открыты для сообщений от всех/);
   assert.match(migration, /before insert on public\.profiles/i);
   assert.doesNotMatch(migration, /update public\.profiles/i);
-  assert.match(html, /существующие настройки не меняются автоматически/i);
+  assert.match(html, /текущие настройки не меняются/i);
 });
 
 test("deletion UI requires acknowledgement and only creates a request", () => {

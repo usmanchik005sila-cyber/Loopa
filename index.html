@@ -1650,7 +1650,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
                   <span class="dm-entry-copy"><strong>Личные сообщения</strong><small>Кто может писать мне</small></span>
                   <span class="dm-entry-value" id="dm-policy-summary">Все</span><span class="linked-entry-chevron" aria-hidden="true">›</span>
                 </button>
-                <p class="privacy-section-note">Для новых профилей по умолчанию выбраны сообщения только от друзей. Существующие настройки не меняются автоматически.</p>
+                <p class="privacy-section-note">Новые профили по умолчанию открыты для сообщений от всех. В любой момент можно выбрать «Только друзья»; текущие настройки не меняются.</p>
                 <div class="privacy-item"><span class="privacy-item-icon"><svg><use href="#i-room"/></svg></span><span class="privacy-item-body"><strong>Приглашения в комнаты</strong><small>Кто сможет присылать приглашения</small><select id="room-invite-policy" class="privacy-select" disabled><option value="everyone">Все пользователи</option><option value="friends" selected>Только друзья</option><option value="nobody">Никто</option></select></span></div>
                 <div class="privacy-item privacy-blocks"><span class="privacy-item-icon"><svg><use href="#i-lock"/></svg></span><span class="privacy-item-body"><strong>Заблокированные</strong><small>Пользователи не смогут отправлять заявки и приглашения</small><div id="blocked-users-list" class="blocked-users-list"><span class="friends-empty">Загрузка списка…</span></div></span></div>
                 <p id="communication-feedback" class="auth-feedback" role="status" aria-live="polite" hidden></p>
@@ -1731,7 +1731,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       <label class="dm-choice"><input type="radio" name="dm-policy" value="everyone" checked><span class="dm-choice-card"><span class="dm-choice-icon"><svg aria-hidden="true"><use href="#i-users"/></svg></span><span class="dm-choice-text"><strong>Все пользователи</strong><small>Любой пользователь LOOPA сможет тебе написать</small></span><span class="dm-choice-check" aria-hidden="true">✓</span></span></label>
       <label class="dm-choice"><input type="radio" name="dm-policy" value="friends"><span class="dm-choice-card"><span class="dm-choice-icon"><svg aria-hidden="true"><use href="#i-lock"/></svg></span><span class="dm-choice-text"><strong>Только друзья</strong><small>Написать смогут лишь люди из твоих друзей</small></span><span class="dm-choice-check" aria-hidden="true">✓</span></span></label>
     </div>
-    <p class="dm-policy-helper" id="dm-policy-helper">Для новых профилей по умолчанию выбраны друзья; настройки существующих профилей не меняются.</p>
+    <p class="dm-policy-helper" id="dm-policy-helper">Новые профили по умолчанию открыты для сообщений от всех. Настройки существующих профилей не меняются.</p>
     <button class="action dm-policy-save" type="button" id="dm-policy-save">Сохранить выбор</button>
     <p id="dm-policy-feedback" class="auth-feedback" role="status" aria-live="polite" hidden></p>
   </dialog>
@@ -4231,8 +4231,8 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
     function refreshDmPolicyView(){
       byId('dm-policy-summary').textContent=dmPolicyLabel(dmPolicyValue);
       byId('dm-policy-helper').textContent=dmPolicyReady
-        ?'Для новых профилей по умолчанию выбраны друзья. Сохранённые настройки существующих профилей не меняются.'
-        :'Примени SQL-настройку безопасности: новые профили получат вариант «Только друзья», существующие настройки останутся прежними.';
+        ?'Новые профили по умолчанию открыты для сообщений от всех. Сохранённые настройки существующих профилей не меняются.'
+        :'Примени SQL-настройку безопасности: новые профили получат вариант «Все», существующие настройки останутся прежними.';
     }
     function setDmPolicyView(value,ready){
       dmPolicyValue=value==='friends'?'friends':'everyone';

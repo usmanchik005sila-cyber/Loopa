@@ -6,10 +6,11 @@ This operator guide is committed to a public repository and is therefore publicl
 
 1. Confirm the `profiles` table and direct-message SQL `loopa_dm_messages_v87` are installed.
 2. Run `migrations/20261110180000_user_safety_requests.sql` in Supabase SQL Editor.
-3. Publish the matching site build.
-4. Review the report and deletion-request queues from the project owner's Supabase SQL Editor.
+3. Run `migrations/20261110190000_dm_policy_default_everyone.sql`. This is safe to run after the first migration and also upgrades installations that already applied it.
+4. Publish the matching site build.
+5. Review the report and deletion-request queues from the project owner's Supabase SQL Editor.
 
-The migration changes only the default for new `profiles.dm_policy` inserts to `friends` and fills an explicit `NULL` on a new profile insert with that same value. It does not update existing profile rows. Existing choices remain as stored; legacy rows with no choice retain the client’s prior “all users” behavior.
+New profiles default to `everyone`; the privacy settings let each user choose between `everyone` and `friends`. The migrations change only the column default and the new-profile trigger. They do not update existing profile rows or overwrite users' saved preferences.
 
 ## Private owner review queue
 
