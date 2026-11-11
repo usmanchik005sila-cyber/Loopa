@@ -5,7 +5,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const html = fs.readFileSync(path.resolve(__dirname, "..", "index.html"), "utf8");
-const startMarker = "const dmInput=byId('dmInput'),dmBrowserIOS=";
+const startMarker = "const dmInput=byId('dmInput')";
 const start = html.indexOf(startMarker);
 const end = html.indexOf("function showPageNow(", start);
 assert.notEqual(start, -1, "DM viewport controller should remain in the page");
@@ -16,8 +16,16 @@ function createController({ telegramMiniApp = false } = {}) {
   const listeners = new Map();
   const bodyClasses = new Set();
   const htmlClasses = new Set(telegramMiniApp ? ["telegram-miniapp"] : []);
-  const frames = [];
+  const frames = new Map();
+  const telegramListeners = new Map();
+  const canceledFrames = [];
+  let nextFrameId = 0;
   const viewport = { height: 844, offsetTop: 0, scale: 1, addEventListener: () => {} };
+  const telegramWebApp = {
+    viewportHeight: 844,
+    viewportStableHeight: 844,
+    onEvent: (name, fn) => telegramListeners.set(name, fn),
+  };
   const input = {
     addEventListener: (name, fn) => listeners.set("input:" + name, fn),
     blur: () => { document.activeElement = null; listeners.get("input:blur")?.(); },
@@ -44,16 +52,20 @@ function createController({ telegramMiniApp = false } = {}) {
     watchBrowserIOS: true,
     byId: id => ({ dmInput: input, dmSend: send, dmForm: form })[id],
     document,
-    window: { innerHeight: 844, scrollY: 0, visualViewport: viewport, addEventListener: () => {} },
-    requestAnimationFrame: fn => { frames.push(fn); return frames.length; },
-    cancelAnimationFrame: () => {},
+    window: { innerHeight: 844, scrollY: 0, visualViewport: viewport, Telegram: { WebApp: telegramWebApp }, addEventListener: () => {} },
+    requestAnimationFrame: fn => { const id = ++nextFrameId; frames.set(id, fn); return id; },
+    cancelAnimationFrame: id => { canceledFrames.push(id); frames.delete(id); },
     setTimeout: () => 1,
     clearTimeout: () => {},
     Math,
   };
   const source = html.slice(start, end) + "\nthis.testApi={updateDmViewport,setDmViewing,scheduleDmViewport};";
   vm.runInNewContext(source, sandbox);
-  return { ...sandbox, input, send, form, listeners, styles, viewport, frames, bodyClasses, flush: () => { while (frames.length) frames.shift()(); } };
+  return {
+    ...sandbox, input, send, form, listeners, styles, viewport, frames, bodyClasses,
+    telegramWebApp, telegramListeners, canceledFrames,
+    flush: () => { const pending = [...frames.values()]; frames.clear(); pending.forEach(fn => fn()); },
+  };
 }
 
 test("DM returns to the saved full height immediately on blur", () => {
@@ -96,4 +108,50 @@ test("Telegram keeps DM pinned to the top while the keyboard is open", () => {
   c.testApi.scheduleDmViewport(); c.flush();
   assert.equal(c.styles.get("--dm-visual-top"), "0px");
   assert.equal(c.styles.get("--dm-visual-height"), "500px");
+});
+
+test("Telegram viewportChanged updates DM even when visualViewport stays stale", () => {
+  const c = createController({ telegramMiniApp: true });
+  c.testApi.setDmViewing(true);
+  c.document.activeElement = c.input;
+  c.telegramWebApp.viewportHeight = 500;
+  c.telegramListeners.get("viewportChanged")({ isStateStable: false });
+  c.flush();
+  assert.equal(c.bodyClasses.has("dmKeyboardOpen"), true);
+  assert.equal(c.styles.get("--dm-visual-height"), "500px");
+});
+
+test("viewport event bursts keep one animation-frame update instead of cancelling it", () => {
+  const c = createController({ telegramMiniApp: true });
+  c.testApi.setDmViewing(true);
+  c.frames.clear();
+  c.testApi.scheduleDmViewport();
+  c.testApi.scheduleDmViewport();
+  c.testApi.scheduleDmViewport();
+  assert.equal(c.frames.size, 1);
+  assert.equal(c.canceledFrames.length, 0);
+});
+
+test("Telegram stable height is used to restore the chat after keyboard dismissal", () => {
+  const c = createController({ telegramMiniApp: true });
+  c.telegramWebApp.viewportStableHeight = 844;
+  c.testApi.setDmViewing(true);
+  c.document.activeElement = c.input;
+  c.telegramWebApp.viewportHeight = 500;
+  c.listeners.get("input:focus")?.();
+  c.flush();
+  c.document.activeElement = null;
+  c.telegramWebApp.viewportHeight = 520;
+  c.listeners.get("input:blur")();
+  assert.equal(c.styles.get("--dm-visual-height"), "844px");
+});
+
+test("Telegram's stable viewport wins over a stale WebView innerHeight", () => {
+  const c = createController({ telegramMiniApp: true });
+  c.telegramWebApp.viewportHeight = 760;
+  c.telegramWebApp.viewportStableHeight = 760;
+  c.window.innerHeight = 844;
+  c.viewport.height = 760;
+  c.testApi.setDmViewing(true);
+  assert.equal(c.styles.get("--dm-visual-height"), "760px");
 });
