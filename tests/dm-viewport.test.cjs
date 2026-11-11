@@ -167,3 +167,24 @@ test("a shrunken layout viewport moves the composer when other viewport reports 
   assert.equal(c.bodyClasses.has("dmKeyboardOpen"), true);
   assert.equal(c.styles.get("--dm-visual-height"), "500px");
 });
+
+test("Safari uses its smaller visible area when browser controls are expanded", () => {
+  const c = createController();
+  c.testApi.setDmViewing(true);
+  c.viewport.height = 770;
+  c.testApi.updateDmViewport();
+  assert.equal(c.styles.get("--dm-visual-height"), "770px");
+});
+
+test("Safari keeps the immediate full-height position during keyboard dismissal", () => {
+  const c = createController();
+  c.testApi.setDmViewing(true);
+  c.document.activeElement = c.input;
+  c.viewport.height = 500;
+  c.testApi.updateDmViewport();
+  c.document.activeElement = null;
+  c.viewport.height = 520;
+  c.testApi.updateDmViewport();
+  assert.equal(c.bodyClasses.has("dmKeyboardOpen"), false);
+  assert.equal(c.styles.get("--dm-visual-height"), "844px");
+});

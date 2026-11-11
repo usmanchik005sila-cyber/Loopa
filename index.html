@@ -3987,7 +3987,11 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       // Refresh the baseline once the visible viewport has returned to its full size.
       if(!focused&&stableHeight)dmViewportBaseHeight=Math.max(dmViewportBaseHeight,stableHeight);
       else if(!focused&&height>=stableHeightNow-55)dmViewportBaseHeight=height;
-      setDmViewportBox(0,Math.max(stableHeightNow,dmViewportBaseHeight));
+      // Safari's bottom browser controls can reduce the visible area slightly after
+      // the keyboard is gone. Respect that smaller viewport, but ignore large
+      // transient reductions while the keyboard is still dismissing.
+      const safariChromeHeight=dmBrowserIOS&&height>0&&stableHeightNow-height<140;
+      setDmViewportBox(0,safariChromeHeight?height:Math.max(stableHeightNow,dmViewportBaseHeight));
     }
     function scheduleDmViewport(){
       if(!document.body.classList.contains('dmViewing')||document.hidden||dmSendPointerActive)return;
