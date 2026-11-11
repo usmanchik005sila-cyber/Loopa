@@ -3932,11 +3932,10 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
         animation.finished.catch(()=>{});
       }catch(error){completePageTransition(transition);}
     }
-    // Keep the DM screen aligned with Safari's visible viewport, but do not let
-    // transient visualViewport pans move it after the keyboard is dismissed.
+    // Keep the DM viewport responsive on the next frame, as in the earlier chat implementation.
+    // Retain the last full height so reopening during iOS keyboard dismissal cannot inherit a shrunken viewport.
     const dmInput=byId('dmInput'),dmBrowserIOS=watchBrowserIOS&&!document.documentElement.classList.contains('telegram-miniapp');
-    let dmViewportFrame=0,dmViewportSettleTimer=0,dmKeyboardDismissTimer=0;
-    let dmViewportBaseHeight=0,dmKeyboardDismissActive=false,dmSendPointerActive=false,dmSendPointerTimer=0;
+    let dmViewportFrame=0,dmViewportBaseHeight=0,dmSendPointerActive=false,dmSendPointerTimer=0;
     function finishDmSendPointer(){
       if(!dmSendPointerActive)return;
       dmSendPointerActive=false;
@@ -3944,72 +3943,34 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       dmSendPointerTimer=0;
       scheduleDmViewport();
     }
-    function finishDmKeyboardDismiss(){
-      dmKeyboardDismissActive=false;
-      if(dmKeyboardDismissTimer)clearTimeout(dmKeyboardDismissTimer);
-      dmKeyboardDismissTimer=0;
-    }
     function setDmViewportBox(top,height){
       const root=document.documentElement;
       root.style.setProperty('--dm-visual-top',Math.max(0,top)+'px');
       root.style.setProperty('--dm-visual-height',Math.max(210,height)+'px');
     }
-    function beginDmKeyboardDismiss(){
-      if(!dmBrowserIOS||!document.body.classList.contains('dmViewing')||dmKeyboardDismissActive)return;
-      const viewport=window.visualViewport;
-      const currentHeight=viewport?.height||window.innerHeight;
-      const fullHeight=Math.max(dmViewportBaseHeight||0,window.innerHeight||0,currentHeight);
-      if(fullHeight-currentHeight<70&&!document.body.classList.contains('dmKeyboardOpen'))return;
-      dmKeyboardDismissActive=true;
-      document.body.classList.remove('dmKeyboardOpen');
-      // Snap back immediately; ignore Safari's intermediate offsetTop/scroll events
-      // until the keyboard has fully retreated.
-      setDmViewportBox(0,fullHeight);
-      dmKeyboardDismissTimer=setTimeout(()=>{
-        finishDmKeyboardDismiss();
-        scheduleDmViewport();
-      },850);
-    }
     function updateDmViewport(){
       if(!document.body.classList.contains('dmViewing'))return;
       const viewport=window.visualViewport;
-      if(viewport&&Math.abs(viewport.scale-1)>.02)return;
-      const height=viewport?.height||window.innerHeight;
+      const height=viewport?.height||window.innerHeight||0;
       const focused=document.activeElement===dmInput;
-      const keyboardWasOpen=document.body.classList.contains('dmKeyboardOpen');
-      if(dmKeyboardDismissActive){
-        if(focused)finishDmKeyboardDismiss();
-        else if(height>=Math.max(0,dmViewportBaseHeight-55))finishDmKeyboardDismiss();
-        else return;
-      }
-      if(!focused&&!keyboardWasOpen)dmViewportBaseHeight=height;
-      const baseHeight=Math.max(dmViewportBaseHeight||0,height);
-      const reduced=baseHeight-height>120;
-      const keyboardOpen=reduced&&(focused||keyboardWasOpen);
-      document.body.classList.toggle('dmKeyboardOpen',keyboardOpen);
-      // Safari can report a stale positive visualViewport.offsetTop after blur.
-      // While typing, follow its layout scroll position; when closed, pin to zero.
-      const top=keyboardOpen&&dmBrowserIOS?Math.max(0,window.scrollY||0):0;
-      if(!keyboardOpen)dmViewportBaseHeight=height;
-      setDmViewportBox(top,height);
-    }
-    function scheduleDmViewport(){
-      if(!document.body.classList.contains('dmViewing')||document.hidden)return;
-      if(dmSendPointerActive)return;
-      const keyboardActive=dmKeyboardDismissActive
-        ||document.body.classList.contains('dmKeyboardOpen')
-        ||document.activeElement===dmInput;
-      if(dmBrowserIOS&&keyboardActive){
-        if(dmViewportFrame){cancelAnimationFrame(dmViewportFrame);dmViewportFrame=0;}
-        if(dmViewportSettleTimer)clearTimeout(dmViewportSettleTimer);
-        dmViewportSettleTimer=setTimeout(()=>{
-          dmViewportSettleTimer=0;
-          updateDmViewport();
-        },80);
+      const fullHeight=Math.max(dmViewportBaseHeight||0,window.innerHeight||0,height);
+      const keyboardOpen=focused&&fullHeight-height>120;
+      if(keyboardOpen){
+        dmViewportBaseHeight=fullHeight;
+        document.body.classList.add('dmKeyboardOpen');
+        // Only Safari needs its page-scroll correction; Telegram stays pinned at the top.
+        setDmViewportBox(dmBrowserIOS?Math.max(0,window.scrollY||0):0,height);
         return;
       }
-      if(dmViewportSettleTimer){clearTimeout(dmViewportSettleTimer);dmViewportSettleTimer=0;}
-      if(dmViewportFrame)return;
+      document.body.classList.remove('dmKeyboardOpen');
+      const stableHeight=Math.max(dmViewportBaseHeight||0,window.innerHeight||0,height);
+      // Refresh the baseline once the visible viewport has returned to its full size.
+      if(!focused&&height>=stableHeight-55)dmViewportBaseHeight=height;
+      setDmViewportBox(0,Math.max(stableHeight,dmViewportBaseHeight));
+    }
+    function scheduleDmViewport(){
+      if(!document.body.classList.contains('dmViewing')||document.hidden||dmSendPointerActive)return;
+      if(dmViewportFrame)cancelAnimationFrame(dmViewportFrame);
       dmViewportFrame=requestAnimationFrame(()=>{
         dmViewportFrame=0;
         updateDmViewport();
@@ -4026,6 +3987,8 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
     });
     byId('dmSend').addEventListener('pointerdown',event=>{
       if(event.isPrimary!==false&&(event.button==null||event.button===0)){
+        // Keep the text field focused so tapping the white arrow does not trigger a slow keyboard collapse.
+        event.preventDefault();
         dmSendPointerActive=true;
         if(dmSendPointerTimer)clearTimeout(dmSendPointerTimer);
         dmSendPointerTimer=setTimeout(finishDmSendPointer,1500);
@@ -4034,14 +3997,17 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
     byId('dmSend').addEventListener('click',finishDmSendPointer,true);
     byId('dmSend').addEventListener('pointercancel',finishDmSendPointer);
     dmInput.addEventListener('focus',()=>{
-      finishDmKeyboardDismiss();
+      const viewport=window.visualViewport;
+      dmViewportBaseHeight=Math.max(dmViewportBaseHeight||0,window.innerHeight||0,viewport?.height||0);
       scheduleDmViewport();
     });
     dmInput.addEventListener('blur',()=>{
-      // A tap on Send naturally blurs the textarea before the button click.
-      // Let the click submit first; resizing the screen here can move the target.
-      if(dmSendPointerActive)return;
-      beginDmKeyboardDismiss();
+      if(dmSendPointerActive||!document.body.classList.contains('dmViewing'))return;
+      const viewport=window.visualViewport;
+      const height=viewport?.height||window.innerHeight||0;
+      const fullHeight=Math.max(dmViewportBaseHeight||0,window.innerHeight||0,height);
+      document.body.classList.remove('dmKeyboardOpen');
+      setDmViewportBox(0,fullHeight);
       scheduleDmViewport();
     });
     document.addEventListener('visibilitychange',()=>{
@@ -4049,22 +4015,23 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
     });
     function setDmViewing(active){
       if(active){
-        finishDmKeyboardDismiss();
-        dmViewportBaseHeight=window.visualViewport?.height||window.innerHeight||0;
+        const viewport=window.visualViewport;
+        const height=viewport?.height||window.innerHeight||0;
+        if(!dmViewportBaseHeight||height>=dmViewportBaseHeight-55)dmViewportBaseHeight=height;
+        dmViewportBaseHeight=Math.max(dmViewportBaseHeight,window.innerHeight||0,height);
         document.body.classList.add('dmViewing');
         updateDmViewport();
         return;
       }
       document.body.classList.remove('dmViewing','dmKeyboardOpen');
       dmInput.blur();
-      finishDmKeyboardDismiss();
       if(dmViewportFrame)cancelAnimationFrame(dmViewportFrame);
-      if(dmViewportSettleTimer)clearTimeout(dmViewportSettleTimer);
-      dmViewportFrame=0;dmViewportSettleTimer=0;dmViewportBaseHeight=0;
+      dmViewportFrame=0;
       document.documentElement.style.removeProperty('--dm-visual-top');
       document.documentElement.style.removeProperty('--dm-visual-height');
+      // Keep the baseline through native keyboard dismissal for an immediate, correctly sized re-open.
     }
-    function showPageNow(destination,animateProfile=false) {
+      function showPageNow(destination,animateProfile=false) {
       if(lastPage==='messages'&&destination!=='messages')stopMessagesInbox();
       if(lastPage==='dm' && destination!=='dm')clearDirectMessageChannel();
       if(destination==='dm'&&lastPage!=='dm')setDmViewing(true);
