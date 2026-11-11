@@ -1069,6 +1069,7 @@ body.dmViewing .dm-screen{
 }
 body.dmViewing .dm-header{padding: max(12px,env(safe-area-inset-top)) 15px 12px;min-height:56px;background:#111114f5}
 body.dmViewing .dm-log{flex:1;min-height:0!important;overflow-y:auto!important;scroll-behavior:auto!important;-webkit-overflow-scrolling:touch;overflow-anchor:none;overscroll-behavior:contain;padding:14px 14px 18px}
+body.dmViewing .dm-log>.dm-group{flex:none}
 body.dmViewing .dm-composer{flex:none;min-height:64px;padding:10px 12px max(12px,env(safe-area-inset-bottom));box-sizing:border-box;background:#101013}
 body.dmViewing.dmKeyboardOpen .dm-composer{padding-bottom:8px;min-height:60px}
 body.dmViewing .dm-composer textarea{font-size:16px!important;line-height:22px;min-height:44px;max-height:88px;scroll-margin:0;overflow-anchor:none}
@@ -3976,10 +3977,14 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       const fullHeight=dmFullViewportHeight(height);
       const keyboardOpen=focused&&fullHeight-height>120;
       if(keyboardOpen){
+        const openingKeyboard=!document.body.classList.contains('dmKeyboardOpen');
         dmViewportBaseHeight=fullHeight;
         document.body.classList.add('dmKeyboardOpen');
         // Only Safari needs its page-scroll correction; Telegram stays pinned at the top.
         setDmViewportBox(dmBrowserIOS?Math.max(0,window.scrollY||0):0,height);
+        // Keep the newest messages visible when the composer takes space from the log.
+        // Scroll once on open so a reader can still scroll upward intentionally.
+        if(openingKeyboard){const log=byId('dmLog');log.scrollTop=log.scrollHeight;}
         return;
       }
       document.body.classList.remove('dmKeyboardOpen');
