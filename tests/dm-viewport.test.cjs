@@ -45,7 +45,7 @@ const fs = require("node:fs");
       clearTimeout: () => {},
       Math,
     };
-    const source = html.slice(start, end) + "\nthis.testApi={updateDmViewport,setDmViewing,scheduleDmViewport,classes:document.body.classList,listeners};";
+    const source = html.slice(start, end) + "\nthis.testApi={updateDmViewport,setDmViewing,scheduleDmViewport};";
     vm.runInNewContext(source, sandbox);
     return { ...sandbox, input, send, form, listeners, styles, viewport, frames, bodyClasses, flush: () => { while(frames.length) frames.shift()(); } };
     }
