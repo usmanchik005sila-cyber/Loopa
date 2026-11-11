@@ -155,3 +155,15 @@ test("Telegram's stable viewport wins over a stale WebView innerHeight", () => {
   c.testApi.setDmViewing(true);
   assert.equal(c.styles.get("--dm-visual-height"), "760px");
 });
+
+test("a shrunken layout viewport moves the composer when other viewport reports are stale", () => {
+  const c = createController({ telegramMiniApp: true });
+  c.testApi.setDmViewing(true);
+  c.document.activeElement = c.input;
+  c.window.innerHeight = 500;
+  c.viewport.height = 844;
+  c.telegramWebApp.viewportHeight = 844;
+  c.testApi.updateDmViewport();
+  assert.equal(c.bodyClasses.has("dmKeyboardOpen"), true);
+  assert.equal(c.styles.get("--dm-visual-height"), "500px");
+});

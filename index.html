@@ -3947,12 +3947,13 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
     function dmCurrentViewportHeight(){
       const visualHeight=window.visualViewport?.height||0;
       const telegramHeight=dmTelegramViewportHeight();
-      if(visualHeight&&telegramHeight)return Math.min(visualHeight,telegramHeight);
-      return visualHeight||telegramHeight||window.innerHeight||0;
+      const layoutHeight=window.innerHeight||0;
+      const reportedHeights=[visualHeight,telegramHeight,layoutHeight].filter(height=>height>0);
+      return reportedHeights.length?Math.min(...reportedHeights):0;
     }
     function dmFullViewportHeight(currentHeight){
       const stableHeight=dmTelegramStableHeight();
-      if(stableHeight)return Math.max(stableHeight,currentHeight||0);
+      if(stableHeight)return Math.max(dmViewportBaseHeight||0,stableHeight,currentHeight||0);
       return Math.max(dmViewportBaseHeight||0,window.innerHeight||0,currentHeight||0);
     }
     function finishDmSendPointer(){
@@ -3984,7 +3985,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       document.body.classList.remove('dmKeyboardOpen');
       const stableHeightNow=dmFullViewportHeight(height);
       // Refresh the baseline once the visible viewport has returned to its full size.
-      if(!focused&&stableHeight)dmViewportBaseHeight=stableHeight;
+      if(!focused&&stableHeight)dmViewportBaseHeight=Math.max(dmViewportBaseHeight,stableHeight);
       else if(!focused&&height>=stableHeightNow-55)dmViewportBaseHeight=height;
       setDmViewportBox(0,Math.max(stableHeightNow,dmViewportBaseHeight));
     }
@@ -4021,7 +4022,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
     byId('dmSend').addEventListener('pointercancel',finishDmSendPointer);
     dmInput.addEventListener('focus',()=>{
       const height=dmCurrentViewportHeight(),stableHeight=dmTelegramStableHeight();
-      if(stableHeight)dmViewportBaseHeight=Math.max(stableHeight,height);
+      if(stableHeight)dmViewportBaseHeight=Math.max(dmViewportBaseHeight||0,stableHeight,height);
       else dmViewportBaseHeight=Math.max(dmViewportBaseHeight||0,window.innerHeight||0,height);
       scheduleDmViewport();
     });
@@ -4040,11 +4041,9 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
     function setDmViewing(active){
       if(active){
         const height=dmCurrentViewportHeight(),stableHeight=dmTelegramStableHeight();
-        if(stableHeight)dmViewportBaseHeight=Math.max(stableHeight,height);
-        else{
-          if(!dmViewportBaseHeight||height>=dmViewportBaseHeight-55)dmViewportBaseHeight=height;
-          dmViewportBaseHeight=Math.max(dmViewportBaseHeight,window.innerHeight||0,height);
-        }
+        if(!stableHeight&&(!dmViewportBaseHeight||height>=dmViewportBaseHeight-55))dmViewportBaseHeight=height;
+        if(stableHeight)dmViewportBaseHeight=Math.max(dmViewportBaseHeight||0,stableHeight,height);
+        else dmViewportBaseHeight=Math.max(dmViewportBaseHeight||0,window.innerHeight||0,height);
         document.body.classList.add('dmViewing');
         updateDmViewport();
         return;
