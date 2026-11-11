@@ -9,14 +9,14 @@ const safetyGroup = html.match(/<div class="privacy-group"><h3>БЕЗОПАСН�
 test("profile security actions use the requested order and labels", () => {
   assert.ok(safetyGroup, "security settings group exists");
 
+  const passwordIndex = safetyGroup.indexOf('id="privacy-reset"');
   const linkedAccountsIndex = safetyGroup.indexOf('id="open-linked-accounts"');
   const supportIndex = safetyGroup.indexOf('class="privacy-action safety-support-link"');
   const signOutIndex = safetyGroup.indexOf('id="privacy-signout"');
-  const passwordIndex = safetyGroup.indexOf('id="privacy-reset"');
 
-  assert.ok(linkedAccountsIndex < supportIndex, "linked accounts stay first");
-  assert.ok(supportIndex < signOutIndex, "support comes second");
-  assert.ok(signOutIndex < passwordIndex, "sign out comes third");
+  assert.ok(passwordIndex < linkedAccountsIndex, "password change comes first");
+  assert.ok(linkedAccountsIndex < supportIndex, "linked accounts come before support");
+  assert.ok(supportIndex < signOutIndex, "support is second-to-last and sign out is last");
   assert.match(safetyGroup, /Сменить пароль \(электронная почта\)/);
 });
 
