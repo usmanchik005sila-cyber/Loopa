@@ -30,6 +30,7 @@ function createController({ telegramMiniApp = false } = {}) {
     addEventListener: (name, fn) => listeners.set("input:" + name, fn),
     blur: () => { document.activeElement = null; listeners.get("input:blur")?.(); },
   };
+  const dmLog = { scrollHeight: 1200, scrollTop: 0 };
   const send = { addEventListener: (name, fn) => listeners.set("send:" + name, fn) };
   const form = { requestSubmit: () => { form.submits++; }, submits: 0 };
   const classList = {
@@ -50,7 +51,7 @@ function createController({ telegramMiniApp = false } = {}) {
   };
   const sandbox = {
     watchBrowserIOS: true,
-    byId: id => ({ dmInput: input, dmSend: send, dmForm: form })[id],
+    byId: id => ({ dmInput: input, dmLog, dmSend: send, dmForm: form })[id],
     document,
     window: { innerHeight: 844, scrollY: 0, visualViewport: viewport, Telegram: { WebApp: telegramWebApp }, addEventListener: () => {} },
     requestAnimationFrame: fn => { const id = ++nextFrameId; frames.set(id, fn); return id; },
@@ -62,7 +63,7 @@ function createController({ telegramMiniApp = false } = {}) {
   const source = html.slice(start, end) + "\nthis.testApi={updateDmViewport,setDmViewing,scheduleDmViewport};";
   vm.runInNewContext(source, sandbox);
   return {
-    ...sandbox, input, send, form, listeners, styles, viewport, frames, bodyClasses,
+    ...sandbox, input, dmLog, send, form, listeners, styles, viewport, frames, bodyClasses,
     telegramWebApp, telegramListeners, canceledFrames,
     flush: () => { const pending = [...frames.values()]; frames.clear(); pending.forEach(fn => fn()); },
   };
@@ -187,4 +188,16 @@ test("Safari keeps the immediate full-height position during keyboard dismissal"
   c.testApi.updateDmViewport();
   assert.equal(c.bodyClasses.has("dmKeyboardOpen"), false);
   assert.equal(c.styles.get("--dm-visual-height"), "844px");
+});
+
+test("opening the keyboard scrolls the DM log to the latest messages in Safari and Telegram", () => {
+  for (const telegramMiniApp of [false, true]) {
+    const c = createController({ telegramMiniApp });
+    c.testApi.setDmViewing(true);
+    c.document.activeElement = c.input;
+    c.viewport.height = 500;
+    c.testApi.updateDmViewport();
+    assert.equal(c.bodyClasses.has("dmKeyboardOpen"), true);
+    assert.equal(c.dmLog.scrollTop, c.dmLog.scrollHeight);
+  }
 });
