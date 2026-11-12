@@ -972,8 +972,9 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
 .safety-delete-entry{display:block;width:100%;margin:12px 0 4px;padding:13px 14px;text-align:left;border:1px solid #a34d4d44;border-radius:14px;background:#681f1f18;color:#efbaba;font:600 13px system-ui;cursor:pointer}
 .safety-delete-entry small{display:block;margin-top:5px;color:#b9a5a5;font:11px/1.45 system-ui}
 .profile-account-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px;align-items:stretch}
-.profile-account-actions .action.secondary{margin-top:0;min-width:0;padding:13px 10px}
-.profile-account-actions .safety-delete-entry{min-width:0;margin:0;padding:13px 10px;overflow-wrap:anywhere}
+.profile-account-actions .action.secondary,.profile-account-actions .safety-delete-entry{display:flex;align-items:center;justify-content:center;box-sizing:border-box;width:100%;height:74px;min-height:74px;max-height:74px;margin:0;padding:10px;text-align:center}
+.profile-account-actions .safety-delete-entry{overflow-wrap:anywhere}
+.profile-account-actions-note{margin:8px 2px 0!important;color:#a6a4aa!important;font:11px/1.45 system-ui!important}
 
 /* LOOPA v87 — people, private messages and invitations */
 .friend-person{cursor:pointer}
@@ -1638,8 +1639,9 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
           </form>
           <div class="profile-account-actions">
             <button class="action secondary" type="button" id="sign-out">Выйти из аккаунта</button>
-            <button class="safety-delete-entry" type="button" id="request-account-deletion">Удалить аккаунт<small>Запрос увидит только владелец LOOPA; отправка не удаляет данные автоматически.</small></button>
+            <button class="safety-delete-entry" type="button" id="request-account-deletion">Удалить аккаунт</button>
           </div>
+          <p class="profile-account-actions-note">Запрос увидит только владелец LOOPA; отправка не удаляет данные автоматически.</p>
         </div>
           </div>
           <div id="settings-privacy" hidden>
