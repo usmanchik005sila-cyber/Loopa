@@ -971,6 +971,9 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
 .dm-message-report:hover,.dm-message-report:focus-visible{background:#ffffff13;color:#fff}
 .safety-delete-entry{display:block;width:100%;margin:12px 0 4px;padding:13px 14px;text-align:left;border:1px solid #a34d4d44;border-radius:14px;background:#681f1f18;color:#efbaba;font:600 13px system-ui;cursor:pointer}
 .safety-delete-entry small{display:block;margin-top:5px;color:#b9a5a5;font:11px/1.45 system-ui}
+.profile-account-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px;align-items:stretch}
+.profile-account-actions .action.secondary{margin-top:0;min-width:0;padding:13px 10px}
+.profile-account-actions .safety-delete-entry{min-width:0;margin:0;padding:13px 10px;overflow-wrap:anywhere}
 
 /* LOOPA v87 — people, private messages and invitations */
 .friend-person{cursor:pointer}
@@ -1633,8 +1636,10 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
             </label>
             <button class="action" id="recovery-submit" type="submit">Обновить пароль</button>
           </form>
-          <button class="action secondary" type="button" id="sign-out">Выйти из аккаунта</button>
-          <button class="safety-delete-entry" type="button" id="request-account-deletion">Запросить удаление аккаунта<small>Запрос увидит только владелец LOOPA; отправка не удаляет данные автоматически.</small></button>
+          <div class="profile-account-actions">
+            <button class="action secondary" type="button" id="sign-out">Выйти из аккаунта</button>
+            <button class="safety-delete-entry" type="button" id="request-account-deletion">Удалить аккаунт<small>Запрос увидит только владелец LOOPA; отправка не удаляет данные автоматически.</small></button>
+          </div>
         </div>
           </div>
           <div id="settings-privacy" hidden>
