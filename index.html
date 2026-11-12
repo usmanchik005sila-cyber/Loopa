@@ -1763,12 +1763,12 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
     </form>
   </dialog>
   <dialog id="account-delete-dialog" class="safety-dialog" aria-labelledby="account-delete-title" aria-describedby="account-delete-description">
-    <div class="dm-dialog-top"><span>ЗАПРОС ВЛАДЕЛЬЦУ LOOPA</span><button type="button" id="account-delete-close" aria-label="Закрыть">×</button></div>
-    <h2 id="account-delete-title">Запросить удаление аккаунта?</h2>
-    <p id="account-delete-description">В закрытой очереди сохранятся ID профиля, время и статус запроса. Он не удалит аккаунт или данные автоматически. После ручной обработки ты можешь потерять доступ к профилю, друзьям, перепискам, комнатам и прогрессу.</p>
+    <div class="dm-dialog-top"><span>УДАЛЕНИЕ АККАУНТА LOOPA</span><button type="button" id="account-delete-close" aria-label="Закрыть">×</button></div>
+    <h2 id="account-delete-title">Удалить аккаунт и данные?</h2>
+    <p id="account-delete-description">После подтверждения аккаунт удалится автоматически. Будут удалены профиль, друзья, личные сообщения, сообщения и комнаты, прогресс, Telegram-привязка и фото. Удаление необратимо; сообщения исчезнут и у собеседников. Локальные данные на других устройствах и резервные копии сайта очистить удалённо нельзя.</p>
     <form id="account-delete-form">
-      <label class="safety-check"><input id="account-delete-ack" type="checkbox" required><span>Я понимаю, что отправляю запрос владельцу, а не удаляю аккаунт сразу.</span></label>
-      <div class="safety-dialog-actions"><button type="button" id="account-delete-cancel">Отмена</button><button class="danger" type="submit" id="account-delete-submit" disabled>Отправить запрос</button></div>
+      <label class="safety-check"><input id="account-delete-ack" type="checkbox" required><span>Я понимаю, что аккаунт и все связанные данные будут удалены без возможности восстановления.</span></label>
+      <div class="safety-dialog-actions"><button type="button" id="account-delete-cancel">Отмена</button><button class="danger" type="submit" id="account-delete-submit" disabled>Удалить сейчас</button></div>
       <p id="account-delete-feedback" class="auth-feedback" role="status" aria-live="polite" hidden></p>
     </form>
   </dialog>
@@ -4303,6 +4303,17 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       byId('account-delete-submit').disabled=!event.target.checked;
     });
     const closeAccountDelete=()=>{if(accountDeleteDialog.open)accountDeleteDialog.close();};
+    function clearLocalAccountData(userId){
+      const keys=[
+        resumeStorageKeyFor(userId),
+        'loopa-watch-pairs-v1-'+userId,
+        'loopa-invite-seen-v1:'+userId,
+        deferredInviteStorageKey
+      ].filter(Boolean);
+      try{keys.forEach(key=>localStorage.removeItem(key));}catch{}
+      inviteSeen.clear();
+      deferredInviteKeys.clear();
+    }
     byId('account-delete-close').addEventListener('click',closeAccountDelete);
     byId('account-delete-cancel').addEventListener('click',closeAccountDelete);
     accountDeleteDialog.addEventListener('click',event=>{
@@ -4320,15 +4331,38 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
         if(currentUser?.id!==owner)return;
         const status=data?.status;
         if(!['submitted','already_pending'].includes(status))throw Error('Не удалось подтвердить запрос.');
+        const {data:deletion,error:deletionError}=await client.functions.invoke('loopa-bot',{
+          body:{action:'delete_account',request_id:data?.request_id}
+        });
+        let deletionErrorBody=null;
+        if(deletionError&&deletionError.context?.json){
+          deletionErrorBody=await deletionError.context.json().catch(()=>null);
+        }
+        if(deletionError||deletion?.status!=='completed'){
+          const code=deletionErrorBody?.error||deletion?.error;
+          if(code==='account_deleted_cleanup_incomplete'){
+            clearLocalAccountData(owner);
+            closeAccountDelete();
+            await client.auth.signOut({scope:'local'}).catch(()=>{});
+            showToast('Вход удалён; очистка данных требует повторной обработки.');
+            return;
+          }
+          const message=code==='deletion_already_processing'
+            ?'Удаление уже выполняется. Не отправляй заявку повторно; дождись завершения.'
+            :code==='account_deletion_failed'
+                ?'Удаление не завершилось. Аккаунт не удалён; попробуй ещё раз позже.'
+                :'Удаление не завершилось. Проверь состояние аккаунта и, если ошибка повторится, напиши владельцу LOOPA.';
+          feedback('account-delete-feedback',message,true);
+          return;
+        }
         closeAccountDelete();
-        const ref=String(data?.request_id||'').slice(0,8);
-        showToast(status==='already_pending'
-          ?'Запрос уже находится у владельца LOOPA'
-          :'Запрос отправлен владельцу'+(ref?' · '+ref:''));
+        clearLocalAccountData(owner);
+        await client.auth.signOut({scope:'local'}).catch(()=>{});
+        showToast('Аккаунт и связанные данные удалены.');
       }catch(err){
         const message=String(err?.message||'');
         feedback('account-delete-feedback',/loopa_request_account_deletion|schema cache|does not exist/i.test(message)
-          ?'Запрос пока не подключён. Владелец должен применить SQL-настройку безопасности.'
+          ?'Удаление пока не подключено. Проверь настройку безопасности Supabase.'
           :errorText(err),true);
       }finally{if(currentUser?.id===owner)submit.disabled=!byId('account-delete-ack').checked;}
     });
