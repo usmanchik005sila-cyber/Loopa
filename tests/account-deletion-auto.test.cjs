@@ -35,6 +35,10 @@ test("bot authenticates the user and automatically removes their Auth and public
   assert.match(bot, /storage\.from\("avatars"\)\.remove\(paths\)/);
 });
 
+test("bot CORS allows the Supabase client info header", () => {
+  assert.match(bot, /Access-Control-Allow-Headers[^}]*x-client-info/i);
+});
+
 test("owner Telegram message is informational and recovery is owner-only", () => {
   assert.match(bot, /LOOPA_OWNER_TELEGRAM_ID/);
   assert.match(bot, /sendMessage[\s\S]*deletionNoticeText\(requestId,"processing"\)/);
