@@ -219,7 +219,7 @@ const HELP = [
 function result(body, status=200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: {"Content-Type":"application/json; charset=utf-8", "Cache-Control":"no-store", "Access-Control-Allow-Origin":SITE_ORIGIN, "Access-Control-Allow-Headers":"apikey, authorization, content-type", "Access-Control-Allow-Methods":"GET, POST, OPTIONS", "Vary":"Origin"}
+    headers: {"Content-Type":"application/json; charset=utf-8", "Cache-Control":"no-store", "Access-Control-Allow-Origin":SITE_ORIGIN, "Access-Control-Allow-Headers":"apikey, authorization, x-client-info, content-type", "Access-Control-Allow-Methods":"GET, POST, OPTIONS", "Vary":"Origin"}
   });
 }
 function sameSecret(a,b) {
