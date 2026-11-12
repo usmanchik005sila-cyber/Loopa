@@ -56,10 +56,11 @@ test("new profiles allow DMs from everyone and keep the privacy choice editable"
   assert.match(html, /текущие настройки не меняются/i);
 });
 
-test("deletion UI requires acknowledgement and only creates a request", () => {
+test("deletion UI requires an explicit acknowledgement and starts server-side deletion", () => {
   assert.match(html, /id="account-delete-ack" type="checkbox" required/i);
   assert.match(html, /client\.rpc\('loopa_request_account_deletion'\)/i);
-  assert.match(html, /не удалит аккаунт или данные автоматически/i);
+  assert.match(html, /будут удалены без возможности восстановления/i);
+  assert.match(html, /action:'delete_account'/i);
   assert.doesNotMatch(migration, /delete\s+from\s+auth\.users/i);
   assert.doesNotMatch(html, /auth\.admin\.deleteUser|deleteUser\s*\(/i);
 });
