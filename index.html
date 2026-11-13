@@ -413,6 +413,12 @@
     .friends-feedback{margin:12px 0 0;font-size:12px;line-height:1.55;color:#cce6d3;}
     .friends-feedback.error{color:#f1bdbb;}
     @media(max-width:360px){.friend-avatar{width:40px;height:40px;}.friend-person{gap:8px;}.friend-small-action{padding:8px;font-size:10px;}}
+    .friend-search-person{display:grid;grid-template-columns:47px minmax(0,1fr);column-gap:12px;row-gap:10px;align-items:center;}
+    .friend-search-person>.friend-avatar{grid-column:1;grid-row:1 / span 2;}
+    .friend-search-person>.friend-person-details{grid-column:2;grid-row:1;min-width:0;align-self:end;}
+    .friend-search-person>.friend-person-actions{grid-column:2;grid-row:2;display:flex;gap:8px;min-width:0;}
+    .friend-search-person .friend-person-name{white-space:normal;word-break:normal;overflow-wrap:anywhere;}
+    .friend-search-person .friend-small-action{flex:1;min-width:0;max-width:none;white-space:nowrap;}
   #room-frame{width:100%;aspect-ratio:16/9;border:0;background:#111;margin:12px 0}#room-note{overflow-wrap:anywhere}.roomBar,#chatForm{display:flex;align-items:center;gap:9px}.roomBar small{margin-left:auto}.roomChat{margin-top:22px;border-top:1px solid var(--line);padding-top:16px}#chatLog{max-height:38vh;overflow:auto;display:flex;flex-direction:column;gap:8px;padding:8px 0 14px}.bubble{align-self:flex-start;max-width:82%;padding:9px 12px;background:#39353a;border-radius:14px;overflow-wrap:anywhere;white-space:pre-wrap}.bubble.peer{align-self:flex-end;background:#29292e}.bubble small{display:block;color:#c7bab0;font-size:10px}#roomSheet{position:fixed;top:auto;bottom:0;margin:0 auto;width:min(100%,480px);max-height:75dvh;overflow:auto;background:#252428;color:inherit;color:#eee;border:1px solid #555;border-radius:22px 22px 0 0;padding:22px 22px max(22px,env(safe-area-inset-bottom))}#roomSheet::backdrop{background:#0009}#pick label{display:block;padding:8px}#videoEdit summary{cursor:pointer;padding:10px 0;font-size:13px}section[data-page="rooms"]:has(#room-active:not([hidden]))>h1,section[data-page="rooms"]:has(#room-active:not([hidden]))>.eyebrow{display:none}.setupHeader{display:none}.choosing .setupHeader{display:block}.choosing .roomBar,.choosing #room-status,.choosing #videoEdit summary,.choosing .roomChat,.choosing #room-frame{display:none!important}.setupHeader h2{font:32px Georgia,serif}.setupHeader .text-link{padding:10px 0 18px}.choosing #videoEdit .action{margin-top:14px}.roomChat{padding:18px 14px;border:1px solid #ffffff26;border-radius:21px;background:radial-gradient(ellipse at 0 0,#ffffff13,transparent 60%),linear-gradient(145deg,#141416ed,#070709f5);box-shadow:inset 0 1px #ffffff12,0 12px 26px #0004;backdrop-filter:blur(16px)}.roomChat h2{font-size:18px}.roomChat #chatLog{min-height:70px;font-size:14px;color:#d4cecb}.roomChat .bubble{background:linear-gradient(145deg,#494346,#312d31);border:1px solid #ffffff17;color:#fff}.roomChat .bubble.peer{background:#22242a}.roomChat #chatText{min-width:0;font-size:16px}.roomChat #chatForm{gap:6px}.roomChat #emojiOpen,#emojiTray button{border:0;color:#eee;background:transparent;cursor:pointer;font-size:22px;min-height:40px;min-width:34px}#emojiTray:not([hidden]){display:grid;grid-template-columns:repeat(6,1fr);background:#252428;border-radius:14px;padding:4px;margin-bottom:8px}#room-link{font-size:16px}.playerCode{display:flex;align-items:center;gap:8px;color:#c2bbba;font-size:12px}.playerCode b{color:#ece6e2;letter-spacing:.06em}.playerCode button{width:42px;height:42px;display:grid;place-items:center;border:0;background:transparent;color:inherit;cursor:pointer}.playerCode svg{width:16px;height:16px}.choosing .playerCode{display:none}.roomChat #chatLog{height:clamp(315px,54svh,620px);max-height:none;overflow-y:auto}.roomChat .bubble{flex-shrink:0}#people{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 20px}#people span{max-width:100%;overflow-wrap:anywhere;padding:8px 14px;background:linear-gradient(145deg,#222225,#101012);border:1px solid #ffffff26;border-radius:13px;color:#eee9e6;font-size:14px}#catalogForm{display:flex;gap:6px;margin:10px 0}#queryVideo{min-width:0;font-size:16px}#hits{max-height:45vh;overflow:auto}#hits button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:#17171a;border:0;border-bottom:1px solid #ffffff20;color:inherit;padding:8px;font:inherit}#hits img{width:30%;aspect-ratio:16/9;object-fit:cover;border-radius:7px}#room-active:not(.choosing) #room-status{float:left;display:flex;align-items:center;min-height:44px;margin:0;color:#c2bcb8}#room-host{display:flow-root}#room-host[hidden]{display:none}#room-active:not(.choosing) #room-host{display:contents}#room-active:not(.choosing) #room-host[hidden]{display:none}#videoEdit summary{box-sizing:border-box;position:relative;display:flex;align-items:center;justify-content:center;gap:7px;width:max-content;min-height:44px;margin-left:auto;padding:0 13px;list-style:none;color:#eee7e2;font:550 12px/1.2 system-ui}#videoEdit summary::-webkit-details-marker{display:none}#videoEdit summary::before{content:"";position:absolute;inset:5px 0;border-radius:11px;border:1px solid #ffffff29;background:linear-gradient(155deg,#ffffff13,#ffffff04);pointer-events:none}#videoEdit summary svg{width:15px;height:15px}#videoEdit[open] summary::before{border-color:#ffffff48}#room-active .roomChat{clear:both}.choosing #videoEdit summary{display:none}
 /* LOOPA 24: room and catalog */
 #room-active{padding:18px 14px}#room-active.choosing{padding:23px}
@@ -4931,7 +4937,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
     // v88 uses loopa_history27 as the single active-time counter.
     // Avoid running v87's separate timer: it would double-count active seconds.
 
-    function friendRow(profile, presence, buttons) {
+    function friendRow(profile, presence, buttons, searchResult=false) {
       const row = document.createElement('div');
       row.className = 'friend-person';
       row.appendChild(friendAvatar(profile));
@@ -4951,6 +4957,8 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       status.append(indicator,text);
       detail.append(name,status);
       row.appendChild(detail);
+      const actionGroup=searchResult?document.createElement('div'):row;
+      if(searchResult)actionGroup.className='friend-person-actions';
       if(profile.id && profile.id !== currentUser?.id){
         row.dataset.profileId=profile.id;
         row.title='Открыть профиль '+(profile.display_name||'пользователя');
@@ -4988,7 +4996,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
             else {option.dataset.openBlacklist='true';}
             menu.appendChild(option);
           }
-          wrap.append(trigger,menu); row.appendChild(wrap); continue;
+          wrap.append(trigger,menu); actionGroup.appendChild(wrap); continue;
         }
         const btn = document.createElement('button');
         btn.type='button';
@@ -4998,8 +5006,9 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
         if (action.userId) btn.dataset.userId = action.userId;
         if (action.requestId) btn.dataset.requestId = action.requestId;
         if (action.disabled) btn.disabled = true;
-        row.appendChild(btn);
+        actionGroup.appendChild(btn);
       }
+      if(searchResult)row.appendChild(actionGroup);
       return row;
     }
     function resetFriends() {
@@ -5164,7 +5173,9 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
           else if (relation.sender_id===owner) actions=[{label:'Отправлено',action:'none',disabled:true}];
           else actions=[{label:'Принять',action:'accept',requestId:relation.id,primary:true}];
           actions.push({label:'Заблокировать',action:'block',userId:profile.id});
-          parent.appendChild(friendRow(profile,presence[profile.id],actions));
+          const resultRow=friendRow(profile,presence[profile.id],actions,true);
+          resultRow.classList.add('friend-search-person');
+          parent.appendChild(resultRow);
         }
       } catch(err) {
         if (generation===friendSearchGeneration && currentUser?.id===owner) friendEmpty(parent,'Не удалось выполнить поиск: '+errorText(err));
