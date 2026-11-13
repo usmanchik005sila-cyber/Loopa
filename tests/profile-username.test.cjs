@@ -31,6 +31,10 @@ test('friend search includes exact usernames and displays the matching handle', 
   assert.match(html, /#friend-search\{[^}]*font-size:16px/);
 });
 
+test('iOS Safari friend search uses a larger input font while Telegram keeps its existing size', () => {
+  assert.match(html, /@supports \(-webkit-touch-callout: none\) \{[^}]*html:not\(\.telegram-miniapp\) #friend-search\{font-size:17px!important;/);
+});
+
 test('database migration keeps usernames optional but enforces format and uniqueness', () => {
   assert.match(migration, /add column if not exists username text/i);
   assert.ok(migration.includes("username ~ '^[a-z][a-z0-9_]{3,31}$'"));
