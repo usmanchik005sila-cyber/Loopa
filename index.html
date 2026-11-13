@@ -238,7 +238,23 @@
     .account-email{overflow-wrap:anywhere;}
     .account-status{margin-top:10px!important;font-size:12px!important;color:#b8b3b4!important;}
     .account-name-field{margin-top:0;font-size:12px;}
-    .account-name-field input{font-size:21px;font-weight:600;letter-spacing:-.4px;min-height:56px;}
+    .account-name-field input{font-size:17px;font-weight:600;letter-spacing:-.2px;min-height:46px;}
+    .profile-identity-row{display:flex;align-items:center;gap:14px;min-width:0;margin:0 0 18px;}
+    .profile-identity-row .account-avatar{width:66px;height:66px;flex:0 0 66px;margin:0;}
+    .profile-identity-details{display:flex;flex:1;flex-direction:column;align-items:flex-start;gap:9px;min-width:0;}
+    .profile-name-line{display:flex;align-items:center;gap:9px;min-width:0;min-height:38px;}
+    .profile-name-line strong{min-width:0;color:#f4f0ed;font-size:19px;line-height:1.25;font-weight:650;overflow-wrap:anywhere;}
+    .profile-name-edit{display:grid;place-items:center;flex:0 0 34px;width:34px;height:34px;padding:0;border:1px solid rgba(255,255,255,.2);border-radius:11px;background:rgba(255,255,255,.07);color:#eee9e6;font-size:16px;cursor:pointer;}
+    .profile-name-edit:focus-visible{outline:2px solid #eee9e6;outline-offset:2px;}
+    #profile-name-editor[hidden]{display:none!important;}
+    .profile-identity-details .avatar-upload{margin:0;padding:7px 10px;font-size:12px;}
+    .account-username-field{margin-top:0;}
+    .account-username-input{display:flex;align-items:center;gap:9px;min-height:49px;margin-top:8px;padding:0 14px;border:1px solid rgba(255,255,255,.22);border-radius:13px;background:rgba(11,11,13,.43);}
+    .account-username-input:focus-within{border-color:#d8c8ba;box-shadow:0 0 0 2px #d8c8ba22;}
+    .account-username-input>span{color:#aaa2a2;font-size:16px;}
+    .field .account-username-input input{flex:1;min-width:0;width:100%;min-height:0;margin:0;padding:0;border:0;border-radius:0;background:transparent;font-size:16px;outline:none;box-shadow:none;}
+    .field .account-username-input input:focus{border:0;box-shadow:none;}
+    .username-note{margin:8px 0 0!important;color:#a9a2a4!important;font-size:11px!important;line-height:1.5!important;}
     #profile-form .account-email{margin:15px 0 24px;color:#bcb5b7;font-size:13px;line-height:1.5;}
     .profile-saved{display:flex;align-items:center;justify-content:center;gap:8px;margin:12px 0 0!important;color:#d7eddb!important;font-size:13px;animation:loopaSavedIn .22s ease-out both;}
     .profile-saved[hidden]{display:none!important;}
@@ -396,6 +412,7 @@
     .friend-avatar img{display:block;width:100%;height:100%;object-fit:cover;}
     .friend-person-details{min-width:0;flex:1;}
     .friend-person-name{font-size:14px;font-weight:630;line-height:1.3;overflow-wrap:anywhere;}
+    .friend-person-username{margin-top:3px;color:#aaa6a8;font-size:11px;line-height:1.35;overflow-wrap:anywhere;}
     .friend-person-status{display:flex;align-items:center;gap:7px;color:#aba6a8;font-size:11px;line-height:1.45;margin-top:5px;}
     .friend-person-status .presence-dot{width:7px;height:7px;box-shadow:none;}
     .friend-person-status .presence-dot.online{box-shadow:none;}
@@ -1474,9 +1491,9 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
           <div class="panel glass friend-panel">
             <p class="panel-note">ЗНАКОМСТВО</p>
             <h2>Найти человека</h2>
-            <label class="friend-search-label" for="friend-search">Поиск по никнейму</label>
-            <input id="friend-search" class="friend-search-input" type="search" maxlength="40" autocomplete="off" placeholder="Введи хотя бы 2 символа">
-            <p class="friend-help">Никнеймы могут совпадать. Рядом с именем увидишь аватарку и статус, если пользователь разрешил его показывать.</p>
+            <label class="friend-search-label" for="friend-search">Поиск по имени или юзернейму</label>
+            <input id="friend-search" class="friend-search-input" type="search" maxlength="40" autocomplete="off" placeholder="Имя или @юзернейм">
+            <p class="friend-help">Ищи по имени или точному юзернейму. Уникальный юзернейм поможет быстро найти нужного человека.</p>
             <div id="friend-search-results" aria-live="polite"></div>
           </div>
           <div class="panel glass friend-panel friend-list-panel">
@@ -1618,14 +1635,26 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
           <div id="settings-account" hidden>
         <div class="panel glass" id="auth-account" hidden>
           <p class="panel-note">ТВОЙ АККАУНТ</p>
-          <div class="account-avatar" id="account-avatar" aria-hidden="true">L</div>
-          <label class="avatar-upload" id="avatar-upload-label">Изменить фото профиля
-            <input id="avatar-file" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif">
-          </label>
           <form id="profile-form">
-            <label class="field account-name-field">Отображаемое имя
-              <input id="profile-name" type="text" maxlength="40" required autocomplete="nickname" placeholder="Твоё имя">
+            <div class="profile-identity-row">
+              <div class="account-avatar" id="account-avatar" aria-hidden="true">L</div>
+              <div class="profile-identity-details">
+                <div class="profile-name-line">
+                  <strong id="profile-display-name">Профиль LOOPA</strong>
+                  <button class="profile-name-edit" id="profile-name-edit" type="button" aria-label="Редактировать отображаемое имя" aria-controls="profile-name-editor" aria-expanded="false">🖊️</button>
+                </div>
+                <label class="field account-name-field" id="profile-name-editor" hidden>Отображаемое имя
+                  <input id="profile-name" type="text" maxlength="40" autocomplete="name" placeholder="Твоё имя">
+                </label>
+                <label class="avatar-upload" id="avatar-upload-label">Изменить фото профиля
+                  <input id="avatar-file" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif">
+                </label>
+              </div>
+            </div>
+            <label class="field account-username-field">Уникальный юзернейм
+              <span class="account-username-input"><span aria-hidden="true">@</span><input id="profile-username" type="text" maxlength="33" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="например, loopa_user"></span>
             </label>
+            <p class="username-note">4–32 символа: латинские буквы, цифры и _. Начинается с буквы; поле можно оставить пустым.</p>
             <p class="account-email" id="account-email"></p><div class="profileStats"><div><strong id="usageTime">—</strong><small>В LOOPA</small></div><div><strong id="joinedDate">—</strong><small>Дата регистрации</small></div></div><p class="statsNote">Время считаем с этого обновления, пока LOOPA открыта на экране.</p>
             <button class="action" id="profile-save" type="submit">Сохранить профиль</button>
             <p id="profile-saved" class="profile-saved" role="status" aria-live="polite" hidden><span aria-hidden="true">✓</span> Сохранено</p>
@@ -4955,7 +4984,9 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       const text = document.createElement('span');
       text.textContent = presence?.label || 'Активность скрыта или недоступна';
       status.append(indicator,text);
-      detail.append(name,status);
+      detail.append(name);
+      if(profile.username){const handle=document.createElement('div');handle.className='friend-person-username';handle.textContent='@'+profile.username;detail.appendChild(handle);}
+      detail.append(status);
       row.appendChild(detail);
       const actionGroup=searchResult?document.createElement('div'):row;
       if(searchResult)actionGroup.className='friend-person-actions';
@@ -5153,14 +5184,22 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       friendEmpty(parent,'Ищем…');
       try {
         const escaped=term.replace(/[\%_]/g,'\\$&');
-        const {data,error} = await client.from('profiles')
-          .select('id,display_name,avatar_path,updated_at').ilike('display_name','%'+escaped+'%').limit(15);
-        if (error) throw error;
+        const handle=term.replace(/^@/,'').trim().toLowerCase();
+        const columns='id,display_name,username,avatar_path,updated_at';
+        const nameSearch=client.from('profiles').select(columns).ilike('display_name','%'+escaped+'%').limit(15);
+        const usernameSearch=/^[a-z][a-z0-9_]{3,31}$/.test(handle)
+          ?client.from('profiles').select(columns).eq('username',handle).limit(1)
+          :Promise.resolve({data:[],error:null});
+        const [nameResult,handleResult]=await Promise.all([nameSearch,usernameSearch]);
+        if(nameResult.error)throw nameResult.error;
+        if(handleResult.error)throw handleResult.error;
         if (generation!==friendSearchGeneration || currentUser?.id!==owner) return;
+        const candidateProfiles=new Map();
+        for(const profile of [...(handleResult.data||[]),...(nameResult.data||[])])candidateProfiles.set(profile.id,profile);
         const {data:blockedRows,error:blockError}=await client.from('blocked_users').select('blocked_id').eq('blocker_id',owner);
         if(blockError) throw blockError;
         const blockedIds=new Set((blockedRows||[]).map(row=>row.blocked_id));
-        const matches=(data||[]).filter(profile=>profile.id!==owner&&!blockedIds.has(profile.id));
+        const matches=[...candidateProfiles.values()].filter(profile=>profile.id!==owner&&!blockedIds.has(profile.id));
         const presence=await getPublicPresence(matches.map(profile=>profile.id));
         if (generation!==friendSearchGeneration || currentUser?.id!==owner) return;
         if (!matches.length) {friendEmpty(parent,'Никого не нашли. Проверь написание никнейма.');return;}
@@ -5293,6 +5332,9 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       openSettings('home');
       const savedName = user.user_metadata?.display_name || user.user_metadata?.full_name || user.user_metadata?.name || '';
       byId('profile-name').value = savedName;
+      byId('profile-username').value='';
+      byId('profile-name-editor').hidden=true;
+      byId('profile-name-edit').setAttribute('aria-expanded','false');
       byId('account-email').textContent = loopaAccountIdentity(user);
       byId('joinedDate').textContent=user.created_at?new Date(user.created_at).toLocaleDateString('ru-RU',{day:'numeric',month:'short',year:'numeric'}):'—';
       usageStart();
@@ -5301,11 +5343,12 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       refreshSettingsIdentity();
       feedback('profile-feedback','');
       try {
-        const {data, error} = await client.from('profiles').select('display_name,avatar_path,allow_friend_requests,room_invite_policy').eq('id', user.id).maybeSingle();
+        const {data, error} = await client.from('profiles').select('display_name,username,avatar_path,allow_friend_requests,room_invite_policy').eq('id', user.id).maybeSingle();
         if (currentUser?.id !== user.id) return;
         if (error) {
           feedback('profile-feedback','Для поиска людей сначала выполни SQL из LOOPA-friends-setup.sql в Supabase. '+errorText(error),true);
         } else {
+          byId('profile-username').value=data?.username||'';
           if (data?.display_name) {
             byId('profile-name').value = data.display_name;
             renderName(data.display_name);
@@ -5392,7 +5435,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
     });
     function renderName(name) {
       const title = name.trim() || 'Профиль LOOPA';
-      // Имя отображается прямо в редактируемом поле профиля.
+      byId('profile-display-name').textContent=title;
       if (!currentUser?.user_metadata?.avatar_path) byId('account-avatar').textContent = (name.trim().charAt(0) || 'L').toUpperCase();
       refreshSettingsIdentity();
     }
@@ -5889,31 +5932,50 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       clearTimeout(profileSavedTimer);
       byId('profile-saved').hidden = true;
     }
-    byId('profile-name').addEventListener('input', hideProfileSaved);
+    byId('profile-name-edit').addEventListener('click',()=>{
+      const editor=byId('profile-name-editor');
+      editor.hidden=!editor.hidden;
+      byId('profile-name-edit').setAttribute('aria-expanded',String(!editor.hidden));
+      if(!editor.hidden){byId('profile-name').focus();byId('profile-name').select();}
+    });
+    byId('profile-name').addEventListener('input',()=>{
+      byId('profile-display-name').textContent=byId('profile-name').value.trim()||'Профиль LOOPA';
+      hideProfileSaved();
+    });
+    byId('profile-username').addEventListener('input',hideProfileSaved);
     byId('profile-form').addEventListener('submit',async (event) => {
       event.preventDefault();
       if (!currentUser || !client) return;
       const name = byId('profile-name').value.trim();
+      const rawUsername=byId('profile-username').value.trim().replace(/^@/,'');
+      const username=rawUsername.toLowerCase();
       if (!name || name.length > 40) return feedback('profile-feedback','Имя должно содержать от 1 до 40 символов.',true);
+      if (username && !/^[a-z][a-z0-9_]{3,31}$/.test(username)) return feedback('profile-feedback','Юзернейм: от 4 до 32 символов, начинается с латинской буквы и содержит только латинские буквы, цифры или _.',true);
       setBusy('profile-save',true);
       hideProfileSaved();
       feedback('profile-feedback','');
       try {
-        const {error} = await client.from('profiles').upsert({id:currentUser.id,display_name:name},{onConflict:'id'});
+        const {error} = await client.from('profiles').upsert({id:currentUser.id,display_name:name,username:username||null},{onConflict:'id'});
         if (error) throw error;
         // Metadata is a convenient fallback while session/profile is loading.
         const update = await client.auth.updateUser({data:{display_name:name}});
         if (update.error) throw update.error;
         currentUser = update.data.user;
         renderName(name);
+        byId('profile-name-editor').hidden=true;
+        byId('profile-name-edit').setAttribute('aria-expanded','false');
+        byId('profile-username').value=username;
         refreshSettingsIdentity();
         feedback('profile-feedback','');
         byId('profile-saved').hidden = false;
         profileSavedTimer = setTimeout(() => { byId('profile-saved').hidden = true; }, 2600);
       } catch (err) {
-        feedback('profile-feedback',/profiles|schema cache|relation|permission denied/i.test(err.message || '')
-          ? 'Таблица профилей ещё не настроена. Выполни SQL из файла loopa-profiles.sql в Supabase → SQL Editor.'
-          : errorText(err),true);
+        const message=String(err?.message||'');
+        if(err?.code==='23505')feedback('profile-feedback','Этот юзернейм уже занят. Выбери другой.',true);
+        else if(err?.code==='23514'||/profiles_username_format_v1/i.test(message))feedback('profile-feedback','Юзернейм должен содержать 4–32 символа: латинские буквы, цифры или _.',true);
+        else if(/username|schema cache/i.test(message))feedback('profile-feedback','Сначала выполни SQL-настройку уникальных юзернеймов в Supabase.',true);
+        else if(/profiles|relation|permission denied/i.test(message))feedback('profile-feedback','Не удалось сохранить профиль. Проверь права доступа и настройки таблицы profiles.',true);
+        else feedback('profile-feedback',errorText(err),true);
       } finally {setBusy('profile-save',false);}
     });
     byId('sign-out').addEventListener('click',async () => {
