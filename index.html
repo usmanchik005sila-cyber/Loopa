@@ -2236,17 +2236,11 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       revealControls();
     });
 
-    // Room-wide collaborative controls. This session signal rides over Supabase Broadcast;
-    // the host remains the only writer to the existing playback RPC. For a production
-    // deployment, add private-channel RLS and a server-verified room-membership policy.
-    let sharedMode=false,sharedRoomCode='',sharedRoomSignal=null,sharedSignalReady=false;
-    let lastRemoteControl=0,hostReturnRequestAt=0,hostReturnAttempted=false,roomHiddenSince=0;
+    // Server-authoritative collaboration: Broadcast payloads cannot prove identity.
+    let sharedMode=false,roomHiddenSince=0;
     const sharedSwitch=byId('roomSharedControl');
     function requestHostRecovery(){
-      if(!hostHere()||!sharedSignalReady||!roomState?.video)return;
-      hostReturnRequestAt=performance.now();hostReturnAttempted=false;
-      sendRoomSignal('position-request',{from:currentUser.id,video:roomState.video});
-      setTimeout(()=>{if(performance.now()-hostReturnRequestAt>=4300)hostReturnRequestAt=0;},4500);
+      if(roomState?.video)void syncPlayback({forceCorrection:!hostHere()});
     }
     document.addEventListener('visibilitychange',()=>{
       if(document.hidden)roomHiddenSince=Date.now();
@@ -2256,92 +2250,30 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
     });
     window.addEventListener('online',()=>setTimeout(requestHostRecovery,600));
     function renderSharedMode(){
+      sharedMode=!!roomState?.shared_control;
       sharedSwitch.checked=sharedMode;
       byId('sharedControlStatus').textContent=sharedMode?'Участники могут управлять общим просмотром':'Видео управляет только создатель';
       byId('sharedControlEdit').hidden=!hostHere();
       updatePlaybackControls();
     }
-    function sendRoomSignal(event,payload={}){
-      if(!sharedSignalReady||!sharedRoomSignal||!roomState)return Promise.resolve('unavailable');
-      return sharedRoomSignal.send({type:'broadcast',event,payload:{...payload,code:roomState.code}}).catch(()=> 'error');
-    }
-    function clearRoomSignals(){
-      const old=sharedRoomSignal;sharedRoomSignal=null;sharedRoomCode='';sharedSignalReady=false;sharedMode=false;
-      if(old&&client)client.removeChannel(old).catch(()=>{});
-      if(sharedSwitch)sharedSwitch.checked=false;
-    }
-    function syncRoomSignals(){
-      if(!roomState?.code||!client||!currentUser)return;
-      if(sharedRoomCode===roomState.code)return;
-      clearRoomSignals();
-      const code=roomState.code;
-      sharedRoomCode=code;
-      const channel=client.channel('loopa-cinema-'+code,{config:{broadcast:{ack:true,self:false}}});
-      sharedRoomSignal=channel;
-      channel.on('broadcast',{event:'mode-state'},({payload:p})=>{
-        if(!p||p.code!==roomState?.code||p.host!==roomState.host||hostHere())return;
-        sharedMode=!!p.enabled;renderSharedMode();
-      });
-      channel.on('broadcast',{event:'mode-request'},({payload:p})=>{
-        if(!p||p.code!==roomState?.code||!hostHere())return;
-        sendRoomSignal('mode-state',{host:currentUser.id,enabled:sharedMode});
-      });
-      channel.on('broadcast',{event:'position-request'},({payload:p})=>{
-        if(!p||p.code!==roomState?.code||hostHere()||p.from!==roomState.host||p.video!==roomState.video)return;
-        const now=performance.now();
-        if(!sample||now-sample.now>2500)return;
-        const pos=Math.max(0,sample.pos+(sample.playing?(now-sample.now)/1000:0));
-        sendRoomSignal('position-response',{from:currentUser.id,video:roomState.video,pos,playing:sample.playing});
-      });
-      channel.on('broadcast',{event:'position-response'},async({payload:p})=>{
-        if(!p||!hostHere()||hostReturnAttempted||!hostReturnRequestAt||performance.now()-hostReturnRequestAt>4300)return;
-        if(p.code!==roomState?.code||p.video!==roomState.video||!roomState.members?.some(m=>m.id===p.from&&m.online))return;
-        if(!Number.isFinite(p.pos)||p.pos<0||p.pos>360000||typeof p.playing!=='boolean')return;
-        hostReturnAttempted=true;
-        const now=performance.now(),pos=mediaDuration?Math.min(mediaDuration,p.pos):p.pos;
-        const hostPosition=sample?.pos||0;
-        if(Math.abs(hostPosition-pos)>1.5||sample?.playing!==p.playing){
-          applyingUntil=now+1200;
-          commandPlayer(pos,p.playing,true);
-          sample={pos,playing:p.playing,now};
-          await syncPlayback();
-          pending={op:p.playing?'play':'pause',seconds:pos,video:roomState.video,code:roomState.code,epoch:roomEpoch};
-          flushPlayback();
-        }
-      });
-      channel.on('broadcast',{event:'control-request'},async({payload:p})=>{
-        if(!p||p.code!==roomState?.code||!hostHere()||!sharedMode||!roomState.video)return;
-        if(!roomState.members?.some(m=>m.id===p.from&&m.online&&m.id!==currentUser.id))return;
-        if(typeof p.playing!=='boolean'||!Number.isFinite(p.pos)||p.pos<0||p.pos>360000)return;
-        const now=performance.now();if(now-lastRemoteControl<260)return;lastRemoteControl=now;
-        const pos=mediaDuration?Math.min(mediaDuration,p.pos):p.pos;
-        applyingUntil=now+1100;
-        commandPlayer(pos,p.playing,true);
-        sample={pos,playing:p.playing,now};
-        updatePlaybackControls();
-        await syncPlayback();
-        // The room RPC is still performed only under the host's credentials.
-        pending={op:p.playing?'play':'pause',seconds:pos,video:roomState.video,code:roomState.code,epoch:roomEpoch};
-        flushPlayback();
-      });
-      channel.subscribe(status=>{
-        if(sharedRoomSignal!==channel||sharedRoomCode!==code)return;
-        sharedSignalReady=status==='SUBSCRIBED';
-        if(sharedSignalReady){
-          if(hostHere()){
-            sendRoomSignal('mode-state',{host:currentUser.id,enabled:sharedMode});
-            setTimeout(requestHostRecovery,400);
-          }else sendRoomSignal('mode-request',{from:currentUser.id});
-        }
-        if(hostHere())byId('sharedControlStatus').textContent=sharedSignalReady?(sharedMode?'Участники могут управлять общим просмотром':'Видео управляет только создатель'):'Подключаем настройки комнаты…';
-      });
-    }
-    sharedSwitch.addEventListener('change',()=>{
-      if(!hostHere())return;
-      if(!sharedSignalReady){sharedSwitch.checked=sharedMode;showToast('Подключаем комнату. Попробуй ещё раз');return;}
-      sharedMode=sharedSwitch.checked;
-      renderSharedMode();
-      sendRoomSignal('mode-state',{host:currentUser.id,enabled:sharedMode});
+    function clearRoomSignals(){sharedMode=false;sharedSwitch.checked=false;}
+    function syncRoomSignals(){/* Server RPC handles collaboration, no public control channel. */}
+    sharedSwitch.addEventListener('change',async()=>{
+      const desired=sharedSwitch.checked;
+      if(!hostHere()||!roomState){sharedSwitch.checked=sharedMode;return;}
+      sharedSwitch.disabled=true;
+      try{
+        const {data,error}=await client.rpc('loopa_collab27',{
+          action:'mode',room_code:roomState.code,enabled:desired
+        });
+        if(error)throw error;
+        if(!roomState)return;
+        roomState.shared_control=!!data?.shared_control;
+        renderSharedMode();
+      }catch(e){
+        sharedSwitch.checked=sharedMode;
+        showToast('Не удалось сохранить настройки: '+errorText(e));
+      }finally{sharedSwitch.disabled=false;}
     });
 
     function setPlayerIssue(issue){
@@ -2393,7 +2325,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       if(e.detail)b.blur();revealControls();
       if(b.id==='guestResync'){guestManualUntil=0;await syncPlayback({forceCorrection:true});updatePlaybackControls();return;}
       if(b.id==='loopaFullscreen')return;
-      const host=hostHere();if(!host&&(!sharedMode||!sharedSignalReady))return;
+      const host=hostHere();if(!host&&!sharedMode)return;
       const fresh=sample&&performance.now()-sample.now<1800;
       let pos=fresh?sample.pos+(sample.playing?(performance.now()-sample.now)/1000:0):Number(roomState.pos)||0;
       let playing=!!sample?.playing;
@@ -2407,10 +2339,18 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
           showToast('Создатель переподключается — управление пока недоступно');return;
         }
         guestManualUntil=performance.now()+3000;
-        commandPlayer(pos,playing);
-        sample={pos,playing,now:performance.now()};
-        const result=await sendRoomSignal('control-request',{from:currentUser.id,playing,pos});
-        if(result!=='ok')showToast('Не удалось передать управление');
+        try{
+          const {error}=await client.rpc('loopa_collab27',{
+            action:'control',room_code:roomState.code,position_seconds:pos,is_playing:playing
+          });
+          if(error)throw error;
+          commandPlayer(pos,playing);
+          sample={pos,playing,now:performance.now()};
+        }catch(e){
+          showToast('Не удалось передать управление: '+errorText(e));
+          void roomRun('read');
+          return;
+        }
         updatePlaybackControls();revealControls();return;
       }
       commandPlayer(pos,playing);
@@ -3045,7 +2985,17 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
 
       byId('setupTitle').textContent=data.host===u?'Выбери видео':'Ведущий выбирает видео';
       renderSocial(data,prev);if(!prev||prev.video!==data.video)byId('videoEdit').open=!data.video;
+      const remoteGuestControl=op==='read'&&prev?.code===data.code
+        &&data.host===u&&!!data.shared_control&&prev.video===data.video
+        &&prev.changed!==data.changed&&
+        (prev.playing!==data.playing||Math.abs((Number(prev.pos)||0)-(Number(data.pos)||0))>0.8);
       roomState=data;roomUser=u;roomClock=performance.now();syncRoomSignals();renderSharedMode();
+      if(remoteGuestControl&&data.video){
+        const remotePos=Math.max(0,Number(data.pos)||0),now=performance.now();
+        applyingUntil=now+1200;
+        commandPlayer(remotePos,!!data.playing,true);
+        sample={pos:remotePos,playing:!!data.playing,now};
+      }
       byId('inviteRoom').hidden=data.host!==u;if(data.host!==u&&catalogDialog.open)closeCatalog();
       byId('room-active').hidden=false;byId('room-lobby').hidden=true;byId('room-code').textContent=data.code;byId('room-host').hidden=data.host!==u;
       byId('room-status').textContent=!data.video?'Ведущий выбирает видео':data.playing?'Идёт просмотр':'На паузе';
