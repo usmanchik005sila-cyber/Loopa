@@ -26,7 +26,8 @@ create policy "Users manage their own LOOPA resume points"
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
-revoke all on table public.loopa_resume_points from public, anon;
+-- Clear default grants too: client roles need DML, never TRUNCATE/TRIGGER.
+revoke all on table public.loopa_resume_points from public, anon, authenticated;
 grant select, insert, update, delete on table public.loopa_resume_points to authenticated;
 
 create or replace function public.loopa_touch_resume_point_updated_at()
@@ -45,10 +46,11 @@ revoke all on function public.loopa_touch_resume_point_updated_at()
 drop trigger if exists loopa_resume_points_touch_updated_at
   on public.loopa_resume_points;
 create trigger loopa_resume_points_touch_updated_at
-  before update on public.loopa_resume_points
+  before insert or update on public.loopa_resume_points
   for each row execute function public.loopa_touch_resume_point_updated_at();
 
 comment on table public.loopa_resume_points is
   'Private per-user playback position; contains no chat messages or video titles.';
 
+notify pgrst, 'reload schema';
 commit;
