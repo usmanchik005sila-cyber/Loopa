@@ -2492,7 +2492,8 @@ section[data-page="profile"]>#settings-detail>.settings-back{margin-bottom:14px}
       clearTimeout(playerReadyTimer);playerReadyTimer=0;playerIssue=null;playerBindingFailed=false;
       clearTimeout(guestControlTimer);guestControlQueued=null;guestManualUntil=0;
       rutubeIframeLoaded=false;rutubeIframeFailed=false;rutubeSignalObserved=false;rutubeRecovery.hidden=true;
-      sample=null;observed={playing:false,pos:0};pending=null;ytPlayer=null;vkPlayer=null;syncSnapshot=null;guestManualUntil=0;nativeNeedsStart=true;nativeAccess=true;localMuted=false;syncProblem='';
+      sample=null;observed={playing:false,pos:0};pending=null;ytPlayer=null;
+      try{vkPlayer?.destroy?.();}catch{}vkPlayer=null;syncSnapshot=null;guestManualUntil=0;nativeNeedsStart=true;nativeAccess=true;localMuted=false;syncProblem='';
       applyingUntil=0;lastPlaybackPublish=0;lastGuestCorrection=0;rutubeAd=false;mediaDuration=0;clearTimeout(overlayTimer);videoStage.classList.remove('controlsVisible');
       const frame=document.createElement('iframe');frame.id='room-frame';frame.title='Видео комнаты';frame.allow='autoplay; encrypted-media; fullscreen; picture-in-picture';frame.allowFullscreen=true;
       roomBox().replaceWith(frame);frame.hidden=!url;if(!url){updatePlaybackControls();return;}
@@ -2528,7 +2529,8 @@ section[data-page="profile"]>#settings-detail>.settings-back{margin-bottom:14px}
       }else if(frame.src.includes('vkvideo.ru/')&&window.VK?.VideoPlayer&&!vkPlayer){
         try{
           vkPlayer=VK.VideoPlayer(frame);
-          for(const [name,playing] of [['started',true],['resumed',true],['paused',false],['ended',false]])vkPlayer.on(name,()=>{if(frame===roomBox()){observed.playing=playing;samplePlayers();}});
+          for(const [name,playing] of [['started',true],['resumed',true],['paused',false],['ended',false]])vkPlayer.on(name,()=>{if(frame===roomBox()){observed.playing=playing;samplePlayers(true);}});
+          for(const name of ['timeupdate','seeked'])vkPlayer.on(name,()=>{if(frame===roomBox())samplePlayers(true);});
           vkPlayer.on('inited',()=>{if(frame===roomBox())readyPlayer();});
           try{vkPlayer.on('error',()=>setPlayerIssue(LOOPAWatchReliability.playerError('vk')));}catch{}
           try{vkPlayer.on('autoplaySoundProhibited',()=>setPlayerIssue(LOOPAWatchReliability.autoplaySoundProhibited(hostHere())));}catch{}
@@ -2539,7 +2541,7 @@ section[data-page="profile"]>#settings-detail>.settings-back{margin-bottom:14px}
         }catch(error){playerBindingFailed=true;setPlayerIssue(LOOPAWatchReliability.playerError('vk'));}
       }
     }
-    function samplePlayers(){
+    function samplePlayers(vkFresh=false){
       if(!roomState?.video)return;
       if(ytPlayer?.getPlayerState){
         const state=ytPlayer.getPlayerState();
@@ -2549,7 +2551,8 @@ section[data-page="profile"]>#settings-detail>.settings-back{margin-bottom:14px}
         if([0,1,2].includes(state))observe(state===1,ytPlayer.getCurrentTime());
         const id=ytPlayer.getVideoData?.().video_id;
         if(id&&hostHere()&&!mediaChanging&&!roomState.video.includes('/embed/'+id+'?'))changeRoomVideo('https://youtu.be/'+id);
-      }else if(vkPlayer?.getCurrentTime){
+      }else if(vkFresh&&vkPlayer?.getCurrentTime){
+        mediaDuration=Number(vkPlayer.getDuration?.())||0;
         const state=vkPlayer.getState?.();
         observe(['playing','started','resumed'].includes(state)?true:['paused','ended'].includes(state)?false:observed.playing,Number(vkPlayer.getCurrentTime()));
       }
@@ -5963,7 +5966,7 @@ section[data-page="profile"]>#settings-detail>.settings-back{margin-bottom:14px}
     init();
 
   </script>
-<script async src="https://www.youtube.com/iframe_api"></script><script async src="https://vk.com/js/api/videoplayer.js"></script>
+<script async src="https://www.youtube.com/iframe_api"></script><script async src="https://vkvideo.ru/js/api/videoplayer.js"></script>
 
 
 </body>
