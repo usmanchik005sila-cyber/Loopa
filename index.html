@@ -1939,11 +1939,12 @@ body.roomViewing #room-active .roomBar{height:auto!important;min-height:56px;ali
     function guestControlCurrent(entry){
       return !!(entry&&client&&currentUser&&roomState&&!hostHere()&&sharedMode&&!document.hidden
         &&entry.user===currentUser.id&&entry.code===roomState.code
-        &&entry.video===roomState.video&&entry.epoch===roomEpoch);
+        &&entry.video===roomState.video&&entry.epoch===roomEpoch
+        &&entry.generation===roomState.control_generation);
     }
     function queueGuestControl(playing,pos){
       if(!roomState?.video||!sharedMode||hostHere()||rutubeAd||document.hidden)return;
-      const entry={playing,pos,user:currentUser?.id,code:roomState.code,video:roomState.video,epoch:roomEpoch};
+      const entry={playing,pos,generation:roomState.control_generation,user:currentUser?.id,code:roomState.code,video:roomState.video,epoch:roomEpoch};
       guestManualUntil=performance.now()+6000;
       clearTimeout(guestControlTimer);
       guestControlTimer=setTimeout(()=>{if(guestControlCurrent(entry))void sendGuestControl(entry);},180);
@@ -1954,8 +1955,8 @@ body.roomViewing #room-active .roomBar{height:auto!important;min-height:56px;ali
       try{
         let next=entry;
         while(next&&guestControlCurrent(next)){
-          const {error}=await client.rpc('loopa_collab27',{
-            action:'control',room_code:next.code,position_seconds:next.pos,is_playing:next.playing
+          const {error}=await client.rpc('loopa_control_v2',{
+            room_code:next.code,expected_video:next.video,expected_generation:next.generation,position_seconds:next.pos,is_playing:next.playing
           });
           if(!guestControlCurrent(next))break;
           if(error){
@@ -1969,6 +1970,7 @@ body.roomViewing #room-active .roomBar{height:auto!important;min-height:56px;ali
       }finally{guestControlInflight=false;guestControlQueued=null;}
     }
     // Pull until acknowledged: an older host sample cannot overwrite a guest command.
+    let pendingHostControl=null;
     async function receiveGuestControl(){
       const ready=resumePlayerReady||(roomState?.video?.startsWith('https://rutube.ru/')&&rutubeSignalObserved);
       if(collabHostPolling||!client||!hostHere()||!sharedMode||!roomState?.video
@@ -1979,15 +1981,27 @@ body.roomViewing #room-active .roomBar{height:auto!important;min-height:56px;ali
         const {data,error}=await client.rpc('loopa_collab27',{action:'pull',room_code:code});
         if(error)throw error;
         if(epoch!==roomEpoch||roomState?.code!==code||roomState.video!==video
-          ||!hostHere()||!sharedMode||!data?.pending||data.video!==video)return;
+          ||!hostHere()||!sharedMode)return;
+        if(!data?.pending||data.video!==video){pendingHostControl=null;return;}
         const seq=Number(data.seq),pos=Number(data.pos);
         if(!Number.isSafeInteger(seq)||seq<1||!Number.isFinite(pos)||pos<0||typeof data.playing!=='boolean')return;
         const now=performance.now();
-        applyingUntil=now+1700;
-        commandPlayer(pos,data.playing,true);
-        sample={pos,playing:data.playing,now};
+        const pending=pendingHostControl;
+        const same=pending&&pending.seq===seq&&pending.epoch===epoch&&pending.video===video&&pending.code===code;
+        // ACK only a fresh observation made AFTER issuing this command.
+        const confirmed=same&&sample?.observed&&sample.now>pending.issued&&now-sample.now<1500
+          &&sample.playing===data.playing&&Math.abs(sample.pos-(pos+(data.playing?Math.max(0,(sample.now-pending.started)/1000):0)))<=1.5;
+        if(!confirmed){
+          if(!same||now-pending.issued>2500){
+            const started=same?pending.started:now;
+            pendingHostControl={seq,epoch,code,video,issued:now,started};
+            applyingUntil=now+1700;commandPlayer(pos+(data.playing?(now-started)/1000:0),data.playing,true);
+          }
+          return;
+        }
         const ack=await client.rpc('loopa_collab27',{action:'ack',room_code:code,sequence:seq});
         if(ack.error)throw ack.error;
+        if(ack.data?.applied)pendingHostControl=null;
         if(epoch===roomEpoch&&roomState?.code===code)updatePlaybackControls();
       }catch(error){
         // A failed acknowledgment leaves the command queued for a later retry.
@@ -1995,10 +2009,10 @@ body.roomViewing #room-active .roomBar{height:auto!important;min-height:56px;ali
       }finally{collabHostPolling=false;}
     }
     setInterval(receiveGuestControl,500);
-    function observe(playing,pos){
+    function observe(playing,pos,positionMeasured=true){
       if(!roomState?.video||!Number.isFinite(pos)||pos<0||typeof playing!=='boolean'||rutubeAd)return;
       const now=performance.now(),previous=sample;
-      sample={playing,pos,now};
+      sample={playing,pos,now,observed:positionMeasured};
       if(playing&&playerIssue?.kind!=='autoplay-sound')clearPlayerIssue();
       // Save a precise checkpoint on pause or a deliberate seek, not just every 10s.
       const expected=previous?previous.pos+(previous.playing?Math.max(0,(now-previous.now)/1000):0):pos;
@@ -2545,6 +2559,7 @@ body.roomViewing #room-active .roomBar{height:auto!important;min-height:56px;ali
       syncPlayback();updatePlaybackControls();
     }
     function mountRoomPlayer(url){
+      pendingHostControl=null;
       resumePlayerReady=false;resumeRestorePending=null;cancelRutubeResume();hideResumePrompt();
       clearTimeout(playerReadyTimer);playerReadyTimer=0;playerIssue=null;playerBindingFailed=false;
       clearTimeout(guestControlTimer);guestControlQueued=null;guestManualUntil=0;
@@ -2646,7 +2661,7 @@ body.roomViewing #room-active .roomBar{height:auto!important;min-height:56px;ali
             observed.playing=m.data.state==='playing';
             if(rutubeResumeTarget){if(observed.playing)retryRutubeResume();return;}
           }
-          if(['player:currentTime','player:changeState'].includes(m?.type))observe(observed.playing,observed.pos);
+          if(['player:currentTime','player:changeState'].includes(m?.type))observe(observed.playing,observed.pos,m.type==='player:currentTime');
         });
         setInterval(()=>{if(!roomState?.video||document.hidden)return;bindRoomPlayers();samplePlayers();if(!hostHere())applyRoom();},250);
     setInterval(syncPlayback,750);
@@ -3181,17 +3196,8 @@ body.roomViewing #room-active .roomBar{height:auto!important;min-height:56px;ali
 
       byId('setupTitle').textContent=data.host===u?'Выбери видео':'Ведущий выбирает видео';
       renderSocial(data,prev);if(!prev||prev.video!==data.video)byId('videoEdit').open=!data.video;
-      const remoteGuestControl=op==='read'&&prev?.code===data.code
-        &&data.host===u&&!!data.shared_control&&prev.video===data.video
-        &&prev.changed!==data.changed&&
-        (prev.playing!==data.playing||Math.abs((Number(prev.pos)||0)-(Number(data.pos)||0))>0.8);
+      // Guest transport is applied only through pull -> measured observation -> ACK.
       roomState=data;roomUser=u;roomClock=performance.now();syncRoomSignals();renderSharedMode();
-      if(remoteGuestControl&&data.video){
-        const remotePos=Math.max(0,Number(data.pos)||0),now=performance.now();
-        applyingUntil=now+1200;
-        commandPlayer(remotePos,!!data.playing,true);
-        sample={pos:remotePos,playing:!!data.playing,now};
-      }
       byId('inviteRoom').hidden=data.host!==u;if(data.host!==u&&catalogDialog.open)closeCatalog();
       byId('room-active').hidden=false;byId('room-lobby').hidden=true;byId('room-code').textContent=data.code;byId('room-host').hidden=data.host!==u;
       byId('room-status').textContent=!data.video?'Ведущий выбирает видео':data.playing?'Идёт просмотр':'На паузе';

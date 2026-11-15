@@ -1,7 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const html=fs.readFileSync(require('node:path').join(__dirname,'../index.html'),'utf8');
-const source=html.slice(html.indexOf('    function observe(playing,pos){'),html.indexOf('    async function flushPlayback(){'));
+const source=html.slice(html.indexOf('    function observe('),html.indexOf('    async function flushPlayback(){'));
 function observeContext(sharedMode){
  const calls=[];const c={roomState:{video:'test'},sample:{playing:true,pos:20,now:100},performance:{now:()=>100},rutubeAd:false,playerIssue:null,nativeNeedsStart:false,localMuted:false,hostHere:()=>false,LOOPAWatchReliability:{isSnapshotFresh:()=>true},syncSnapshot:{playing:true},positionNow:()=>20,applyingUntil:0,sharedMode,guestManualUntil:0,saveResumeCheckpoint:()=>{},revealControls:()=>{},queueGuestControl:()=>calls.push('publish'),applyRoom:force=>calls.push(force?'restore':'sync'),updatePlaybackControls:()=>{}};
  vm.createContext(c);vm.runInContext(source,c);return {c,calls};
