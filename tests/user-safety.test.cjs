@@ -68,7 +68,7 @@ test("deletion UI requires an explicit acknowledgement and starts server-side de
 test("users can report a profile and an incoming DM", () => {
   assert.match(html, /id="friendPageReport"/);
   assert.match(html, /id="dmReportUser"/);
-  assert.match(html, /Пожаловаться на сообщение/);
+  assert.match(fs.readFileSync(path.join(root, "assets/direct-messages.js"), "utf8"), /Пожаловаться на сообщение/);
   assert.match(html, /client\.rpc\('loopa_submit_user_report'/i);
   assert.match(html, /p_message_ref:ref/);
 });
