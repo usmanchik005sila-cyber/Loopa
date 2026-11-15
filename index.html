@@ -2470,7 +2470,11 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       });
       byId('playbackHint').textContent=playbackMessage||'';
       const frame=roomBox();if(frame){frame.style.pointerEvents='';frame.tabIndex=0;}
-      guestPlaybackLock.hidden=!active||host||sharedMode;
+      // iOS may require a direct tap inside the provider iframe to start audio.
+      // Permit that initial gesture only while the host is already playing;
+      // unauthorized seeks/pauses are still immediately corrected from server state.
+      const guestNeedsStart=!!(nativeNeedsStart&&syncSnapshot?.playing&&!sample?.playing);
+      guestPlaybackLock.hidden=!active||host||sharedMode||guestNeedsStart;
       videoStage.classList.toggle('nativeAccess',rutubeAd);
       videoStage.classList.toggle('guestVideo',!host);
       if(!active||rutubeAd){clearTimeout(overlayTimer);videoStage.classList.remove('controlsVisible');}
