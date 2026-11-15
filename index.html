@@ -569,6 +569,9 @@ body.roomViewing #room-active{transition:none}
 @media(prefers-reduced-motion:reduce){body.roomViewing #room-frame{transition:none}}
 
 #videoStage{position:relative;background:#000;flex:none;width:100%;overflow:hidden}
+#guestPlaybackLock[hidden]{display:none!important}
+#guestPlaybackLock{position:absolute;inset:0;z-index:5;background:transparent;display:flex;align-items:flex-end;justify-content:center;padding:12px;box-sizing:border-box;cursor:not-allowed;touch-action:manipulation}
+#guestPlaybackLock span{max-width:95%;padding:6px 11px;border:1px solid #ffffff25;border-radius:999px;background:#0e0e10ba;color:#efeff1;font:11px/1.3 system-ui;text-align:center;pointer-events:none}
 body.roomViewing #videoStage{height:var(--watch-player-height,56.25vw);transition:none}
 body.roomViewing #videoStage #room-frame{width:var(--watch-player-width,100%);height:100%;margin:0;transition:none}
 #videoStage[hidden],#playbackControls [hidden]{display:none!important}
@@ -2001,8 +2004,9 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
           :hasSnapshot?positionNow():null;
         const stateChanged=previous?previous.playing!==playing:(hasSnapshot&&syncSnapshot.playing!==playing);
         const seeked=baseline!==null&&Math.abs(pos-baseline)>2.5;
-        if(sharedMode&&now>applyingUntil&&(stateChanged||seeked)){
-          queueGuestControl(playing,pos);revealControls();
+        if(now>applyingUntil&&(stateChanged||seeked)){
+          if(sharedMode){queueGuestControl(playing,pos);revealControls();}
+          else if(hasSnapshot){guestManualUntil=0;applyRoom(true);}
         }
         applyRoom();updatePlaybackControls();return;
       }
@@ -2020,6 +2024,16 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
     }
     const videoStage=document.createElement('div');videoStage.id='videoStage';
     roomBox().before(videoStage);videoStage.append(roomBox());
+    // Prevent unauthorized local pause/seek from native iframes. This shield is
+    // shown only to guests while no current-video host grant exists.
+    const guestPlaybackLock=document.createElement('div');
+    guestPlaybackLock.id='guestPlaybackLock';guestPlaybackLock.hidden=true;
+    guestPlaybackLock.setAttribute('aria-label','Управление видео доступно только создателю комнаты');
+    guestPlaybackLock.append(Object.assign(document.createElement('span'),{
+      textContent:'Просмотром управляет создатель комнаты'
+    }));
+    guestPlaybackLock.addEventListener('click',()=>showToast('Совместное управление выключено. Включить его может только создатель.'));
+    videoStage.append(guestPlaybackLock);
     const playbackControls=document.createElement('div');playbackControls.id='playbackControls';
     playbackControls.innerHTML='<div class="transport57" aria-label="Управление воспроизведением"><button type="button" data-step="-10" aria-label="Назад на 10 секунд" title="Назад на 10 секунд"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M21.5 9.5 10.8 16l10.7 6.5Z"/></svg></button><button type="button" id="roomToggle" aria-label="Воспроизвести" title="Воспроизвести"><svg viewBox="0 0 32 32" aria-hidden="true"><path class="statePlay" d="M11 7.5 25 16 11 24.5Z"/><path class="statePause" d="M10 7h4v18h-4z M19 7h4v18h-4z"/></svg></button><button type="button" data-step="10" aria-label="Вперёд на 10 секунд" title="Вперёд на 10 секунд"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M10.5 9.5 21.2 16l-10.7 6.5Z"/></svg></button></div><div id="loopaTimeline" aria-label="Позиция видео"><span id="loopaElapsed">0:00</span><input id="loopaSeek" type="range" min="0" max="100" value="0" step="1" aria-label="Перемотать видео"><span id="loopaDuration">0:00</span><button type="button" id="loopaFullscreen" aria-label="Полный экран" title="Полный экран">⛶</button></div><button type="button" id="guestResync" hidden>Синхронизировать</button><span id="playbackHint" role="status"></span>';
     videoStage.append(playbackControls);
@@ -2365,7 +2379,11 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
     });
     window.addEventListener('online',()=>setTimeout(requestHostRecovery,600));
     function renderSharedMode(){
-      sharedMode=!!roomState?.shared_control;
+      // A true flag by itself is not permission: the lease must be live AND
+      // explicitly linked to the currently selected room video.
+      sharedMode=!!(roomState?.shared_control
+        &&roomState.shared_control_video===roomState.video
+        &&Date.parse(roomState.shared_control_until)>Date.now());
       if(!sharedMode){clearTimeout(guestControlTimer);guestControlQueued=null;guestManualUntil=0;}
       sharedSwitch.checked=sharedMode;
       byId('sharedControlStatus').textContent=sharedMode?'Участники могут управлять общим просмотром':'Видео управляет только создатель';
@@ -2385,12 +2403,35 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
         if(error)throw error;
         if(!roomState)return;
         roomState.shared_control=!!data?.shared_control;
+        roomState.shared_control_video=data?.shared_control_video||'';
+        roomState.shared_control_until=data?.shared_control_until||null;
         renderSharedMode();
       }catch(e){
         sharedSwitch.checked=sharedMode;
         showToast('Не удалось сохранить настройки: '+errorText(e));
       }finally{sharedSwitch.disabled=false;}
     });
+
+    // Keep permission alive only while the host is viewing the room.
+    // A browser crash or abrupt exit stops renewal; backend denies guests
+    // after the 30-second lease expires.
+    let renewingSharedControl=false;
+    setInterval(async()=>{
+      if(renewingSharedControl||!client||!roomState||!hostHere()||!sharedMode||document.hidden)return;
+      const code=roomState.code,video=roomState.video,epoch=roomEpoch;
+      renewingSharedControl=true;
+      try{
+        const {data,error}=await client.rpc('loopa_collab27',{action:'renew',room_code:code});
+        if(error)throw error;
+        if(epoch!==roomEpoch||roomState?.code!==code||roomState.video!==video)return;
+        if(data?.shared_control&&data?.shared_control_until)
+          roomState.shared_control_until=data.shared_control_until;
+        else {roomState.shared_control=false;renderSharedMode();}
+      }catch(error){
+        // Fail closed at expiry; refresh the authoritative mode on next read.
+        console.warn('LOOPA: host permission renewal failed',error?.code||error?.message||'network');
+      }finally{renewingSharedControl=false;}
+    },10000);
 
     function setPlayerIssue(issue){
       playerIssue=issue||null;
@@ -2429,6 +2470,11 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       });
       byId('playbackHint').textContent=playbackMessage||'';
       const frame=roomBox();if(frame){frame.style.pointerEvents='';frame.tabIndex=0;}
+      // iOS may require a direct tap inside the provider iframe to start audio.
+      // Permit that initial gesture only while the host is already playing;
+      // unauthorized seeks/pauses are still immediately corrected from server state.
+      const guestNeedsStart=!!(nativeNeedsStart&&syncSnapshot?.playing&&!sample?.playing);
+      guestPlaybackLock.hidden=!active||host||sharedMode||guestNeedsStart;
       videoStage.classList.toggle('nativeAccess',rutubeAd);
       videoStage.classList.toggle('guestVideo',!host);
       if(!active||rutubeAd){clearTimeout(overlayTimer);videoStage.classList.remove('controlsVisible');}
@@ -3090,7 +3136,12 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
     roomSheet.addEventListener('click',e=>{if(e.target===roomSheet&&outsideSheet(e))roomSheet.close();});
 
     byId('saveAccess').onclick=async function(){this.disabled=true;try{await roomCall('access',{media:JSON.stringify({mode:byId('accessMode').value,ids:[...byId('pick').querySelectorAll('input:checked')].map(c=>c.value)})});byId('roomSheet').close();showToast('Доступ обновлён');}catch(err){showToast(err.message);}finally{this.disabled=false;}};
-    function roomExit(){saveResumeCheckpoint(true);resumeRestorePending=null;clearChatReply();hideResumePrompt();applyCinemaMode(false);cinemaPlayerRatio=1;finishCinemaResize();clearRoomSignals();clearTimeout(roomPeopleTimer);peopleFlash.classList.remove('is-visible');watchPeerSession='';watchPeerSeen.clear();stopWatchViewport();document.body.classList.remove('roomViewing','chatTyping');closeCatalog(true);closeEmoji();byId("room-link").value="";byId('roomSheet').close();byId('chatText').value='';byId('chatLog').replaceChildren();roomEpoch++;syncSnapshot=null;roomState=null;roomUser=null;mountRoomPlayer('');byId('room-active').hidden=true;byId('room-lobby').hidden=false;byId('room-recent').replaceChildren();byId('room-note').textContent='';}
+    function roomExit(){
+      // Best-effort immediate revocation; the lease also expires if the tab dies.
+      if(hostHere()&&roomState?.shared_control&&client){
+        void client.rpc('loopa_collab27',{action:'mode',room_code:roomState.code,enabled:false});
+      }
+      saveResumeCheckpoint(true);resumeRestorePending=null;clearChatReply();hideResumePrompt();applyCinemaMode(false);cinemaPlayerRatio=1;finishCinemaResize();clearRoomSignals();clearTimeout(roomPeopleTimer);peopleFlash.classList.remove('is-visible');watchPeerSession='';watchPeerSeen.clear();stopWatchViewport();document.body.classList.remove('roomViewing','chatTyping');closeCatalog(true);closeEmoji();byId("room-link").value="";byId('roomSheet').close();byId('chatText').value='';byId('chatLog').replaceChildren();roomEpoch++;syncSnapshot=null;roomState=null;roomUser=null;mountRoomPlayer('');byId('room-active').hidden=true;byId('room-lobby').hidden=false;byId('room-recent').replaceChildren();byId('room-note').textContent='';}
     async function roomCall(op,args={}){
       if(!currentUser||!client){showPage('profile',()=>showToast('Войди в аккаунт'));return;}
       const u=currentUser.id, epoch=roomEpoch;
