@@ -569,6 +569,9 @@ body.roomViewing #room-active{transition:none}
 @media(prefers-reduced-motion:reduce){body.roomViewing #room-frame{transition:none}}
 
 #videoStage{position:relative;background:#000;flex:none;width:100%;overflow:hidden}
+#guestSettings{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 12px;background:#111;color:#bdbdc6;font-size:12px}
+#guestSettings button{border:1px solid #ffffff30;border-radius:12px;background:#ffffff0a;padding:9px 12px;cursor:pointer}
+#guestSettings[hidden]{display:none!important}
 #guestPlaybackLock[hidden]{display:none!important}
 #guestPlaybackLock{position:absolute;inset:0;z-index:5;background:transparent;display:flex;align-items:flex-end;justify-content:center;padding:12px;box-sizing:border-box;cursor:not-allowed;touch-action:manipulation}
 #guestPlaybackLock span{max-width:95%;padding:6px 11px;border:1px solid #ffffff25;border-radius:999px;background:#0e0e10ba;color:#efeff1;font:11px/1.3 system-ui;text-align:center;pointer-events:none}
@@ -2034,6 +2037,18 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
     }));
     guestPlaybackLock.addEventListener('click',()=>showToast('Совместное управление выключено. Включить его может только создатель.'));
     videoStage.append(guestPlaybackLock);
+    // Native provider menus own volume, captions and quality. This local switch
+    // never grants permission to publish playback or send guest control RPCs.
+    let guestSettingsOpen=false;
+    const guestSettings=document.createElement('div');guestSettings.id='guestSettings';guestSettings.hidden=true;
+    const guestSettingsButton=document.createElement('button');guestSettingsButton.type='button';
+    guestSettingsButton.textContent='Настройки плеера';guestSettingsButton.setAttribute('aria-pressed','false');
+    const guestSettingsHint=document.createElement('span');
+    guestSettingsHint.textContent='Громкость, качество и субтитры';
+    guestSettings.append(guestSettingsButton,guestSettingsHint);videoStage.after(guestSettings);
+    guestSettingsButton.addEventListener('click',()=>{
+      guestSettingsOpen=!guestSettingsOpen;updatePlaybackControls();
+    });
     const playbackControls=document.createElement('div');playbackControls.id='playbackControls';
     playbackControls.innerHTML='<div class="transport57" aria-label="Управление воспроизведением"><button type="button" data-step="-10" aria-label="Назад на 10 секунд" title="Назад на 10 секунд"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M21.5 9.5 10.8 16l10.7 6.5Z"/></svg></button><button type="button" id="roomToggle" aria-label="Воспроизвести" title="Воспроизвести"><svg viewBox="0 0 32 32" aria-hidden="true"><path class="statePlay" d="M11 7.5 25 16 11 24.5Z"/><path class="statePause" d="M10 7h4v18h-4z M19 7h4v18h-4z"/></svg></button><button type="button" data-step="10" aria-label="Вперёд на 10 секунд" title="Вперёд на 10 секунд"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M10.5 9.5 21.2 16l-10.7 6.5Z"/></svg></button></div><div id="loopaTimeline" aria-label="Позиция видео"><span id="loopaElapsed">0:00</span><input id="loopaSeek" type="range" min="0" max="100" value="0" step="1" aria-label="Перемотать видео"><span id="loopaDuration">0:00</span><button type="button" id="loopaFullscreen" aria-label="Полный экран" title="Полный экран">⛶</button></div><button type="button" id="guestResync" hidden>Синхронизировать</button><span id="playbackHint" role="status"></span>';
     videoStage.append(playbackControls);
@@ -2474,7 +2489,13 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       // Permit that initial gesture only while the host is already playing;
       // unauthorized seeks/pauses are still immediately corrected from server state.
       const guestNeedsStart=!!(nativeNeedsStart&&syncSnapshot?.playing&&!sample?.playing);
-      guestPlaybackLock.hidden=!active||host||sharedMode||guestNeedsStart;
+      guestPlaybackLock.hidden=!active||host||sharedMode||guestNeedsStart||guestSettingsOpen;
+      guestSettings.hidden=!active||host||sharedMode;
+      guestSettingsButton.setAttribute('aria-pressed',String(guestSettingsOpen));
+      guestSettingsButton.textContent=guestSettingsOpen?'Закрыть настройки':'Настройки плеера';
+      guestSettingsHint.textContent=guestSettingsOpen
+        ?'Открой меню видео. Паузой и перемоткой управляет ведущий.'
+        :'Громкость, качество и субтитры';
       videoStage.classList.toggle('nativeAccess',rutubeAd);
       videoStage.classList.toggle('guestVideo',!host);
       if(!active||rutubeAd){clearTimeout(overlayTimer);videoStage.classList.remove('controlsVisible');}
@@ -2532,6 +2553,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       syncPlayback();updatePlaybackControls();
     }
     function mountRoomPlayer(url){
+      guestSettingsOpen=false;
       resumePlayerReady=false;resumeRestorePending=null;cancelRutubeResume();hideResumePrompt();
       clearTimeout(playerReadyTimer);playerReadyTimer=0;playerIssue=null;playerBindingFailed=false;
       clearTimeout(guestControlTimer);guestControlQueued=null;guestManualUntil=0;
