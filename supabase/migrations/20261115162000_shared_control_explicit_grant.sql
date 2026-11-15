@@ -45,7 +45,7 @@ begin
       set shared_control=enabled,
           shared_control_video=case when enabled then r.video else '' end,
           shared_control_until=case when enabled then clock_timestamp()+interval '30 seconds' else null end,
-          control_applied_seq=case when enabled then r.control_applied_seq else r.control_seq end
+          control_applied_seq=r.control_seq
       where r.code=v_code;
     return jsonb_build_object('shared_control',enabled,'shared_control_video',
       case when enabled then room_row.video else '' end,'shared_control_until',
