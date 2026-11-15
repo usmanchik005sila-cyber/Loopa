@@ -2672,7 +2672,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       if(!unknown.length)return;
       unknown.forEach(id=>roomProfilePending.add(id));
       try{
-        const {data,error}=await client.from('profiles').select('id,display_name,avatar_path,updated_at').in('id',unknown);
+        const {data,error}=await client.rpc('loopa_public_profiles').select('id,display_name,avatar_path,updated_at').in('id',unknown);
         if(error)throw error;
         for(const id of unknown)roomProfileCache.set(id,{url:null});
         for(const person of data||[]){
@@ -4631,7 +4631,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
         if(error) throw error;
         const ids=(data||[]).map(row=>row.blocked_id);
         if(!ids.length){list.textContent='Список пуст';return;}
-        const {data:profiles,error:profileError}=await client.from('profiles').select('id,display_name,avatar_path,updated_at').in('id',ids);
+        const {data:profiles,error:profileError}=await client.rpc('loopa_public_profiles').select('id,display_name,avatar_path,updated_at').in('id',ids);
         if(profileError) throw profileError;
         for(const profile of profiles||[]) list.appendChild(friendRow(profile,null,[{label:'Разблокировать',action:'unblock',userId:profile.id}]));
       } catch(err){list.textContent='Не удалось загрузить список: '+errorText(err);}
@@ -4863,7 +4863,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       showPage('friend-profile');
       try{
         const [p,stats,prs]=await Promise.all([
-          client.from('profiles').select('id,display_name,avatar_path,updated_at').eq('id',profile.id).maybeSingle(),
+          client.rpc('loopa_public_profiles').select('id,display_name,avatar_path,updated_at').eq('id',profile.id).maybeSingle(),
           client.rpc('loopa_friend_stats_v88',{peer_id:profile.id}),
           getPublicPresence([profile.id]).catch(()=>({}))
         ]);
@@ -4899,7 +4899,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       const fallback={id:userId,display_name:roomProfileCache.get(userId)?.name||visibleName||'Участник'};
       if(byId('roomSheet').open)byId('roomSheet').close();
       try{
-        const {data}=await client.from('profiles').select('id,display_name,avatar_path,updated_at').eq('id',userId).maybeSingle();
+        const {data}=await client.rpc('loopa_public_profiles').select('id,display_name,avatar_path,updated_at').eq('id',userId).maybeSingle();
         if(currentUser&&roomState)openFriendProfile(data||fallback);
         else if(currentUser)openFriendProfile(data||fallback);
       }catch{if(currentUser)openFriendProfile(fallback);}
@@ -4962,7 +4962,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
         }
         if(!latest.size){inboxState('Здесь появятся твои переписки. Открой профиль друга и нажми «Написать», чтобы начать общение.',true);return;}
         const ids=[...latest.keys()];
-        const {data:people,error:profileError}=await client.from('profiles')
+        const {data:people,error:profileError}=await client.rpc('loopa_public_profiles')
           .select('id,display_name,avatar_path,updated_at').in('id',ids);
         if(revision!==messagesInboxGeneration||currentUser?.id!==owner)return;
         // If a profile isn't public or was removed, keep the conversation accessible.
@@ -5262,7 +5262,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
         let directory={};
         let presence={};
         if (ids.length) {
-          const {data:profiles,error:profileError} = await client.from('profiles')
+          const {data:profiles,error:profileError} = await client.rpc('loopa_public_profiles')
             .select('id,display_name,avatar_path,updated_at').in('id',ids);
           if (profileError) throw profileError;
           directory=Object.fromEntries((profiles||[]).map(profile=>[profile.id,profile]));
@@ -5321,9 +5321,9 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
         const escaped=term.replace(/[\%_]/g,'\\$&');
         const handle=term.replace(/^@/,'').trim().toLowerCase();
         const columns='id,display_name,username,avatar_path,updated_at';
-        const nameSearch=client.from('profiles').select(columns).ilike('display_name','%'+escaped+'%').limit(15);
+        const nameSearch=client.rpc('loopa_public_profiles').select(columns).ilike('display_name','%'+escaped+'%').limit(15);
         const usernameSearch=/^[a-z][a-z0-9_]{3,31}$/.test(handle)
-          ?client.from('profiles').select(columns).eq('username',handle).limit(1)
+          ?client.rpc('loopa_public_profiles').select(columns).eq('username',handle).limit(1)
           :Promise.resolve({data:[],error:null});
         const [nameResult,handleResult]=await Promise.all([nameSearch,usernameSearch]);
         if(nameResult.error)throw nameResult.error;
