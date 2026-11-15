@@ -37,4 +37,5 @@ alter table public.loopa_rooms16
   drop column if exists control_video,
   drop column if exists control_at,
   drop column if exists control_actor;
+notify pgrst, 'reload schema';
 commit;
