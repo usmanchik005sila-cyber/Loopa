@@ -12,8 +12,10 @@ test('open personal settings do not publish guest pause or seek without host per
 test('explicit shared control still propagates guest transport actions',()=>{
  const {c,calls}=observeContext(true);c.observe(false,250);assert.ok(calls.includes('publish'));
 });
-test('YouTube is directly accessible without a separate settings control',()=>{
+test('locked guest cannot interact with the native iframe, including during first start',()=>{
  assert.ok(!html.includes('guestSettingsButton'));
- assert.match(html,/guestPlaybackLock\.hidden=.*\|\|nativeYouTube/);
- assert.match(html,/const nativeYouTube=LOOPAWatchReliability\.providerFor\(roomState.video\)==='youtube'/);
+ assert.match(html,/guestPlaybackLock\.hidden=!active\|\|host\|\|sharedMode;/);
+ assert.ok(html.includes("frame.style.pointerEvents=locked?'none':'';frame.tabIndex=locked?-1:0"));
+ assert.ok(html.includes("byId('moreRoom').before(roomPlaybackStatus)"));
+ assert.ok(html.includes("roomPlaybackStatus.append(byId('playbackHint'),byId('guestResync'))"));
 });
