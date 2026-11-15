@@ -1439,6 +1439,17 @@ body.roomViewing #room-active .roomBar{height:auto!important;min-height:56px;ali
 #roomPlaybackStatus #playbackHint{position:static;max-width:none;flex:1;min-width:0;font:11px/1.35 system-ui;color:#c9c9ce;text-shadow:none;pointer-events:auto}
 #roomPlaybackStatus #guestResync{flex:none;border:1px solid #ffffff30;border-radius:10px;padding:7px;font:11px system-ui;background:#ffffff0a;color:inherit;cursor:pointer}
 </style>
+<style>
+/* Compact account editing and invitation notification. */
+#username-feedback{margin:5px 0 0;font:12px/1.4 system-ui;color:#efb6b6;background:none;border:0;padding:0}
+#roomInviteNotice{width:min(calc(100vw - 40px),380px);padding:10px;gap:7px;border-radius:18px}
+#roomInviteNotice .inviteVideoCard{grid-template-columns:76px minmax(0,1fr);align-items:center;gap:9px;padding:8px;border-radius:12px}
+#roomInviteNotice #roomInviteNoticeText{font-size:12px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+#roomInviteNotice #roomInviteNoticeMeta{margin:0 0 3px;font-size:9px;letter-spacing:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#roomInviteNotice .inviteNoticeSender{padding:3px 7px 3px 4px}
+#roomInviteNotice .inviteVideoPlaceholder{width:24px;height:24px;font-size:10px}
+section[data-page="profile"]>#settings-detail>.settings-back{margin-bottom:14px}
+</style>
 </head>
 <body>
   <svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden" xmlns="http://www.w3.org/2000/svg">
@@ -1561,9 +1572,7 @@ body.roomViewing #room-active .roomBar{height:auto!important;min-height:56px;ali
         </div>
       </section>
 
-      <section data-page="profile" hidden>
-        <div class="eyebrow">ЛИЧНОЕ ПРОСТРАНСТВО</div>
-        <h1>Твой<br>профиль.</h1>
+      <section data-page="profile" aria-label="Профиль" hidden>
         <div class="panel glass" id="auth-loading"><p class="panel-note">АККАУНТ LOOPA</p><h2>Подключаемся…</h2><p>Проверяем авторизацию.</p></div>
         <div class="panel glass" id="auth-guest" hidden>
           <p class="panel-note">АККАУНТ LOOPA</p>
@@ -1668,9 +1677,10 @@ body.roomViewing #room-active .roomBar{height:auto!important;min-height:56px;ali
               </div>
             </div>
             <label class="field account-username-field">Уникальный юзернейм
-              <span class="account-username-input"><span aria-hidden="true">@</span><input id="profile-username" type="text" maxlength="33" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="например, loopa_user"></span>
+              <span class="account-username-input"><span aria-hidden="true">@</span><input id="profile-username" type="text" maxlength="16" aria-describedby="username-feedback username-note" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="например, loopa_user"></span>
             </label>
-            <p class="username-note">4–32 символа: латинские буквы, цифры и _. Начинается с буквы; поле можно оставить пустым.</p>
+            <p id="username-feedback" class="username-feedback" role="status" aria-live="polite" hidden></p>
+            <p id="username-note" class="username-note">4–16 символа: латинские буквы, цифры и _. Начинается с буквы; поле можно оставить пустым.</p>
             <p class="account-email" id="account-email"></p><div class="profileStats"><div><strong id="usageTime">—</strong><small>В LOOPA</small></div><div><strong id="joinedDate">—</strong><small>Дата регистрации</small></div></div><p class="statsNote">Время считаем с этого обновления, пока LOOPA открыта на экране.</p>
             <button class="action" id="profile-save" type="submit">Сохранить профиль</button>
             <p id="profile-saved" class="profile-saved" role="status" aria-live="polite" hidden><span aria-hidden="true">✓</span> Сохранено</p>
@@ -5090,7 +5100,7 @@ body.roomViewing #room-active .roomBar{height:auto!important;min-height:56px;ali
         const handle=term.replace(/^@/,'').trim().toLowerCase();
         const columns='id,display_name,username,avatar_path,updated_at';
         const nameSearch=client.rpc('loopa_public_profiles').select(columns).ilike('display_name','%'+escaped+'%').limit(15);
-        const usernameSearch=/^[a-z][a-z0-9_]{3,31}$/.test(handle)
+        const usernameSearch=/^[a-z][a-z0-9_]{3,15}$/.test(handle)
           ?client.rpc('loopa_public_profiles').select(columns).eq('username',handle).limit(1)
           :Promise.resolve({data:[],error:null});
         const [nameResult,handleResult]=await Promise.all([nameSearch,usernameSearch]);
@@ -5234,7 +5244,7 @@ body.roomViewing #room-active .roomBar{height:auto!important;min-height:56px;ali
       openSettings('home');
       const savedName = user.user_metadata?.display_name || user.user_metadata?.full_name || user.user_metadata?.name || '';
       byId('profile-name').value = savedName;
-      byId('profile-username').value='';
+      byId('profile-username').value='';usernameFeedback();
       byId('profile-name-editor').hidden=true;
       byId('profile-name-edit').setAttribute('aria-expanded','false');
       byId('account-email').textContent = loopaAccountIdentity(user);
@@ -5844,7 +5854,11 @@ body.roomViewing #room-active .roomBar{height:auto!important;min-height:56px;ali
       byId('profile-display-name').textContent=byId('profile-name').value.trim()||'Профиль LOOPA';
       hideProfileSaved();
     });
-    byId('profile-username').addEventListener('input',hideProfileSaved);
+    function usernameFeedback(message=''){
+      feedback('username-feedback',message,true);
+      byId('profile-username').setAttribute('aria-invalid',String(!!message));
+    }
+    byId('profile-username').addEventListener('input',()=>{hideProfileSaved();usernameFeedback();});
     byId('profile-form').addEventListener('submit',async (event) => {
       event.preventDefault();
       if (!currentUser || !client) return;
@@ -5852,7 +5866,8 @@ body.roomViewing #room-active .roomBar{height:auto!important;min-height:56px;ali
       const rawUsername=byId('profile-username').value.trim().replace(/^@/,'');
       const username=rawUsername.toLowerCase();
       if (!name || name.length > 40) return feedback('profile-feedback','Имя должно содержать от 1 до 40 символов.',true);
-      if (username && !/^[a-z][a-z0-9_]{3,31}$/.test(username)) return feedback('profile-feedback','Юзернейм: от 4 до 32 символов, начинается с латинской буквы и содержит только латинские буквы, цифры или _.',true);
+      usernameFeedback();
+      if (username && !/^[a-z][a-z0-9_]{3,15}$/.test(username)) return usernameFeedback('От 4 до 16 символов: латинская буква в начале, затем буквы, цифры или _.');
       setBusy('profile-save',true);
       hideProfileSaved();
       feedback('profile-feedback','');
@@ -5873,8 +5888,8 @@ body.roomViewing #room-active .roomBar{height:auto!important;min-height:56px;ali
         profileSavedTimer = setTimeout(() => { byId('profile-saved').hidden = true; }, 2600);
       } catch (err) {
         const message=String(err?.message||'');
-        if(err?.code==='23505')feedback('profile-feedback','Этот юзернейм уже занят. Выбери другой.',true);
-        else if(err?.code==='23514'||/profiles_username_format_v1/i.test(message))feedback('profile-feedback','Юзернейм должен содержать 4–32 символа: латинские буквы, цифры или _.',true);
+        if(err?.code==='23505')usernameFeedback('юзернейм занят');
+        else if(err?.code==='23514'||/profiles_username_format_v1/i.test(message))usernameFeedback('От 4 до 16 символов: латинские буквы, цифры или _.');
         else if(/username|schema cache/i.test(message))feedback('profile-feedback','Сначала выполни SQL-настройку уникальных юзернеймов в Supabase.',true);
         else if(/profiles|relation|permission denied/i.test(message))feedback('profile-feedback','Не удалось сохранить профиль. Проверь права доступа и настройки таблицы profiles.',true);
         else feedback('profile-feedback',errorText(err),true);

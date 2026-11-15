@@ -21,7 +21,7 @@ test('profile saves a normalized optional username with the display name', () =>
   assert.ok(html.includes("const username=rawUsername.toLowerCase();"));
   assert.ok(html.includes("username:username||null"));
   assert.ok(html.includes("if(err?.code==='23505')"));
-  assert.ok(html.includes("/^[a-z][a-z0-9_]{3,31}$/"));
+  assert.ok(html.includes("/^[a-z][a-z0-9_]{3,15}$/"));
 });
 
 test('friend search includes exact usernames and displays the matching handle', () => {
@@ -40,4 +40,16 @@ test('database migration keeps usernames optional but enforces format and unique
   assert.ok(migration.includes("username ~ '^[a-z][a-z0-9_]{3,31}$'"));
   assert.match(migration, /create unique index if not exists profiles_username_unique_v1/i);
   assert.match(migration, /where username is not null/i);
+});
+
+test('duplicate username produces short inline feedback beside the username input',async()=>{
+  const vm=require('node:vm');let submit;
+  const nodes={'profile-name':{value:'Name'},'profile-username':{value:'loopa',addEventListener(){},setAttribute(){}},'profile-form':{addEventListener:(_,fn)=>submit=fn}};
+  const notices=[];
+  const context={byId:id=>nodes[id],currentUser:{id:'owner'},client:{from:()=>({upsert:async()=>({error:{code:'23505'}})})},feedback:(...args)=>notices.push(args),hideProfileSaved(){},setBusy(){},errorText:()=>'',clearTimeout(){}};
+  const start=html.indexOf('    function usernameFeedback('),end=html.indexOf("    byId('sign-out').addEventListener",start);
+  vm.runInNewContext(html.slice(start,end),context);
+  await submit({preventDefault(){}});
+  assert.ok(notices.some(([id,message])=>id==='username-feedback'&&message==='юзернейм занят'));
+  assert.ok(!notices.some(([id,message])=>id==='profile-feedback'&&message));
 });
