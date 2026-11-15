@@ -8,7 +8,8 @@ const vm = require('node:vm');
 
 const root = path.join(__dirname, '..');
 const helperSource = fs.readFileSync(path.join(root, 'assets/account-continuity.js'), 'utf8');
-const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8')
+  + fs.readFileSync(path.join(root, 'assets/resume-storage.js'), 'utf8');
 const migration = fs.readFileSync(path.join(root, 'supabase/migrations/20261110120000_account_resume_points.sql'), 'utf8');
 const setup = fs.readFileSync(path.join(root, 'supabase/ACCOUNT_CONTINUITY_SETUP.md'), 'utf8');
 const telegramBridgePath = path.join(root, 'supabase/functions/telegram-miniapp-auth/index.js');
