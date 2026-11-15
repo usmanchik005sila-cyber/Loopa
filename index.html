@@ -4924,6 +4924,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       finally{button.disabled=false;}
     };
     let messagesInboxGeneration=0,messagesInboxChannel=null,messagesInboxOwner=null;
+    let inboxRows=new Map(),inboxCursor=null,inboxHasMore=false,inboxPaging=false;
     function stopMessagesInbox(){
       if(messagesInboxChannel&&client)client.removeChannel(messagesInboxChannel).catch(()=>{});
       messagesInboxChannel=null;messagesInboxOwner=null;
@@ -4944,19 +4945,23 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       if(allowNav){const btn=document.createElement('button');btn.type='button';btn.textContent='Перейти к друзьям';btn.onclick=()=>showPage('friends');box.append(btn);}
       root.append(box);
     }
-    async function refreshMessagesInbox(){
+    async function refreshMessagesInbox(older=false){
+      if(older&&inboxPaging)return;
+      if(!older){inboxRows=new Map();inboxCursor=null;}
+      inboxPaging=true;
+      const previousCursor=inboxCursor;
       const revision=++messagesInboxGeneration,owner=currentUser?.id;
-      if(!owner||!client){inboxState('Войди в LOOPA, чтобы видеть свои переписки.');return;}
-      inboxState('Загружаем переписки…');
+      if(!owner||!client){inboxPaging=false;inboxState('Войди в LOOPA, чтобы видеть свои переписки.');return;}
+      if(!older)inboxState('Загружаем переписки…');
       try{
-        const {data,error}=await client.from('loopa_dm_messages_v87')
-          .select('id,sender_id,recipient_id,body,created_at')
-          .or(`sender_id.eq.${owner},recipient_id.eq.${owner}`)
-          .order('created_at',{ascending:false}).limit(500);
+        const {data,error}=await client.rpc('loopa_dm_inbox',{before_id:older?inboxCursor:null,page_size:51});
         if(error)throw error;
         if(revision!==messagesInboxGeneration||currentUser?.id!==owner)return;
-        const latest=new Map();
-        for(const msg of data||[]){
+        inboxHasMore=(data||[]).length>50;
+        const page=(data||[]).slice(0,50);
+        inboxCursor=page.at(-1)?.id||null;
+        const latest=inboxRows;
+        for(const msg of page){
           const peerId=msg.sender_id===owner?msg.recipient_id:msg.sender_id;
           if(peerId&&!latest.has(peerId))latest.set(peerId,msg);
         }
@@ -4986,35 +4991,52 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
           btn.onclick=()=>openDirectMessage(profile);
           root.append(btn);
         }
+        if(inboxHasMore){const more=document.createElement('button');more.type='button';more.className='action';more.textContent='Ещё переписки';more.onclick=()=>refreshMessagesInbox(true);root.append(more);}
       }catch(error){
         if(revision!==messagesInboxGeneration)return;
-        inboxState('Не удалось загрузить сообщения. Проверь подключение и SQL для личных переписок (v87).');
-      }
+        if(older){inboxCursor=previousCursor;showToast('Не удалось загрузить старые переписки. Попробуй ещё раз.');}
+        else inboxState('Не удалось загрузить переписки. Проверь подключение и попробуй ещё раз.');
+      }finally{if(revision===messagesInboxGeneration)inboxPaging=false;}
+
     }
     function clearDirectMessageChannel(){
       if(dmChannel&&client){client.removeChannel(dmChannel).catch(()=>{});dmChannel=null;}
     }
-    async function loadDirectMessages(){
-      if(!client||!currentUser||!dmPeer)return;
-      const owner=currentUser.id,peer=dmPeer.id;
-      const log=byId('dmLog');
-      const {data,error}=await client.from('loopa_dm_messages_v87')
-        .select('id,sender_id,recipient_id,body,created_at')
-        .or(`and(sender_id.eq.${owner},recipient_id.eq.${peer}),and(sender_id.eq.${peer},recipient_id.eq.${owner})`)
-        .order('created_at',{ascending:false}).limit(100);
-      if(currentUser?.id!==owner||dmPeer?.id!==peer)return;
-      if(error){
-        log.replaceChildren();
-        const el=document.createElement('p');el.className='dm-empty';
-        el.textContent='Для личных переписок необходимо выполнить SQL LOOPA v87 в Supabase.';
-        log.append(el);return;
-      }
-      dmHistory=(data||[]).reverse();
-      renderDirectMessages();
+    let dmHistoryEpoch=0,dmOlderBusy=false,dmHasOlder=false;
+    async function loadDirectMessages(older=false){
+      if(!client||!currentUser||!dmPeer||(older&&dmOlderBusy))return;
+      const owner=currentUser.id,peer=dmPeer.id,epoch=dmHistoryEpoch;
+      const log=byId('dmLog'),height=log.scrollHeight,top=log.scrollTop;
+      const nearBottom=height-top-log.clientHeight<80,initial=dmHistory.length===0;
+      if(older)dmOlderBusy=true;
+      try{
+        let query=client.from('loopa_dm_messages_v87')
+          .select('id,sender_id,recipient_id,body,created_at')
+          .or(`and(sender_id.eq.${owner},recipient_id.eq.${peer}),and(sender_id.eq.${peer},recipient_id.eq.${owner})`)
+          .order('id',{ascending:!older&&!initial}).limit(101);
+        if(older&&dmHistory.length)query=query.lt('id',dmHistory[0].id);
+        else if(!initial)query=query.gt('id',dmHistory.at(-1).id);
+        const {data,error}=await query;
+        if(currentUser?.id!==owner||dmPeer?.id!==peer||epoch!==dmHistoryEpoch)return;
+        if(error)throw error;
+        if(older||initial)dmHasOlder=(data||[]).length>100;
+        const page=(data||[]).slice(0,100);
+        if(older||initial)page.reverse();
+        const merged=new Map(dmHistory.map(m=>[String(m.id),m]));
+        page.forEach(m=>merged.set(String(m.id),m));
+        dmHistory=[...merged.values()].sort((a,b)=>BigInt(a.id)<BigInt(b.id)?-1:BigInt(a.id)>BigInt(b.id)?1:0);
+        renderDirectMessages();
+        if(older)log.scrollTop=top+(log.scrollHeight-height);
+        else if(!nearBottom)log.scrollTop=top;
+        if(!older&&!initial&&(data||[]).length>100)void loadDirectMessages();
+      }catch(error){
+        if(epoch===dmHistoryEpoch)showToast('Не удалось загрузить сообщения. Попробуй ещё раз.');
+      }finally{if(epoch===dmHistoryEpoch)dmOlderBusy=false;}
     }
     function renderDirectMessages(){
       const log=byId('dmLog');log.replaceChildren();
       if(!dmHistory.length){const el=document.createElement('p');el.className='dm-empty';el.textContent='Сообщений пока нет. Напиши первым.';log.append(el);return;}
+      if(dmHasOlder){const more=document.createElement('button');more.type='button';more.className='action';more.textContent='Загрузить ранние сообщения';more.onclick=()=>loadDirectMessages(true);log.append(more);}
       const groups=[];
       for(const msg of dmHistory){
         const last=groups.at(-1);
@@ -5051,6 +5073,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       if(!currentUser||!profile?.id)return;
       if(profile.id===currentUser.id)return;
       dmPageReturn=lastPage==='friend-profile'?'friend-profile':(lastPage==='messages'?'messages':'friends');
+      dmHistoryEpoch++;dmOlderBusy=false;dmHasOlder=false;dmHistory=[];
       dmPeer={...profile};
       byId('dmPeerName').textContent=profile.display_name||'Друг';
       byId('dmPeerAvatar').replaceChildren(avatarForUser(profile));
@@ -5060,7 +5083,7 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       clearDirectMessageChannel();
       showPage('dm');
       await loadDirectMessages();
-      if(!dmPeer||!currentUser||lastPage!=='dm')return;
+      if(!dmPeer||dmPeer.id!==profile.id||!currentUser||lastPage!=='dm')return;
       const owner=currentUser.id;
       const peerId=profile.id;
       dmChannel=client.channel('loopa-dm-'+owner+'-'+peerId)
