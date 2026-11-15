@@ -26,6 +26,7 @@ test('server denies guest control without a live host and video grant',()=>{
   assert.match(sql,/Совместное управление выключено/);
   assert.match(sql,/action='renew'/);
   assert.match(sql,/action='mode'/);
+  assert.match(sql,/control_applied_seq=r\.control_seq/);
   assert.match(sql,/shared_control=false,shared_control_video='',shared_control_until=null/);
 });
 test('changing video revokes the grant and pending control',()=>{
