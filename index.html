@@ -1432,7 +1432,14 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
         background-image:none!important;
       }
     </style>
-    </head>
+    <style>
+/* Room status stays in the same panel as the room menu, above the player. */
+body.roomViewing #room-active .roomBar{height:auto!important;min-height:56px;align-items:center}
+#roomPlaybackStatus{flex:1;min-width:0;display:flex;align-items:center;gap:6px}
+#roomPlaybackStatus #playbackHint{position:static;max-width:none;flex:1;min-width:0;font:11px/1.35 system-ui;color:#c9c9ce;text-shadow:none;pointer-events:auto}
+#roomPlaybackStatus #guestResync{flex:none;border:1px solid #ffffff30;border-radius:10px;padding:7px;font:11px system-ui;background:#ffffff0a;color:inherit;cursor:pointer}
+</style>
+</head>
 <body>
   <svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden" xmlns="http://www.w3.org/2000/svg">
     <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></symbol>
@@ -2029,14 +2036,15 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
     const guestPlaybackLock=document.createElement('div');
     guestPlaybackLock.id='guestPlaybackLock';guestPlaybackLock.hidden=true;
     guestPlaybackLock.setAttribute('aria-label','Управление видео доступно только создателю комнаты');
-    guestPlaybackLock.append(Object.assign(document.createElement('span'),{
-      textContent:'Просмотром управляет создатель комнаты'
-    }));
     guestPlaybackLock.addEventListener('click',()=>showToast('Совместное управление выключено. Включить его может только создатель.'));
     videoStage.append(guestPlaybackLock);
     const playbackControls=document.createElement('div');playbackControls.id='playbackControls';
     playbackControls.innerHTML='<div class="transport57" aria-label="Управление воспроизведением"><button type="button" data-step="-10" aria-label="Назад на 10 секунд" title="Назад на 10 секунд"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M21.5 9.5 10.8 16l10.7 6.5Z"/></svg></button><button type="button" id="roomToggle" aria-label="Воспроизвести" title="Воспроизвести"><svg viewBox="0 0 32 32" aria-hidden="true"><path class="statePlay" d="M11 7.5 25 16 11 24.5Z"/><path class="statePause" d="M10 7h4v18h-4z M19 7h4v18h-4z"/></svg></button><button type="button" data-step="10" aria-label="Вперёд на 10 секунд" title="Вперёд на 10 секунд"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M10.5 9.5 21.2 16l-10.7 6.5Z"/></svg></button></div><div id="loopaTimeline" aria-label="Позиция видео"><span id="loopaElapsed">0:00</span><input id="loopaSeek" type="range" min="0" max="100" value="0" step="1" aria-label="Перемотать видео"><span id="loopaDuration">0:00</span><button type="button" id="loopaFullscreen" aria-label="Полный экран" title="Полный экран">⛶</button></div><button type="button" id="guestResync" hidden>Синхронизировать</button><span id="playbackHint" role="status"></span>';
     videoStage.append(playbackControls);
+    // Connection status belongs to the room header, never over the video.
+    const roomPlaybackStatus=document.createElement('div');roomPlaybackStatus.id='roomPlaybackStatus';
+    roomPlaybackStatus.append(byId('playbackHint'),byId('guestResync'));
+    byId('moreRoom').before(roomPlaybackStatus);
     // Visible below the player so its links never cover native playback controls.
     const rutubeRecovery=document.createElement('div');
     rutubeRecovery.id='rutubeRecovery';rutubeRecovery.hidden=true;
@@ -2468,20 +2476,23 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
         b.disabled=rutubeAd||!canControl;
         b.title=b.getAttribute('aria-label');
       });
-      byId('playbackHint').textContent=playbackMessage||'';
-      const frame=roomBox();if(frame){frame.style.pointerEvents='';frame.tabIndex=0;}
-      // iOS may require a direct tap inside the provider iframe to start audio.
-      // Permit that initial gesture only while the host is already playing;
-      // unauthorized seeks/pauses are still immediately corrected from server state.
-      const guestNeedsStart=!!(nativeNeedsStart&&syncSnapshot?.playing&&!sample?.playing);
-      // YouTube owns its native settings UI. Leave it directly accessible;
-      // observe() corrects unauthorized local transport and RPCs enforce rights.
-      const nativeYouTube=LOOPAWatchReliability.providerFor(roomState.video)==='youtube';
-      guestPlaybackLock.hidden=!active||host||sharedMode||guestNeedsStart||nativeYouTube;
+      byId('playbackHint').textContent=playbackMessage||(!host&&!sharedMode?'Просмотром управляет ведущий':'');
+      const locked=active&&!host&&!sharedMode;
+      const frame=roomBox();if(frame){frame.style.pointerEvents=locked?'none':'';frame.tabIndex=locked?-1:0;}
+      // No iframe gesture exception: it also exposes native pause and seek.
+      guestPlaybackLock.hidden=!active||host||sharedMode;
+      const needsLocalStart=!host&&nativeNeedsStart&&syncSnapshot?.playing&&!sample?.playing;
+      byId('guestResync').hidden=!(needsResync||needsLocalStart);
+      byId('guestResync').textContent=needsLocalStart?'Включить видео':'Синхронизировать';
       videoStage.classList.toggle('nativeAccess',rutubeAd);
       videoStage.classList.toggle('guestVideo',!host);
       if(!active||rutubeAd){clearTimeout(overlayTimer);videoStage.classList.remove('controlsVisible');}
     }
+    byId('guestResync').addEventListener('click',()=>{
+      // A trusted local start gesture does not publish or grant transport rights.
+      if(!hostHere()&&syncSnapshot?.playing){commandPlayer(positionNow(),true);}
+      guestManualUntil=0;void syncPlayback({forceCorrection:true});
+    });
     let timelineTarget=null;
     async function runTransportAction({seconds,playing}){
       timelineTarget={seconds,playing};
@@ -2490,7 +2501,6 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
     playbackControls.addEventListener('click',async e=>{
       const b=e.target.closest('button');if(!b||!roomState?.video||rutubeAd)return;
       if(e.detail)b.blur();revealControls();
-      if(b.id==='guestResync'){guestManualUntil=0;await syncPlayback({forceCorrection:true});updatePlaybackControls();return;}
       if(b.id==='loopaFullscreen')return;
       const host=hostHere();if(!host&&!sharedMode)return;
       const fresh=sample&&performance.now()-sample.now<1800;

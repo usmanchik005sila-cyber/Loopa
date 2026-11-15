@@ -12,7 +12,7 @@ test('guest permission is based on same-video live server grant, not just checkb
   assert.match(html,/sharedMode=!!\(roomState\?\.shared_control/);
   assert.match(html,/roomState\.shared_control_video===roomState\.video/);
   assert.match(html,/Date\.parse\(roomState\.shared_control_until\)>Date\.now\(\)/);
-  assert.match(html,/guestPlaybackLock\.hidden=!active\|\|host\|\|sharedMode\|\|guestNeedsStart/);
+  assert.match(html,/guestPlaybackLock\.hidden=!active\|\|host\|\|sharedMode;/);
 });
 test('host must renew its own grant and it is revoked on exit',()=>{
   assert.match(html,/action:'renew',room_code:code/);
