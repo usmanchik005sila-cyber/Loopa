@@ -590,6 +590,10 @@ body.roomViewing #videoStage #room-frame{width:var(--watch-player-width,100%);he
 
 #playbackControls #guestResync{position:absolute;left:12px;bottom:10px;height:30px;width:auto;min-width:0;border-radius:20px;font:500 11px system-ui;padding:0 12px}
 #playbackHint{position:absolute;top:10px;left:12px;max-width:70%;font:11px system-ui;color:#ddd;text-shadow:0 1px 3px #000}
+#rutubeRecovery[hidden]{display:none!important}
+#rutubeRecovery{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 12px;background:#101216;border:1px solid #ffffff20;border-radius:0 0 12px 12px;color:#d9dce1;font:12px/1.4 system-ui}
+#rutubeRecovery .rutubeRecoveryText{flex:1 1 100%;overflow-wrap:anywhere}
+#rutubeRecovery button{min-height:34px;padding:7px 11px;border:1px solid #ffffff35;border-radius:9px;background:#ffffff10;color:#fff;font:inherit;cursor:pointer}
 #videoStage.nativeAccess #playbackControls{opacity:1;background:none}
 #videoStage.nativeAccess #playbackControls button{pointer-events:auto}
 @media(prefers-reduced-motion:reduce){#playbackControls,body.roomViewing #videoStage{transition:none}}
@@ -1950,6 +1954,48 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
     const playbackControls=document.createElement('div');playbackControls.id='playbackControls';
     playbackControls.innerHTML='<div class="transport57" aria-label="Управление воспроизведением"><button type="button" data-step="-10" aria-label="Назад на 10 секунд" title="Назад на 10 секунд"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M21.5 9.5 10.8 16l10.7 6.5Z"/></svg></button><button type="button" id="roomToggle" aria-label="Воспроизвести" title="Воспроизвести"><svg viewBox="0 0 32 32" aria-hidden="true"><path class="statePlay" d="M11 7.5 25 16 11 24.5Z"/><path class="statePause" d="M10 7h4v18h-4z M19 7h4v18h-4z"/></svg></button><button type="button" data-step="10" aria-label="Вперёд на 10 секунд" title="Вперёд на 10 секунд"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M10.5 9.5 21.2 16l-10.7 6.5Z"/></svg></button></div><div id="loopaTimeline" aria-label="Позиция видео"><span id="loopaElapsed">0:00</span><input id="loopaSeek" type="range" min="0" max="100" value="0" step="1" aria-label="Перемотать видео"><span id="loopaDuration">0:00</span><button type="button" id="loopaFullscreen" aria-label="Полный экран" title="Полный экран">⛶</button></div><button type="button" id="guestResync" hidden>Синхронизировать</button><span id="playbackHint" role="status"></span>';
     videoStage.append(playbackControls);
+    // Visible below the player so its links never cover native playback controls.
+    const rutubeRecovery=document.createElement('div');
+    rutubeRecovery.id='rutubeRecovery';rutubeRecovery.hidden=true;
+    const rutubeRecoveryText=document.createElement('span');
+    rutubeRecoveryText.className='rutubeRecoveryText';
+    const rutubeOpenButton=document.createElement('button');
+    rutubeOpenButton.type='button';rutubeOpenButton.textContent='Открыть в RUTUBE';
+    const rutubeCopyButton=document.createElement('button');
+    rutubeCopyButton.type='button';rutubeCopyButton.textContent='Скопировать ссылку';
+    rutubeRecovery.append(rutubeRecoveryText,rutubeOpenButton,rutubeCopyButton);
+    videoStage.after(rutubeRecovery);
+    let rutubeIframeLoaded=false,rutubeSignalObserved=false,rutubeIframeFailed=false;
+    function rutubeSourceURL(){
+      const raw=roomState?.video||'';
+      try{
+        const url=new URL(raw);
+        if(url.origin!=='https://rutube.ru')return '';
+        const match=url.pathname.match(/^\/play\/embed\/([a-f0-9]{32})\/$/i);
+        return match?'https://rutube.ru/video/'+match[1]+'/':'';
+      }catch{return '';}
+    }
+    function renderRutubeRecovery(){
+      const visible=!!rutubeSourceURL()&&playerIssue?.kind==='ready-timeout';
+      rutubeRecovery.hidden=!visible;
+      if(!visible)return;
+      rutubeRecoveryText.textContent=rutubeIframeFailed
+        ?'Браузер сообщил об ошибке загрузки iframe RUTUBE. Попробуй открыть видео на сайте.'
+        :rutubeSignalObserved
+          ?'iframe RUTUBE прислал событие, но подтверждение готовности не получено. Проверь видео на сайте.'
+          :rutubeIframeLoaded
+            ?'iframe загрузился, но RUTUBE не подтвердил готовность плеера. Это может быть ограничение видео, браузера или сети.'
+            :'Нет подтверждения загрузки iframe RUTUBE. Проверь доступность видео на сайте.';
+    }
+    rutubeOpenButton.addEventListener('click',()=>{
+      const url=rutubeSourceURL();
+      if(url)window.open(url,'_blank','noopener,noreferrer');
+    });
+    rutubeCopyButton.addEventListener('click',async()=>{
+      const url=rutubeSourceURL();if(!url)return;
+      try{await navigator.clipboard.writeText(url);showToast('Ссылка на RUTUBE скопирована');}
+      catch{showToast('Не удалось скопировать ссылку — открой видео на RUTUBE');}
+    });
     // LOOPA v84: the central touch area toggles all three glass controls.
     // Leave the top/bottom of the YouTube iframe uncovered for native settings,
     // closed captions, quality selection and the native seek bar.
@@ -2346,11 +2392,13 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
 
     function setPlayerIssue(issue){
       playerIssue=issue||null;
+      renderRutubeRecovery();
       updatePlaybackControls();
     }
     function clearPlayerIssue(kind){
       if(kind&&playerIssue?.kind!==kind)return;
       playerIssue=null;
+      renderRutubeRecovery();
       updatePlaybackControls();
     }
     function updatePlaybackControls(){
@@ -2430,11 +2478,21 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
     function mountRoomPlayer(url){
       resumePlayerReady=false;resumeRestorePending=null;cancelRutubeResume();hideResumePrompt();
       clearTimeout(playerReadyTimer);playerReadyTimer=0;playerIssue=null;playerBindingFailed=false;
+      rutubeIframeLoaded=false;rutubeIframeFailed=false;rutubeSignalObserved=false;rutubeRecovery.hidden=true;
       sample=null;observed={playing:false,pos:0};pending=null;ytPlayer=null;vkPlayer=null;syncSnapshot=null;guestManualUntil=0;nativeNeedsStart=true;nativeAccess=true;localMuted=false;syncProblem='';
       applyingUntil=0;lastPlaybackPublish=0;lastGuestCorrection=0;rutubeAd=false;mediaDuration=0;clearTimeout(overlayTimer);videoStage.classList.remove('controlsVisible');
       const frame=document.createElement('iframe');frame.id='room-frame';frame.title='Видео комнаты';frame.allow='autoplay; encrypted-media; fullscreen; picture-in-picture';frame.allowFullscreen=true;
       roomBox().replaceWith(frame);frame.hidden=!url;if(!url){updatePlaybackControls();return;}
-      frame.onload=()=>{if(frame===roomBox())bindRoomPlayers();};
+      frame.onload=()=>{
+        if(frame!==roomBox())return;
+        if(frame.src.startsWith('https://rutube.ru/'))rutubeIframeLoaded=true;
+        bindRoomPlayers();
+      };
+      frame.onerror=()=>{
+        if(frame!==roomBox()||!frame.src.startsWith('https://rutube.ru/'))return;
+        rutubeIframeFailed=true;
+        setPlayerIssue(LOOPAWatchReliability.playerReadyTimeout('rutube',hostHere()));
+      };
       if(url.includes('youtube.com/embed/')){const u=new URL(url);u.searchParams.set('controls','1');u.searchParams.set('fs','1');url=u.toString();}
       frame.src=url;
       playerReadyTimer=setTimeout(()=>{
@@ -2492,7 +2550,9 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
     window.addEventListener('message',e=>{
           if(e.origin!=='https://rutube.ru'||e.source!==roomBox()?.contentWindow)return;
           let m;try{m=typeof e.data==='string'?JSON.parse(e.data):e.data;}catch{return;}
-          if(m?.type==='player:ready')readyPlayer();
+          if(typeof m?.type!=='string'||!m.type.startsWith('player:'))return;
+          rutubeSignalObserved=true;
+          if(m.type==='player:ready')readyPlayer();
           if(m?.type==='player:error'){setPlayerIssue(LOOPAWatchReliability.playerError('rutube',m.data?.code));return;}
           if(m?.type==='player:volumeChange'){localMuted=!!m.data?.muted||Number(m.data?.volume)===0;updatePlaybackControls();}
           if(m?.type==='player:durationChange')mediaDuration=Number(m.data?.duration)||0;
