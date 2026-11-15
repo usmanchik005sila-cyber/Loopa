@@ -121,4 +121,5 @@ begin
  if snap.code is null or snap.video<>r.video or snap.owner<>r.host then return jsonb_build_object('ready',false); end if;
  return jsonb_build_object('ready',true,'video',snap.video,'pos',snap.pos,'playing',snap.playing,'age',greatest(0,extract(epoch from clock_timestamp()-snap.stamp)));
 end $function$;
+notify pgrst, 'reload schema';
 commit;
