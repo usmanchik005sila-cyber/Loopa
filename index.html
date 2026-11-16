@@ -3426,7 +3426,7 @@ section[data-page="profile"]>#settings-detail>.settings-back{margin-bottom:14px}
     function inviteCountWord(value){const n=Math.abs(value),hundred=n%100,ten=n%10;if(hundred>=11&&hundred<=14)return 'участников';if(ten===1)return 'участник';if(ten>=2&&ten<=4)return 'участника';return 'участников';}
     function safeInviteImage(value){
       if(typeof value!=='string'||!value.trim())return '';
-      try{const imageUrl=new URL(value);const host=imageUrl.hostname.toLowerCase();const allowed=['ytimg.com','youtube.com','userapi.com','vk.com','vkvideo.ru','rutube.ru'];return imageUrl.protocol==='https:'&&allowed.some(domain=>host===domain||host.endsWith('.'+domain))?imageUrl.href:'';}catch{return '';}
+      try{const imageUrl=new URL(value);const host=imageUrl.hostname.toLowerCase();const allowed=['ytimg.com','youtube.com','userapi.com','vk.com','vkvideo.ru','rutube.ru','rtbcdn.ru'];return imageUrl.protocol==='https:'&&allowed.some(domain=>host===domain||host.endsWith('.'+domain))?imageUrl.href:'';}catch{return '';}
     }
     function setInviteCover(cover,image,value){
       const safe=safeInviteImage(value);image.onerror=()=>{image.hidden=true;cover.classList.remove('has-image');};
