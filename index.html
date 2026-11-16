@@ -3794,10 +3794,10 @@ section[data-page="profile"]>#settings-detail>.settings-back{margin-bottom:14px}
       const key=suggestionKey(provider,q);
       if(readSuggestionMemo(provider,q)!==null||suggestionInFlight.has(key)||Date.now()<(suggestionRetryAfter.get(key)||0))return;
       const owner=currentUser.id,code=roomState.code;
-      // RUTUBE derives suggestions from catalog searches, so wait for a typing pause.
-      // Keep YouTube's lighter autocomplete requests responsive and rate-limited.
+      // Both providers use lightweight autocomplete: start early and rate-limit
+      // subsequent prefixes while cached matching replies render immediately.
       const gap=suggestionLastRequestAt?Math.max(0,150-(Date.now()-suggestionLastRequestAt)):0;
-      const wait=provider==='rutube'?350:Math.max(gap,q.length===2?0:35);
+      const wait=Math.max(gap,q.length===2?0:35);
       suggestionTimer=setTimeout(()=>{
         if(currentUser?.id!==owner||roomState?.code!==code||!canShowSuggestions())return;
         if(suggestionProvider()!==provider||suggestionField.value.trim()!==q)return;

@@ -28,21 +28,14 @@ Deno.serve(async req=>{
  const {provider,q,page,mode}=await req.json();
  if(typeof q!=='string'||q.trim().length<2||q.length>100)return reply({message:'Введи название видео'},400);
  if(mode==='suggest'){
- if(provider==='rutube'){
-  try{
-   const result=await rutubePage(q.trim(),1,auth,4500);
-   if(result.status!==200)return reply({suggestions:[]});
-   const suggestions=[...new Set<string>(result.data.items
-    .map((item:any)=>typeof item.title==='string'?item.title.trim().slice(0,100):'')
-    .filter((title:string)=>title.length>1))].slice(0,6);
-   return reply({suggestions});
-  }catch{return reply({suggestions:[]});}
- }
- if(provider!=='youtube')return reply({suggestions:[]});
- const term=q.trim(),cacheKey=term.toLocaleLowerCase('ru'),cached=suggestionCache.get(cacheKey);
+ if(provider!=='youtube'&&provider!=='rutube')return reply({suggestions:[]});
+ // RUTUBE uses general query completions; a catalog search is only needed on submit.
+ // Keep the provider in the key: YouTube's video-specific suggestions are different.
+ const term=q.trim(),cacheKey=JSON.stringify([provider,term.toLocaleLowerCase('ru')]),cached=suggestionCache.get(cacheKey);
  if(cached&&cached.expires>Date.now())return reply({suggestions:cached.values});
  try{
- const params=new URLSearchParams({client:'firefox',ds:'yt',hl:'ru',q:term,ie:'utf-8',oe:'utf-8'});
+ const params=new URLSearchParams({client:'firefox',hl:'ru',q:term,ie:'utf-8',oe:'utf-8'});
+ if(provider==='youtube')params.set('ds','yt');
  const response=await fetch('https://suggestqueries.google.com/complete/search?'+params,{signal:AbortSignal.timeout(3000)});
  if(!response.ok)return reply({suggestions:[]});
  const data=await response.json();
