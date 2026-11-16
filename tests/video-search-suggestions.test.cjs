@@ -2,14 +2,14 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const {stripTypeScriptTypes}=require('node:module');
 const source=stripTypeScriptTypes(fs.readFileSync(path.join(__dirname,'../supabase/functions/video-search/index.ts'),'utf8'));
-function server({items=[],fail=false}={}){
+function server({items=[],fail=false,suggestions=['поиск','поиск видео']}={}){
  let handler,authorized=true,now=1000;const calls=[];
  class Clock extends Date{static now(){return now;}}
  const context={Response,URLSearchParams,AbortSignal,Date:Clock,Deno:{env:{get:key=>key==='SUPABASE_URL'?'https://test.supabase.co':'fixture'},serve:fn=>handler=fn},fetch:async(url,options)=>{
   if(url.endsWith('/auth/v1/user'))return Response.json({}, {status:authorized?200:401});
   calls.push({url,options});
   if(fail)throw new Error('provider unavailable');
-  if(url.includes('suggestqueries.google.com'))return Response.json(['query',['YouTube suggestion']]);
+  if(url.includes('suggestqueries.google.com'))return Response.json(['query',suggestions]);
   return Response.json({items,next:'2'});
  }};
  vm.runInNewContext(source,context);
@@ -18,25 +18,38 @@ function server({items=[],fail=false}={}){
   return {status:response.status,data:await response.json()};
  }};
 }
-test('RUTUBE suggestions use bounded unique titles and reuse the first search page',async()=>{
- const items=[' Природа ','Природа','',null,'а','x'.repeat(130),'Вода','Лес','Горы','Море','Океан'].map(title=>({title}));
- const s=server({items});
- const first=await s.invoke({provider:'rutube',q:'природа',mode:'suggest'});
- assert.equal(first.status,200);assert.equal(first.data.suggestions.length,6);
- assert.deepEqual(first.data.suggestions.slice(0,2),['Природа','x'.repeat(100)]);
- const search=await s.invoke({provider:'rutube',q:'ПРИРОДА'});
- assert.deepEqual(search.data,{items,next:'2'});assert.equal(s.calls.length,1);
+test('RUTUBE autocomplete never searches the catalog and caches bounded unique phrases',async()=>{
+ const s=server({suggestions:['званый ужин','званый ужин',null,'','x'.repeat(151),'обзор','кино','шоу','клип','природа','ещё']});
+ const first=await s.invoke({provider:'rutube',q:'званый',mode:'suggest'});
+ assert.equal(first.status,200);
+ assert.deepEqual(first.data.suggestions,['званый ужин','обзор','кино','шоу','клип','природа']);
+ assert.equal(s.calls.length,1);
+ const url=new URL(s.calls[0].url);
+ assert.equal(url.hostname,'suggestqueries.google.com');assert.equal(url.searchParams.get('q'),'званый');
+ assert.equal(url.searchParams.has('ds'),false);
+ assert.deepEqual((await s.invoke({provider:'rutube',q:'ЗВАНЫЙ',mode:'suggest'})).data,first.data);
+ assert.equal(s.calls.length,1);
+ s.setAuthorized(false);
+ assert.equal((await s.invoke({provider:'rutube',q:'званый',mode:'suggest'})).status,401);
+ assert.equal(s.calls.length,1);
+ s.setAuthorized(true);s.advance(600001);
+ await s.invoke({provider:'rutube',q:'званый',mode:'suggest'});assert.equal(s.calls.length,2);
+});
+test('YouTube video autocomplete has a separate cache from general RUTUBE query completions',async()=>{
+ const s=server();
+ for(const provider of ['rutube','youtube','rutube','youtube'])await s.invoke({provider,q:'природа',mode:'suggest'});
+ assert.equal(s.calls.length,2);
+ assert.equal(new URL(s.calls[1].url).searchParams.get('ds'),'yt');
+});
+test('submitted RUTUBE searches still use the catalog and keep page-specific cache',async()=>{
+ const items=[{title:'Природа',url:'https://rutube.ru/video/fixture/'}],s=server({items});
+ const first=await s.invoke({provider:'rutube',q:'природа'});
+ assert.deepEqual(first,{status:200,data:{items,next:'2'}});
+ await s.invoke({provider:'rutube',q:'ПРИРОДА'});assert.equal(s.calls.length,1);
+ assert.match(s.calls[0].url,/functions.yandexcloud.net/);
  await s.invoke({provider:'rutube',q:'природа',page:2});assert.equal(s.calls.length,2);
  assert.deepEqual(JSON.parse(s.calls[1].options.body),{q:'природа',page:2});
-});
-test('expired RUTUBE cache refreshes, but unauthenticated users never read it',async()=>{
- const s=server({items:[{title:'Природа'}]});
- await s.invoke({provider:'rutube',q:'природа'});
- s.setAuthorized(false);
- assert.equal((await s.invoke({provider:'rutube',q:'природа',mode:'suggest'})).status,401);
- assert.equal(s.calls.length,1);
- s.setAuthorized(true);s.advance(120001);
- await s.invoke({provider:'rutube',q:'природа',mode:'suggest'});assert.equal(s.calls.length,2);
+ s.advance(120001);await s.invoke({provider:'rutube',q:'природа'});assert.equal(s.calls.length,3);
 });
 test('failed suggestions do not block search or cache a provider failure',async()=>{
  const s=server({fail:true});
@@ -51,7 +64,7 @@ test('invalid requests do not reach RUTUBE; other provider suggestions remain in
  }
  assert.equal(s.calls.length,0);
  assert.deepEqual((await s.invoke({provider:'vk',q:'природа',mode:'suggest'})).data,{suggestions:[]});
- assert.deepEqual((await s.invoke({provider:'youtube',q:'природа',mode:'suggest'})).data,{suggestions:['YouTube suggestion']});
+ assert.deepEqual((await s.invoke({provider:'youtube',q:'природа',mode:'suggest'})).data,{suggestions:['поиск','поиск видео']});
 });
 test('rapid RUTUBE typing requests only the final prefix and ignores a room change',()=>{
  const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
@@ -61,7 +74,35 @@ test('rapid RUTUBE typing requests only the final prefix and ignores a room chan
   canShowSuggestions:()=>true,suggestionKey:(p,q)=>p+q,readSuggestionMemo:()=>null,suggestionInFlight:new Map(),suggestionRetryAfter:new Map(),currentUser:{id:'owner'},roomState:{code:'room'},suggestionProvider:()=> 'rutube',suggestionField:{value:''},fetchSuggestions:(...args)=>calls.push(args)};
  vm.createContext(c);vm.runInContext(code,c);
  for(const q of ['пр','при','природа']){c.suggestionField.value=q;c.queueSuggestionFetch('rutube',q);}
- assert.equal(timers.size,1);const pending=[...timers.values()][0];assert.equal(pending.ms,350);pending.fn();
+ assert.equal(timers.size,1);const pending=[...timers.values()][0];assert.equal(pending.ms,35);pending.fn();
  assert.deepEqual(calls,[['rutube','природа','owner','room']]);
+ c.queueSuggestionFetch('rutube','пр');assert.equal([...timers.values()].at(-1).ms,0);
+ c.suggestionLastRequestAt=Date.now();c.queueSuggestionFetch('rutube','при');assert.ok([...timers.values()].at(-1).ms<=150);
  c.queueSuggestionFetch('rutube','природа');c.roomState.code='another-room';[...timers.values()].at(-1).fn();assert.equal(calls.length,1);
+});
+test('cached prefix matches render immediately and stay inside their provider',()=>{
+ const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
+ const code=html.slice(html.indexOf('    const suggestionMemo='),html.indexOf('    function canShowSuggestions('));
+ const c={Date,byId:()=>({value:'rutube'})};vm.createContext(c);vm.runInContext(code,c);
+ c.memoSuggestions('rutube','зв',['Званый ужин','Звезда']);
+ assert.deepEqual(Array.from(c.immediateSuggestions('rutube','зван')),['Званый ужин']);
+ assert.deepEqual(Array.from(c.immediateSuggestions('youtube','зван')),[]);
+});
+test('late unrelated prefix replies cannot replace current RUTUBE suggestions',async()=>{
+ const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
+ const memo=html.slice(html.indexOf('    const suggestionMemo='),html.indexOf('    function canShowSuggestions('));
+ const fetcher=html.slice(html.indexOf('    async function fetchSuggestions('),html.indexOf('    function queueSuggestionFetch('));
+ const pending=[],shown=[],field={value:'пр'},source={value:'rutube'};
+ const c={Date,AbortController,setTimeout:()=>1,clearTimeout:()=>{},byId:id=>id==='source'?source:field,
+  currentUser:{id:'owner'},roomState:{code:'room'},canShowSuggestions:()=>true,queueSuggestionFetch:()=>{},
+  client:{functions:{invoke:()=>new Promise(resolve=>pending.push(resolve))}},
+  refreshCurrentSuggestions:()=>shown.push(Array.from(c.immediateSuggestions(source.value,field.value)))};
+ vm.createContext(c);vm.runInContext(memo+fetcher,c);
+ const old=c.fetchSuggestions('rutube','зв','owner','room'),latest=c.fetchSuggestions('rutube','пр','owner','room');
+ pending[1]({data:{suggestions:['природа']}});await latest;
+ pending[0]({data:{suggestions:['званый ужин']}});await old;
+ assert.deepEqual(shown,[['природа'],['природа']]);
+ const swapped=c.fetchSuggestions('rutube','ки','owner','room');c.roomState.code='new-room';
+ pending[2]({data:{suggestions:['кино']}});await swapped;
+ assert.equal(c.readSuggestionMemo('rutube','ки'),null);
 });
