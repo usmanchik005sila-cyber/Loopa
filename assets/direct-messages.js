@@ -204,7 +204,7 @@
         }
       }catch(e){
         const el=byId('dm-error');el.hidden=false;
-        el.textContent=/row.level.security|violates row.level|permission denied/i.test(e.message||'')
+        el.textContent=/Слишком много сообщений/.test(e.message||'')?e.message:/row.level.security|violates row.level|permission denied/i.test(e.message||'')
           ?'Сообщение не отправлено: получатель ограничил переписку или вы заблокированы.'
           :'Не удалось отправить сообщение. Проверь SQL v87 и подключение к Supabase.';
       }finally{dmBusy=false;byId('dmSend').disabled=false;}

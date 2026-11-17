@@ -1,6 +1,6 @@
 // Supabase Edge Function: video-search
-const headers={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, apikey, content-type, x-client-info'};
-function reply(body:unknown,status=200){return Response.json(body,{status,headers});}
+const headers={'Access-Control-Allow-Origin':'*','Access-Control-Expose-Headers':'Retry-After','Access-Control-Allow-Headers':'authorization, apikey, content-type, x-client-info'};
+function reply(body:unknown,status=200,extra:Record<string,string>={}){return Response.json(body,{status,headers:{...headers,...extra}});}
 const suggestionCache=new Map<string,{expires:number,values:string[]}>();
 const rutubeCache=new Map<string,{expires:number,data:any}>();
 function searchReply(data:any,status=200){return {data,status};}
@@ -27,6 +27,21 @@ Deno.serve(async req=>{
  if(!user.ok)return reply({message:'Войди в аккаунт'},401);
  const {provider,q,page,mode}=await req.json();
  if(typeof q!=='string'||q.trim().length<2||q.length>100)return reply({message:'Введи название видео'},400);
+ if(!['youtube','rutube','vk'].includes(provider))return reply({message:'Неизвестный источник'},400);
+ if(mode==='suggest'&&provider==='vk')return reply({suggestions:[]});
+ // Durable per-account quota; never trust a client-provided user id or an
+ // isolate-local counter. A quota outage must not expose paid upstream APIs.
+ try{
+ const quota=await fetch(Deno.env.get('SUPABASE_URL')+'/rest/v1/rpc/loopa_search_budget',{
+  method:'POST',headers:{Authorization:auth,apikey:Deno.env.get('SUPABASE_ANON_KEY')!,'Content-Type':'application/json'},
+  body:JSON.stringify({p_mode:mode==='suggest'?'suggest':'search'}),signal:AbortSignal.timeout(2500)});
+ const budget=await quota.json();
+ if(!quota.ok||typeof budget?.allowed!=='boolean')return reply({message:'Поиск временно недоступен. Попробуй ещё раз.'},503);
+ if(!budget.allowed){
+  const retry=Math.max(1,Math.min(60,Number(budget.retry_after)||1));
+  return reply({message:'Слишком много запросов. Подожди немного и попробуй снова.',retry_after:retry},429,{'Retry-After':String(retry)});
+ }
+ }catch{return reply({message:'Поиск временно недоступен. Попробуй ещё раз.'},503);}
  if(mode==='suggest'){
  if(provider!=='youtube'&&provider!=='rutube')return reply({suggestions:[]});
  // RUTUBE uses general query completions; a catalog search is only needed on submit.
