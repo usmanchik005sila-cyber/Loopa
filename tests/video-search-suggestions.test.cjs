@@ -2,20 +2,21 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const {stripTypeScriptTypes}=require('node:module');
 const source=stripTypeScriptTypes(fs.readFileSync(path.join(__dirname,'../supabase/functions/video-search/index.ts'),'utf8'));
-function server({items=[],fail=false,suggestions=['поиск','поиск видео']}={}){
- let handler,authorized=true,now=1000;const calls=[];
+function server({items=[],fail=false,budgetAllowed=true,budgetFail=false,suggestions=['поиск','поиск видео']}={}){
+ let handler,authorized=true,now=1000;const calls=[],budgetCalls=[];let lastResponse;
  class Clock extends Date{static now(){return now;}}
  const context={Response,URLSearchParams,AbortSignal,Date:Clock,Deno:{env:{get:key=>key==='SUPABASE_URL'?'https://test.supabase.co':'fixture'},serve:fn=>handler=fn},fetch:async(url,options)=>{
   if(url.endsWith('/auth/v1/user'))return Response.json({}, {status:authorized?200:401});
+  if(url.endsWith('/rpc/loopa_search_budget')){budgetCalls.push(JSON.parse(options.body));return Response.json({allowed:budgetAllowed,retry_after:3},{status:budgetFail?500:200});}
   calls.push({url,options});
   if(fail)throw new Error('provider unavailable');
   if(url.includes('suggestqueries.google.com'))return Response.json(['query',suggestions]);
   return Response.json({items,next:'2'});
  }};
  vm.runInNewContext(source,context);
- return {calls,setAuthorized:v=>authorized=v,advance:ms=>now+=ms,invoke:async body=>{
+ return {calls,budgetCalls,lastResponse:()=>lastResponse,setAuthorized:v=>authorized=v,advance:ms=>now+=ms,invoke:async body=>{
   const response=await handler(new Request('https://test/video-search',{method:'POST',headers:{Authorization:'Bearer fixture','Content-Type':'application/json'},body:JSON.stringify(body)}));
-  return {status:response.status,data:await response.json()};
+  lastResponse=response;return {status:response.status,data:await response.json()};
  }};
 }
 test('RUTUBE autocomplete never searches the catalog and caches bounded unique phrases',async()=>{
@@ -105,4 +106,26 @@ test('late unrelated prefix replies cannot replace current RUTUBE suggestions',a
  const swapped=c.fetchSuggestions('rutube','ки','owner','room');c.roomState.code='new-room';
  pending[2]({data:{suggestions:['кино']}});await swapped;
  assert.equal(c.readSuggestionMemo('rutube','ки'),null);
+});
+
+test('search and suggestions share durable account quotas across cached calls',async()=>{
+ const s=server();
+ await s.invoke({provider:'rutube',q:'природа',mode:'suggest'});
+ await s.invoke({provider:'rutube',q:'природа',mode:'suggest'});
+ await s.invoke({provider:'rutube',q:'природа'});
+ assert.deepEqual(s.budgetCalls,[{p_mode:'suggest'},{p_mode:'suggest'},{p_mode:'search'}]);
+});
+test('exhausted quotas return 429 and Retry-After without calling upstream',async()=>{
+ const s=server({budgetAllowed:false});
+ for(const mode of ['suggest','search']){
+  const result=await s.invoke({provider:'rutube',q:'природа',mode});
+  assert.equal(result.status,429);assert.equal(result.data.retry_after,3);
+  assert.equal(s.lastResponse().headers.get('Retry-After'),'3');
+ }
+ assert.equal(s.calls.length,0);
+});
+test('quota outages fail closed without calling upstream',async()=>{
+ const s=server({budgetFail:true});
+ assert.equal((await s.invoke({provider:'youtube',q:'природа'})).status,503);
+ assert.equal(s.calls.length,0);
 });
