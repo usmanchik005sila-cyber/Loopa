@@ -2,7 +2,7 @@
   'use strict';
   // Owns conversation state, paging, rendering, and realtime subscriptions.
   function create({getClient,getCurrentUser,getPage,showPage,byId,document,
-    friendAvatar,avatarForUser,openSafetyReport,showToast}){
+    friendAvatar,avatarForUser,openFriendProfile,openSafetyReport,showToast}){
     let dmPeer=null,dmChannel=null,dmHistory=[],dmBusy=false,dmPageReturn='friend-profile';
     let messagesInboxGeneration=0,messagesInboxChannel=null,messagesInboxOwner=null;
     let inboxRows=new Map(),inboxCursor=null,inboxHasMore=false,inboxPaging=false;
@@ -56,9 +56,13 @@
         const root=byId('messagesList');root.replaceChildren();
         for(const [peerId,msg] of latest){
           const profile=names.get(peerId)||{id:peerId,display_name:'Пользователь LOOPA'};
-          const btn=document.createElement('button');btn.type='button';btn.className='message-conversation';
+          const row=document.createElement('div');row.className='message-conversation';
+          const avatar=document.createElement('button');avatar.type='button';avatar.className='message-avatar-open';
+          avatar.setAttribute('aria-label','Открыть профиль '+(profile.display_name||'пользователя'));
+          avatar.append(friendAvatar(profile));avatar.onclick=()=>openFriendProfile?.(profile);
+          const btn=document.createElement('button');btn.type='button';btn.className='message-conversation-content message-conversation-open';
           btn.setAttribute('aria-label','Открыть переписку с '+(profile.display_name||'пользователем'));
-          btn.append(friendAvatar(profile));
+
           const copy=document.createElement('span');copy.className='message-conversation-content';
           const heading=document.createElement('span');heading.className='message-conversation-head';
           const name=document.createElement('strong');name.textContent=profile.display_name||'Пользователь LOOPA';
@@ -70,7 +74,7 @@
           preview.textContent=(msg.sender_id===owner?'Ты: ':'')+(msg.body||'');
           copy.append(heading,preview);btn.append(copy);
           btn.onclick=()=>openDirectMessage(profile);
-          root.append(btn);
+          row.append(avatar,btn);root.append(row);
         }
         if(inboxHasMore){const more=document.createElement('button');more.type='button';more.className='action';more.textContent='Ещё переписки';more.onclick=()=>refreshMessagesInbox(true);root.append(more);}
       }catch(error){
@@ -133,7 +137,9 @@
         const head=document.createElement('span');head.className='dm-group-label';head.textContent=mine?'Ты':(who.display_name||'Друг');wrap.append(head);
         group.items.forEach((msg,index)=>{
           const row=document.createElement('div');row.className='dm-message-row';
-          const ava=document.createElement('div');ava.className=index===group.items.length-1?'dm-message-avatar':'dm-avatar-space';
+          const clickable=!mine&&index===group.items.length-1;
+          const ava=document.createElement(clickable?'button':'div');ava.className=index===group.items.length-1?'dm-message-avatar':'dm-avatar-space';
+          if(clickable){ava.type='button';ava.setAttribute('aria-label','Открыть профиль '+(who.display_name||'пользователя'));ava.onclick=()=>openFriendProfile?.(who);}
           if(index===group.items.length-1)ava.append(avatarForUser(who));
           const bubble=document.createElement('div');bubble.className='dm-bubble';
           const text=document.createElement('span');text.textContent=msg.body;
@@ -150,10 +156,10 @@
       }
       log.scrollTop=log.scrollHeight;
     }
-    async function openDirectMessage(profile){
+    async function openDirectMessage(profile,preserveReturn=false){
       if(!getCurrentUser()||!profile?.id)return;
       if(profile.id===getCurrentUser().id)return;
-      dmPageReturn=getPage()==='friend-profile'?'friend-profile':(getPage()==='messages'?'messages':'friends');
+      if(!preserveReturn)dmPageReturn=getPage()==='friend-profile'?'friend-profile':(getPage()==='messages'?'messages':'friends');
       dmHistoryEpoch++;dmOlderBusy=false;dmHasOlder=false;dmHistory=[];
       dmPeer={...profile};
       byId('dmPeerName').textContent=profile.display_name||'Друг';
@@ -172,6 +178,7 @@
           if(dmPeer?.id===payload.new.sender_id)loadDirectMessages();
         }).subscribe();
     }
+    byId('dmPeerAvatar').onclick=()=>{if(dmPeer)openFriendProfile?.(dmPeer);};
     byId('dmBack').onclick=()=>{
       clearDirectMessageChannel();
       showPage(dmPageReturn==='friend-profile'?'friend-profile':(dmPageReturn==='messages'?'messages':'friends'));
@@ -207,7 +214,7 @@
       dmHistoryEpoch++;dmPeer=null;dmHistory=[];dmOlderBusy=false;dmHasOlder=false;
       inboxRows=new Map();inboxCursor=null;inboxHasMore=false;inboxPaging=false;
     }
-    return Object.freeze({openDirectMessage,refreshMessagesInbox,subscribeMessagesInbox,
+    return Object.freeze({resumeDirectMessage:()=>{const draft=byId('dmInput').value;const pending=openDirectMessage(dmPeer,true);byId('dmInput').value=draft;return pending;},openDirectMessage,refreshMessagesInbox,subscribeMessagesInbox,
       stopMessagesInbox,clearDirectMessageChannel,reset,get returnPage(){return dmPageReturn;}});
   }
   root.LOOPADirectMessages=Object.freeze({create});
