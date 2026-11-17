@@ -1124,9 +1124,9 @@ body.dmViewing .dm-screen,#dmLog,#dmForm{transition:none!important;animation:non
 .bottom .nav-item{font-size:11px;gap:7px;min-width:0}
 .bottom .nav-item svg{width:24px;height:24px}
 /* Calm glass treatment for the inbox, matching the rest of Private Cinema. */
-.messages-header{margin:20px 0 25px}
-.messages-header h1{margin-bottom:12px}
-.messages-summary{font:13px/1.6 system-ui;color:#a8a8ae}
+.message-avatar-open,#dmPeerAvatar,button.dm-message-avatar{padding:0;border:0;background:none;color:inherit;cursor:pointer;flex:none}
+.message-conversation-open{padding:0;border:0;background:none;color:inherit;text-align:left;cursor:pointer}
+.message-avatar-open:focus-visible,#dmPeerAvatar:focus-visible,button.dm-message-avatar:focus-visible{outline:2px solid #fff;outline-offset:3px;border-radius:50%}
 .messages-list{display:grid;gap:10px}
 .message-conversation{display:flex;align-items:center;gap:13px;width:100%;min-height:78px;padding:15px 14px;text-align:left;cursor:pointer;color:#efeff1;border:1px solid #ffffff22;border-radius:19px;background:linear-gradient(140deg,#28282bcf,#111113e8);box-shadow:inset 0 1px #ffffff0a}
 .message-conversation:active{background:#ffffff15}
@@ -1536,9 +1536,7 @@ section[data-page="profile"]>#settings-detail>.settings-back{margin-bottom:14px}
       </section>
 
 
-      <section data-page="messages" hidden>
-        <div class="eyebrow">ЛИЧНОЕ ОБЩЕНИЕ</div>
-        <div class="messages-header"><h1>Твои<br>сообщения.</h1><p class="messages-summary">Все личные переписки в LOOPA — в одном месте.</p></div>
+      <section data-page="messages" aria-label="Сообщения" hidden>
         <div id="messagesList" class="messages-list" aria-live="polite"><div class="messages-state">Открываем переписки…</div></div>
       </section>
 
@@ -1565,7 +1563,7 @@ section[data-page="profile"]>#settings-detail>.settings-back{margin-bottom:14px}
       <section data-page="dm" hidden>
         <div class="eyebrow">ЛИЧНОЕ ОБЩЕНИЕ</div>
         <div class="dm-screen">
-          <div class="dm-header"><button id="dmBack" aria-label="Назад к профилю" type="button">‹</button><div id="dmPeerAvatar"></div><div class="dm-header-info"><strong id="dmPeerName">Собеседник</strong><small>Личные сообщения LOOPA</small></div><button id="dmReportUser" type="button" aria-label="Пожаловаться на пользователя" title="Пожаловаться">⋯</button></div>
+          <div class="dm-header"><button id="dmBack" aria-label="Назад к профилю" type="button">‹</button><button id="dmPeerAvatar" type="button" aria-label="Открыть профиль собеседника"></button><div class="dm-header-info"><strong id="dmPeerName">Собеседник</strong><small>Личные сообщения LOOPA</small></div><button id="dmReportUser" type="button" aria-label="Пожаловаться на пользователя" title="Пожаловаться">⋯</button></div>
           <div class="dm-log" id="dmLog" aria-live="polite"><p class="dm-empty">Загрузка переписки…</p></div>
           <p id="dm-error" role="status" hidden></p>
           <form id="dmForm" class="dm-composer"><textarea id="dmInput" aria-label="Сообщение" placeholder="Сообщение…" maxlength="2000" rows="1" enterkeyhint="send" required></textarea><button id="dmSend" type="submit" aria-label="Отправить сообщение">↑</button></form>
@@ -4798,8 +4796,8 @@ section[data-page="profile"]>#settings-detail>.settings-back{margin-bottom:14px}
     async function openFriendProfile(profile,presence=null){
       if(!currentUser||!profile?.id)return;
       const requestId=++friendProfileRequest;
-      profilePageReturn=lastPage==='dm'?'friends':lastPage;
-      byId('friendPageBack').textContent=profilePageReturn==='rooms'?'‹ Назад в комнату':(profilePageReturn==='messages'?'‹ Назад к сообщениям':'‹ Назад к друзьям');
+      profilePageReturn=lastPage;
+      byId('friendPageBack').textContent=profilePageReturn==='dm'?'‹ Назад к переписке':profilePageReturn==='rooms'?'‹ Назад в комнату':(profilePageReturn==='messages'?'‹ Назад к сообщениям':'‹ Назад к друзьям');
       profilePeer={...profile};
       byId('friendPageName').textContent=profile.display_name||'Пользователь LOOPA';
       byId('friendPageAvatar').replaceChildren(avatarForUser(profile));
@@ -4854,7 +4852,7 @@ section[data-page="profile"]>#settings-detail>.settings-back{margin-bottom:14px}
         else if(currentUser)openFriendProfile(data||fallback);
       }catch{if(currentUser)openFriendProfile(fallback);}
     }
-    byId('friendPageBack').onclick=()=>showPage(profilePageReturn==='rooms'&&roomState?'rooms':(profilePageReturn==='messages'?'messages':'friends'));
+    byId('friendPageBack').onclick=()=>profilePageReturn==='dm'?messages.resumeDirectMessage():showPage(profilePageReturn==='rooms'&&roomState?'rooms':(profilePageReturn==='messages'?'messages':'friends'));
     byId('friendPageWrite').onclick=()=>{if(profilePeer)openDirectMessage(profilePeer);};
     byId('friendPageReport').onclick=()=>{
       if(profilePeer)openSafetyReport({userId:profilePeer.id,displayName:profilePeer.display_name||'пользователя'});
@@ -4875,7 +4873,7 @@ section[data-page="profile"]>#settings-detail>.settings-back{margin-bottom:14px}
     };
     const messages=LOOPADirectMessages.create({
       getClient:()=>client,getCurrentUser:()=>currentUser,getPage:()=>lastPage,
-      showPage,byId,document,friendAvatar,avatarForUser,openSafetyReport,showToast
+      showPage,byId,document,friendAvatar,avatarForUser,openFriendProfile,openSafetyReport,showToast
     });
     const {openDirectMessage,refreshMessagesInbox,subscribeMessagesInbox,
       stopMessagesInbox,clearDirectMessageChannel}=messages;
