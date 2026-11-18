@@ -99,8 +99,9 @@ jobs:
               latest = next((v for v in versions if '$latest' in v.get('tags', [])), None)
               if latest is None:
                   raise ProbeError('No $latest version found; probe stopped without changing the function')
+              version = request_json(API_URL + '/versions/' + latest['id'], 'Read version metadata', token=token)
               # Explicit allow-list only. Never print raw API JSON, environment, source or tokens.
-              print(json.dumps({'connection': 'ok', 'function_id': FUNCTION_ID,
+              print(json.dumps({'connection': 'ok', 'version_fields': sorted(version.keys()), 'function_id': FUNCTION_ID,
                                 'folder_id': function.get('folderId'), 'version_id': latest.get('id'),
                                 'runtime': latest.get('runtime'), 'entrypoint': latest.get('entrypoint'),
                                 'execution_timeout': latest.get('executionTimeout'),
