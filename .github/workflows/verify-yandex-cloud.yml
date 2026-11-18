@@ -1,0 +1,120 @@
+name: Verify Yandex Cloud access
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/verify-yandex-cloud.yml']
+permissions: {}
+concurrency:
+  group: verify-yandex-cloud-access
+  cancel-in-progress: false
+jobs:
+  verify:
+    if: github.repository == 'usmanchik005sila-cyber/Loopa'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Verify service-account access (read-only)
+        env:
+          YC_SA_JSON_CREDENTIALS: ${{ secrets.YC_SA_JSON_CREDENTIALS }}
+        shell: bash
+        run: |
+          python3 - <<'PYCODE'
+          import base64
+          import json
+          import os
+          import subprocess
+          import tempfile
+          import time
+          import urllib.error
+          import urllib.request
+          
+          SA_ID = 'ajejjebhmvkkfhjg5vo4'
+          FUNCTION_ID = 'd4e8n1se4iuc8ql4rm82'
+          IAM_URL = 'https://iam.api.cloud.yandex.net/iam/v1/tokens'
+          API_URL = 'https://serverless-functions.api.cloud.yandex.net/functions/v1'
+          
+          class ProbeError(Exception):
+              pass
+          
+          def b64(value):
+              return base64.urlsafe_b64encode(value).rstrip(b'=').decode()
+          
+          def request_json(url, stage, payload=None, token=None):
+              headers = {'Content-Type': 'application/json'}
+              if token:
+                  headers['Authorization'] = 'Bearer ' + token
+              body = None if payload is None else json.dumps(payload).encode()
+              request = urllib.request.Request(url, data=body, headers=headers)
+              try:
+                  with urllib.request.urlopen(request, timeout=30) as response:
+                      return json.load(response)
+              except urllib.error.HTTPError as error:
+                  # Never echo a remote error body: it may contain credentials/configuration.
+                  raise ProbeError(f'{stage}: HTTP {error.code}') from None
+              except Exception:
+                  raise ProbeError(f'{stage}: network or response error') from None
+          
+          def main():
+              raw = os.environ.get('YC_SA_JSON_CREDENTIALS', '')
+              if not raw:
+                  raise ProbeError('Repository secret YC_SA_JSON_CREDENTIALS is missing or empty')
+              try:
+                  key = json.loads(raw)
+                  if key.get('service_account_id') != SA_ID:
+                      raise ProbeError('The key belongs to a different service account')
+                  private_key = key['private_key']
+                  kid = key['id']
+                  if not isinstance(private_key, str) or not isinstance(kid, str):
+                      raise ValueError()
+              except ProbeError:
+                  raise
+              except Exception:
+                  raise ProbeError('Secret must contain the full authorized-key JSON, including private_key') from None
+              now = int(time.time())
+              header = b64(json.dumps({'alg': 'PS256', 'typ': 'JWT', 'kid': kid}).encode())
+              payload = b64(json.dumps({'iss': SA_ID, 'aud': IAM_URL, 'iat': now, 'exp': now + 300}).encode())
+              unsigned = (header + '.' + payload).encode()
+              with tempfile.TemporaryDirectory(prefix='yc-probe-') as directory:
+                  path = os.path.join(directory, 'key.pem')
+                  fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+                  with os.fdopen(fd, 'w') as handle:
+                      handle.write(private_key)
+                  signed = subprocess.run(['openssl', 'dgst', '-sha256', '-sign', path,
+                                           '-sigopt', 'rsa_padding_mode:pss',
+                                           '-sigopt', 'rsa_pss_saltlen:32'],
+                                          input=unsigned, capture_output=True)
+                  if signed.returncode:
+                      raise ProbeError('Cannot sign with this key; use an authorized RSA service-account key')
+              jwt_value = unsigned.decode() + '.' + b64(signed.stdout)
+              token_data = request_json(IAM_URL, 'IAM authentication', {'jwt': jwt_value})
+              token = token_data.get('iamToken')
+              if not isinstance(token, str) or not token:
+                  raise ProbeError('IAM authentication: token missing')
+              function = request_json(API_URL + '/functions/' + FUNCTION_ID, 'Read function', token=token)
+              if function.get('id') != FUNCTION_ID:
+                  raise ProbeError('Unexpected function response')
+              versions = request_json(API_URL + '/versions?functionId=' + FUNCTION_ID + '&pageSize=1000',
+                                      'Read function versions', token=token).get('versions', [])
+              latest = next((v for v in versions if '$latest' in v.get('tags', [])), None)
+              if latest is None:
+                  raise ProbeError('No $latest version found; probe stopped without changing the function')
+              # Explicit allow-list only. Never print raw API JSON, environment, source or tokens.
+              print(json.dumps({'connection': 'ok', 'function_id': FUNCTION_ID,
+                                'folder_id': function.get('folderId'), 'version_id': latest.get('id'),
+                                'runtime': latest.get('runtime'), 'entrypoint': latest.get('entrypoint'),
+                                'execution_timeout': latest.get('executionTimeout'),
+                                'memory_bytes': latest.get('resources', {}).get('memory'),
+                                'runtime_service_account_id': latest.get('serviceAccountId'),
+                                'environment_variable_count': len(latest.get('environment', {}))}))
+          
+          if __name__ == '__main__':
+              try:
+                  main()
+              except ProbeError as error:
+                  print('Connection check failed: ' + str(error))
+                  raise SystemExit(1)
+              except Exception:
+                  print('Connection check failed: unexpected error; sensitive details suppressed')
+                  raise SystemExit(1)
+          PYCODE
