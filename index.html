@@ -5403,11 +5403,16 @@ section[data-page="profile"]>#settings-detail>.settings-back{margin-bottom:14px}
       if(!response.ok){
         const error=new Error(result.error||'backend_unavailable');
         error.status=response.status;
+        error.retryAfter=Number(response.headers.get('Retry-After'));
         throw error;
       }
       return result;
     }
     function telegramMiniErrorMessage(error){
+      if(error?.message==='telegram_rate_limited')
+        return error.retryAfter>0
+          ? 'Слишком много попыток. Повтори через '+error.retryAfter+' сек.'
+          : 'Слишком много попыток. Подожди немного и повтори.';
       if(error?.message==='reopen_miniapp')
         return 'Нужно новое подтверждение Telegram. Закрой Mini App и открой заново.';
       if(error?.message==='telegram_already_linked_to_another_profile')
@@ -5641,7 +5646,7 @@ section[data-page="profile"]>#settings-detail>.settings-back{margin-bottom:14px}
         }else{
           message=LOOPAAAccountContinuity.identityLinkError(error,'Telegram')||message;
         }
-        if(error?.message==='reopen_miniapp')message=telegramMiniErrorMessage(error);
+        if(['reopen_miniapp','telegram_rate_limited'].includes(error?.message))message=telegramMiniErrorMessage(error);
         feedback('telegramAuthError',message,true);
       }finally{button.disabled=false;}
     };
