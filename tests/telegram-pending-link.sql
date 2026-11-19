@@ -9,6 +9,8 @@ do $test$
 begin
   if has_function_privilege('anon', 'public.loopa_telegram_link_step(text,uuid,boolean)', 'EXECUTE')
      or has_function_privilege('authenticated', 'public.loopa_telegram_link_step(text,uuid,boolean)', 'EXECUTE')
+     or has_function_privilege('anon', 'public.loopa_complete_telegram_registration(text)', 'EXECUTE')
+     or has_function_privilege('authenticated', 'public.loopa_complete_telegram_registration(text)', 'EXECUTE')
      or has_table_privilege('service_role', 'loopa_private.telegram_pending_links', 'SELECT') then
     raise exception 'Unexpected permission on pending Telegram links';
   end if;
@@ -29,6 +31,9 @@ begin
      or exists (select 1 from public.telegram_miniapp_links where telegram_id = '1234') then
     raise exception 'Link activated before Auth email was ready';
   end if;
+  if public.loopa_complete_telegram_registration('1234')->>'status' is distinct from 'link_pending' then
+    raise exception 'Registration ignored pending explicit link';
+  end if;
   if public.loopa_telegram_link_step('1234', v_other, false) <> 'telegram_already_linked_to_another_profile'
      or public.loopa_telegram_link_step('4321', v_owner, false) <> 'profile_already_linked_to_another_telegram' then
     raise exception 'Competing reservation was accepted';
@@ -43,7 +48,7 @@ $test$;
 
 reset role;
 -- Stand in for a successful Auth Admin email update between Edge calls.
-update auth.users set email = 'miniapp-1234@auth.loopacinema.invalid'
+update auth.users set email = 'miniapp-link-' || id::text || '@auth.loopacinema.invalid'
 where id = '00000000-0000-0000-0000-000000000001';
 
 set local role service_role;
@@ -67,6 +72,74 @@ do $test$
 begin
   if exists (select 1 from loopa_private.telegram_pending_links where telegram_id = '1234') then
     raise exception 'Finalization left a pending record';
+  end if;
+end;
+$test$;
+
+-- An email independently added while the reservation exists must win.
+set local role service_role;
+select public.loopa_telegram_link_step('4321', '00000000-0000-0000-0000-000000000002', false);
+reset role;
+do $test$
+begin
+  begin
+    update auth.users set email = 'miniapp-link-' || id::text || '@auth.loopacinema.invalid'
+    where id = '00000000-0000-0000-0000-000000000002';
+    raise exception 'A real email was replaced';
+  exception when check_violation then null;
+  end;
+  begin
+    insert into auth.users (id, email) values
+      ('00000000-0000-0000-0000-000000000005', 'miniapp-4321@auth.loopacinema.invalid');
+    raise exception 'Auth created an account for a pending link';
+  exception when unique_violation then null;
+  end;
+end;
+$test$;
+
+insert into auth.users (id, email, email_confirmed_at, raw_app_meta_data, raw_user_meta_data) values
+  ('00000000-0000-0000-0000-000000000003', 'miniapp-5678@auth.loopacinema.invalid',
+   clock_timestamp(), '{}', '{"loopa_telegram_registration":"5678"}'),
+  ('00000000-0000-0000-0000-000000000004', 'miniapp-8765@auth.loopacinema.invalid',
+   clock_timestamp(), '{"loopa_telegram_registration":"8765"}', '{}');
+
+set local role service_role;
+do $test$
+declare
+  v_registration jsonb;
+begin
+  if public.loopa_complete_telegram_registration('5678')->>'status' is distinct from 'missing' then
+    raise exception 'Registration trusted user-editable account metadata';
+  end if;
+  if public.loopa_telegram_link_step('8765', '00000000-0000-0000-0000-000000000003', false)
+     is distinct from 'telegram_registration_pending' then
+    raise exception 'Explicit link took ownership of a recoverable Auth registration';
+  end if;
+  begin
+    insert into public.telegram_miniapp_links (telegram_id, user_id) values
+      ('8765', '00000000-0000-0000-0000-000000000003');
+    raise exception 'Direct link bypassed recoverable registration';
+  exception when unique_violation then null;
+  end;
+  v_registration := public.loopa_complete_telegram_registration('8765');
+  if v_registration->>'user_id' is distinct from '00000000-0000-0000-0000-000000000004'
+     or v_registration->>'status' is distinct from 'linked' then
+    raise exception 'Registration did not recover the Auth account';
+  end if;
+  if public.loopa_complete_telegram_registration('8765') is distinct from v_registration then
+    raise exception 'Repeated completion changed registration ownership';
+  end if;
+end;
+$test$;
+
+reset role;
+delete from public.telegram_miniapp_links where telegram_id = '8765';
+
+set local role service_role;
+do $test$
+begin
+  if public.loopa_complete_telegram_registration('8765')->>'status' is distinct from 'missing' then
+    raise exception 'Completed registration restored a removed link';
   end if;
 end;
 $test$;

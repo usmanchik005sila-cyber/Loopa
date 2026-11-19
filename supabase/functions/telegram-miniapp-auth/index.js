@@ -109,10 +109,34 @@ async function lookup(admin, telegramId) {
   return data;
 }
 
-function internalEmail(telegramId) {
-  // Used ONLY for previously email-less users who explicitly link their
-  // existing account. Never delivered to; not a user-supplied recovery address.
-  return "miniapp-" + telegramId + "@auth.loopacinema.invalid";
+async function completeRegistration(admin, telegramId) {
+  const { data, error } = await admin.rpc("loopa_complete_telegram_registration", {
+    p_telegram_id: telegramId,
+  });
+  if (error || !data) throw error || new Error("registration_state_unavailable");
+  return data;
+}
+
+async function readRequestBody(request) {
+  if (Number(request.headers.get("Content-Length") || "0") > MAX_BODY_BYTES) return null;
+  if (!request.body) return "";
+  const reader = request.body.getReader();
+  const bytes = new Uint8Array(MAX_BODY_BYTES);
+  let length = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) return new TextDecoder().decode(bytes.subarray(0, length));
+      if (length + value.byteLength > MAX_BODY_BYTES) {
+        void reader.cancel().catch(() => {});
+        return null;
+      }
+      bytes.set(value, length);
+      length += value.byteLength;
+    }
+  } finally {
+    reader.releaseLock();
+  }
 }
 
 Deno.serve(async (request) => {
@@ -123,11 +147,8 @@ Deno.serve(async (request) => {
   if (request.method !== "POST") return reply({ error: "method_not_allowed" }, 405);
 
   try {
-    if (Number(request.headers.get("Content-Length") || "0") > MAX_BODY_BYTES) {
-      return reply({ error: "request_too_large" }, 413);
-    }
-    const raw = await request.text();
-    if (raw.length > MAX_BODY_BYTES) return reply({ error: "request_too_large" }, 413);
+    const raw = await readRequestBody(request);
+    if (raw === null) return reply({ error: "request_too_large" }, 413);
     let body;
     try { body = JSON.parse(raw); }
     catch { return reply({ error: "invalid_json" }, 400); }
@@ -166,41 +187,35 @@ Deno.serve(async (request) => {
     if (!needsSession) {
       let link = await lookup(admin, telegramId);
       if (!link && action === "register") {
-        // Create a distinct LOOPA profile only after explicit registration in the
-        // Mini App, based on HMAC-verified Telegram initData (never initDataUnsafe).
-        // Existing profiles must be linked separately; do not merge them silently.
-        const email = internalEmail(telegramId);
-        const passwordBytes = crypto.getRandomValues(new Uint8Array(32));
-        const password = Array.from(passwordBytes, b => b.toString(16).padStart(2, "0")).join("");
-        const { data: created, error: createError } = await admin.auth.admin.createUser({
-          email, password, email_confirm: true,
-          user_metadata: { display_name: "Участник LOOPA" },
-        });
-        if (createError || !created?.user?.id) {
-          // Concurrent attempts or an existing internal email must not mint a
-          // session unless this Telegram ID is already mapped to that user.
-          link = await lookup(admin, telegramId);
-          if (!link) return reply({ error: "registration_unavailable" }, 409);
-        } else {
-          const createdId = created.user.id;
-          const { error: bindError } = await admin.from("telegram_miniapp_links")
-            .insert({ telegram_id: telegramId, user_id: createdId });
-          if (bindError) {
-            // The new identity is not yet exposed to the browser. Prevent orphan
-            // profiles if another request linked the Telegram ID concurrently.
-            await admin.auth.admin.deleteUser(createdId).catch(() => {});
-            link = await lookup(admin, telegramId);
-            if (!link) return reply({ error: "registration_unavailable" }, 409);
-          } else {
-            link = { telegram_id: telegramId, user_id: createdId };
+        let registration = await completeRegistration(admin, telegramId);
+        if (registration.status === "missing") {
+          // Auth can commit even if the response is lost. Mark the candidate
+          // at creation so a retry can finish the same UUID without deleting it.
+          const passwordBytes = crypto.getRandomValues(new Uint8Array(32));
+          const password = Array.from(passwordBytes, b => b.toString(16).padStart(2, "0")).join("");
+          const { error: creationError } = await admin.auth.admin.createUser({
+            email: "miniapp-" + telegramId + "@auth.loopacinema.invalid",
+            password,
+            email_confirm: true,
+            user_metadata: { display_name: "Участник LOOPA" },
+            app_metadata: { loopa_telegram_registration: telegramId },
+          });
+          registration = await completeRegistration(admin, telegramId);
+          if (registration.status === "missing" && creationError && creationError.status >= 500) {
+            throw creationError;
           }
         }
+        if (registration.status === "link_pending") return reply({ error: "telegram_link_pending" }, 409);
+        if (registration.status !== "linked" || !registration.user_id) {
+          return reply({ error: "registration_unavailable" }, 409);
+        }
+        link = registration;
       }
       if (!link) return reply({ status: "unlinked" });
 
       const { data: userResponse, error: userError } =
         await admin.auth.admin.getUserById(link.user_id);
-      if (userError || !userResponse?.user?.email) {
+      if (userError || userResponse?.user?.id !== link.user_id || !userResponse.user.email) {
         return reply({ status: "login_unavailable" });
       }
 
@@ -218,12 +233,17 @@ Deno.serve(async (request) => {
 
       // The link is minted ONLY for the UUID bound to verified Telegram initData.
       // The hash is single-use and is never written to URLs or logs.
-      const { data, error } = await admin.auth.admin.generateLink({
-        type: "magiclink", email: userResponse.user.email,
-      });
-      if (error || !data?.properties?.hashed_token ||
-          data.user?.id !== link.user_id) {
-        return reply({ status: "login_unavailable" });
+      let generated;
+      try {
+        generated = await admin.auth.admin.generateLink({
+          type: "magiclink", email: userResponse.user.email,
+        });
+      } catch {
+        return reply({ error: "reopen_miniapp" }, 503);
+      }
+      const { data, error } = generated;
+      if (error || !data?.properties?.hashed_token || data.user?.id !== link.user_id) {
+        return reply({ error: "reopen_miniapp" }, 503);
       }
       return reply({ status: "login_ready", token_hash: data.properties.hashed_token });
     }
@@ -252,7 +272,8 @@ Deno.serve(async (request) => {
     if (reserveError) throw reserveError;
     if (reservation === "already_linked") return reply({ status: reservation });
     if (reservation === "telegram_already_linked_to_another_profile" ||
-        reservation === "profile_already_linked_to_another_telegram") {
+        reservation === "profile_already_linked_to_another_telegram" ||
+        reservation === "telegram_registration_pending") {
       return reply({ error: reservation }, 409);
     }
     if (reservation !== "reserved") return reply({ error: "service_unavailable" }, 503);
@@ -265,7 +286,7 @@ Deno.serve(async (request) => {
     }
     if (!account.user.email) {
       const { error: emailError } = await admin.auth.admin.updateUserById(viewerId, {
-        email: internalEmail(telegramId),
+        email: "miniapp-link-" + viewerId + "@auth.loopacinema.invalid",
         email_confirm: true,
       });
       if (emailError) throw emailError;

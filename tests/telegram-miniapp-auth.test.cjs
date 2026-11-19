@@ -25,7 +25,7 @@ function signedLaunch() {
   });
 }
 
-function mockBridge({ linked = true, issueError = false, claimError = false, actionBudget = { data: 0 }, linkFailure = "" } = {}) {
+function mockBridge({ linked = true, issueError = false, claimError = false, actionBudget = { data: 0 }, linkFailure = '', registrationFailure = '' } = {}) {
   const claims = new Set();
   let mintCount = 0;
   const authCalls = [];
@@ -33,18 +33,28 @@ function mockBridge({ linked = true, issueError = false, claimError = false, act
   let handler;
   let link = linked ? { user_id: 'synthetic-profile' } : null;
   let pending;
+  let candidate;
+  let createCount = 0;
   let email = linked ? 'synthetic@example.invalid' : '';
   const linkCalls = [];
   const emailUpdates = [];
   const admin = {
-    from: () => ({
-      select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: link }) }) }),
-      insert: async row => { link = row; return {}; },
-    }),
+    from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: link }) }) }) }),
     rpc: async (name, args) => {
       if (name === 'loopa_take_telegram_action_budget') {
         budgetCalls.push({ ...args });
         return actionBudget;
+      }
+      if (name === 'loopa_complete_telegram_registration') {
+        if (pending) return { data: { status: 'link_pending' } };
+        if (link) return { data: { status: 'linked', user_id: link.user_id } };
+        if (!candidate) return { data: { status: 'missing' } };
+        link = { user_id: candidate };
+        if (registrationFailure === 'after_link_commit') {
+          registrationFailure = '';
+          return { error: new Error('response lost') };
+        }
+        return { data: { status: 'linked', user_id: candidate } };
       }
       if (name === 'loopa_telegram_link_step') {
         const { p_user_id: userId, p_finish: finish } = args;
@@ -52,6 +62,7 @@ function mockBridge({ linked = true, issueError = false, claimError = false, act
         if (link?.user_id === userId) return { data: 'already_linked' };
         if (pending && pending !== userId) return { data: 'telegram_already_linked_to_another_profile' };
         if (!finish) {
+          if (candidate) return { data: 'telegram_registration_pending' };
           pending = userId;
           return { data: 'reserved' };
         }
@@ -80,8 +91,15 @@ function mockBridge({ linked = true, issueError = false, claimError = false, act
       return { data: { user: { id: token === 'other-session' ? 'other-profile' : 'synthetic-profile' } } };
     }, admin: {
       createUser: async options => {
+        assert.equal(options.app_metadata.loopa_telegram_registration, '1234');
+        assert.equal(++createCount, 1);
         email = options.email;
-        return { data: { user: { id: 'synthetic-profile' } } };
+        candidate = 'synthetic-profile';
+        if (registrationFailure === 'after_auth_commit') {
+          registrationFailure = '';
+          throw new Error('response lost');
+        }
+        return { data: { user: { id: candidate } } };
       },
       getUserById: async id => ({ data: { user: { id, email } } }),
       updateUserById: async (id, update) => {
@@ -110,6 +128,7 @@ function mockBridge({ linked = true, issueError = false, claimError = false, act
     crypto: webcrypto,
     Response,
     TextEncoder,
+    TextDecoder,
     URLSearchParams,
     Deno: {
       env: { get: key => key === 'TELEGRAM_BOT_TOKEN' ? syntheticBotToken : 'mock-setting' },
@@ -117,6 +136,7 @@ function mockBridge({ linked = true, issueError = false, claimError = false, act
     },
   });
   return {
+    responseFor: request => handler(request),
     request: async (action, fields, bearer = '') => {
       const response = await handler(new Request(origin, {
         method: 'POST',
@@ -126,6 +146,7 @@ function mockBridge({ linked = true, issueError = false, claimError = false, act
       return { code: response.status, headers: response.headers, body: await response.json() };
     },
     mintCount: () => mintCount,
+    createCount: () => createCount,
     budgetCalls,
     authCalls,
     linkCalls,
@@ -153,7 +174,9 @@ test('unlinked automatic login leaves the launch available for explicit registra
 test('ambiguous issuance failure cannot mint again and unavailable claims block issuance', async () => {
   const fields = signedLaunch();
   const brokenIssuance = mockBridge({ issueError: true });
-  assert.equal((await brokenIssuance.request('login', fields)).code, 503);
+  const failedIssuance = await brokenIssuance.request('login', fields);
+  assert.equal(failedIssuance.code, 503);
+  assert.equal(failedIssuance.body.error, 'reopen_miniapp');
   assert.equal((await brokenIssuance.request('login', fields)).body.error, 'reopen_miniapp');
   assert.equal(brokenIssuance.mintCount(), 1);
 
@@ -209,3 +232,46 @@ for (const failure of ['before_email_update', 'after_email_update', 'before_fini
     assert.equal((await bridge.request('login', fields)).body.status, 'login_ready');
   });
 }
+
+for (const failure of ['after_auth_commit', 'after_link_commit']) {
+  test('registration retries reuse the account after ' + failure, async () => {
+    const bridge = mockBridge({ linked: false, registrationFailure: failure });
+    const fields = signedLaunch();
+    assert.equal((await bridge.request('register', fields)).code, 503);
+    if (failure === 'after_auth_commit') {
+      assert.equal((await bridge.request('link', fields, 'other-session')).body.error,
+        'telegram_registration_pending');
+    }
+    assert.equal((await bridge.request('register', fields)).body.status, 'login_ready');
+    assert.equal(bridge.createCount(), 1);
+    assert.equal(bridge.mintCount(), 1);
+  });
+}
+
+test('registration leaves a pending explicit link with its owner', async () => {
+  const bridge = mockBridge({ linked: false, linkFailure: 'before_finish' });
+  const fields = signedLaunch();
+  assert.equal((await bridge.request('link', fields, 'synthetic-session')).code, 503);
+  assert.equal((await bridge.request('register', fields)).body.error, 'telegram_link_pending');
+  assert.equal(bridge.createCount(), 0);
+  assert.equal((await bridge.request('link', fields, 'synthetic-session')).body.status, 'linked');
+});
+
+test('request stream is capped by bytes without requiring Content-Length', async () => {
+  const bridge = mockBridge();
+  const chunks = Array(3).fill(new TextEncoder().encode('я'.repeat(3000)));
+  let cancelled = false;
+  const body = new ReadableStream({
+    pull(controller) {
+      controller.enqueue(chunks.shift());
+      if (!chunks.length) controller.close();
+    },
+    cancel() { cancelled = true; },
+  });
+  const response = await bridge.responseFor(new Request(origin, {
+    method: 'POST', headers: { Origin: origin }, body, duplex: 'half',
+  }));
+  assert.equal(response.status, 413);
+  assert.ok(cancelled || chunks.length === 0);
+  assert.equal(bridge.budgetCalls.length, 0);
+});
