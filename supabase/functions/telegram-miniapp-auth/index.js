@@ -38,7 +38,7 @@ function hexToBytes(hex) {
   return bytes;
 }
 
-async function telegramUserId(initData, botToken) {
+async function verifyTelegramInitData(initData, botToken) {
   if (typeof initData !== "string" || !initData || initData.length > 8192) {
     throw new Error("invalid_init_data");
   }
@@ -85,7 +85,7 @@ async function telegramUserId(initData, botToken) {
   if (!user || !Number.isSafeInteger(user.id) || user.id <= 0) {
     throw new Error("invalid_user");
   }
-  return String(user.id);
+  return { telegramId: String(user.id), authDate, signature: calculatedHash };
 }
 
 function adminClient() {
@@ -133,13 +133,14 @@ Deno.serve(async (request) => {
 
     const token = Deno.env.get("TELEGRAM_BOT_TOKEN");
     if (!token) return reply({ error: "backend_not_configured" }, 503);
-    let telegramId;
-    try { telegramId = await telegramUserId(body?.initData, token); }
+    let telegram;
+    try { telegram = await verifyTelegramInitData(body?.initData, token); }
     catch (error) {
       const stale = error instanceof Error && error.message === "stale_init_data";
       return reply({ error: stale ? "reopen_miniapp" : "invalid_telegram_data" }, 401);
     }
 
+    const { telegramId } = telegram;
     const admin = adminClient();
     if (body.action === "login" || body.action === "register") {
       let link = await lookup(admin, telegramId);
@@ -181,6 +182,18 @@ Deno.serve(async (request) => {
       if (userError || !userResponse?.user?.email) {
         return reply({ status: "login_unavailable" });
       }
+
+      // Claim the verified payload before calling Auth. Never release the claim:
+      // a transport failure can leave the result of generateLink unknown.
+      const fingerprintBytes = await crypto.subtle.digest("SHA-256", telegram.signature);
+      const fingerprint = Array.from(new Uint8Array(fingerprintBytes), byte =>
+        byte.toString(16).padStart(2, "0")).join("");
+      const { data: claimed, error: claimError } = await admin.rpc("loopa_claim_telegram_login", {
+        p_fingerprint: fingerprint,
+        p_auth_date: telegram.authDate,
+      });
+      if (claimError) throw claimError;
+      if (claimed !== true) return reply({ error: "reopen_miniapp" }, 409);
 
       // The link is minted ONLY for the UUID bound to verified Telegram initData.
       // The hash is single-use and is never written to URLs or logs.

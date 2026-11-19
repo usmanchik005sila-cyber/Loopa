@@ -17,7 +17,7 @@
 
 ## Порядок развёртывания
 
-1. В Supabase проекта LOOPA запусти SQL-файл `supabase/migrations/20261108_telegram_miniapp_links.sql` в **SQL Editor**.
+1. В тестовой среде примени миграции `20261108_telegram_miniapp_links.sql` и `20261119162157_telegram_single_use_login.sql`. После проверки и согласования примени миграции к production перед обновлением Edge Function.
 2. В Supabase Edge Functions добавь секрет `TELEGRAM_BOT_TOKEN` — токен **этого же бота LOOPAvideo_bot** из BotFather. **Никогда не вставляй секрет в index.html или публичный GitHub**, не присылай его в чат.
 3. Проверь доступность `SUPABASE_URL` и одного из `SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_SECRET_KEY` / `SUPABASE_SECRET_KEYS.default` в окружении Edge Functions. Значение сервисного ключа нельзя публиковать.
 4. Разверни функцию `telegram-miniapp-auth` по `supabase/functions/telegram-miniapp-auth/index.js` с конфигурацией из `supabase/config.toml` (для первого входа `verify_jwt=false`, проверки происходят внутри функции). Через Supabase CLI: `supabase functions deploy telegram-miniapp-auth --project-ref <REF> --no-verify-jwt`.
@@ -26,10 +26,14 @@
 
 Вместо `--no-verify-jwt` можно использовать настройки из `supabase/config.toml` при локально настроенном Supabase CLI. **Не включай публичный доступ к другим функциям.**
 
+### Откат
+
+Миграция совместима с предыдущей Edge Function. При откате Edge Function сохрани таблицу отметок. Предыдущая версия снова допускает повторную выдачу токена, поэтому согласуй такой откат отдельно. После нового запуска Mini App требуется свежее подписанное подтверждение Telegram, если предыдущий обмен уже был зарезервирован. Обычный вход через email и другие настроенные способы остаётся доступен.
+
 ## Важные проверки перед запуском для всех пользователей
 
 - Проверить SQL RLS: у `anon` и `authenticated` нет доступа к `telegram_miniapp_links`.
-- Проверить подпись: изменённое / истёкшее `initData` отвергается сервером.
+- Проверить подпись: изменённое / истёкшее `initData` отвергается сервером. Проверить, что повторный обмен уже использованного подтверждения просит заново открыть Mini App, а новая сессия запуска позволяет войти.
 - Проверить попытку связать чужой профиль / второй Telegram — должна возвращаться ошибка 409.
 - Проверить авторизацию с настоящего iPhone внутри Telegram; до реального теста нельзя считать интеграцию готовой.
 - После деплоя проверь CORS: `https://loopacinema.ru` — единственный разрешённый источник.

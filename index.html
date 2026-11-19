@@ -5409,7 +5409,7 @@ section[data-page="profile"]>#settings-detail>.settings-back{margin-bottom:14px}
     }
     function telegramMiniErrorMessage(error){
       if(error?.message==='reopen_miniapp')
-        return 'Время подтверждения истекло. Закрой Mini App и открой заново.';
+        return 'Нужно новое подтверждение Telegram. Закрой Mini App и открой заново.';
       if(error?.message==='telegram_already_linked_to_another_profile')
         return 'Этот Telegram уже связан с другим профилем LOOPA. Сначала войди в него.';
       if(error?.message==='profile_already_linked_to_another_telegram')
@@ -5641,6 +5641,7 @@ section[data-page="profile"]>#settings-detail>.settings-back{margin-bottom:14px}
         }else{
           message=LOOPAAAccountContinuity.identityLinkError(error,'Telegram')||message;
         }
+        if(error?.message==='reopen_miniapp')message=telegramMiniErrorMessage(error);
         feedback('telegramAuthError',message,true);
       }finally{button.disabled=false;}
     };
