@@ -19,6 +19,8 @@ Limits reduce abuse by one account; they do not stop distributed attacks or atta
 
 Rollback: deploy the previous video-search source before executing rollback/abuse_rate_limits_down.sql. The rollback keeps counters, so re-enabling should reuse the existing table rather than recreate it. No paid infrastructure is required.
 
-## Remaining RUTUBE bridge boundary
+## RUTUBE direct-call protection (2026-11-19)
 
-The independently deployed Yandex Cloud bridge is outside this repository and was not modified. Limits here cover calls through video-search. Its direct public endpoint must also enforce a quota or require server-only authentication before we can claim RUTUBE cannot be queried around the main Edge API. Deployment access/source for that function was not available in this session. Do not remove its existing user-auth validation.
+The Yandex bridge now checks the same durable account quota before calling RUTUBE, including direct public URL calls. Source and Go tests live in yandex/rutube-search. Deployed version: d4eifd0b9quegqm2qt92. Previous version d4e0shn1vd4don2tmjgd is retained under before-rutube-limits-20261119 for rollback. Deployment smoke checks and independent calls rejected missing/invalid authorization with HTTP 401. Authenticated success, quota exhaustion and quota failure were verified with mocked HTTP transport, not a live user session.
+
+An uncached RUTUBE search through Edge currently consumes two search tokens (Edge and bridge). This stricter allowance is documented; direct bridge calls consume one. Cached Edge results consume one. Autocomplete is unaffected and uses its own quota. These are per-account limits, not a global anti-DDoS boundary.
