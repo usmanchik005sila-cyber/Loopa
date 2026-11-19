@@ -234,41 +234,51 @@ Deno.serve(async (request) => {
       return reply({ error: "login_required" }, 401);
     }
     const viewerId = viewer.user.id;
-    // Do not silently merge or reassign: both telegram_id and user_id are UNIQUE.
-    const existing = await lookup(admin, telegramId);
-    if (action === "status" && existing) {
-      return reply({ status: existing.user_id === viewerId ? "linked" : "claimed_by_another_profile" });
-    }
-    if (existing) {
-      return existing.user_id === viewerId
-        ? reply({ status: "already_linked" })
-        : reply({ error: "telegram_already_linked_to_another_profile" }, 409);
-    }
-    const { data: other, error: otherError } = await admin.from("telegram_miniapp_links")
-      .select("telegram_id").eq("user_id", viewerId).maybeSingle();
-    if (otherError) throw otherError;
     if (action === "status") {
+      const existing = await lookup(admin, telegramId);
+      if (existing) {
+        return reply({ status: existing.user_id === viewerId ? "linked" : "claimed_by_another_profile" });
+      }
+      const { data: other, error } = await admin.from("telegram_miniapp_links")
+        .select("telegram_id").eq("user_id", viewerId).maybeSingle();
+      if (error) throw error;
       return reply({ status: other ? "profile_linked_elsewhere" : "unlinked" });
     }
-    if (other) return reply({ error: "profile_already_linked_to_another_telegram" }, 409);
 
-    if (!viewer.user.email) {
-      // Deliberate account link action: retain original UUID, rooms and friends.
-      // Supabase magiclink sessions require an email identifier. A non-routable,
-      // internal-only address is added only for email-less accounts.
+    const linkArgs = { p_telegram_id: telegramId, p_user_id: viewerId };
+    const { data: reservation, error: reserveError } = await admin.rpc("loopa_telegram_link_step", {
+      ...linkArgs, p_finish: false,
+    });
+    if (reserveError) throw reserveError;
+    if (reservation === "already_linked") return reply({ status: reservation });
+    if (reservation === "telegram_already_linked_to_another_profile" ||
+        reservation === "profile_already_linked_to_another_telegram") {
+      return reply({ error: reservation }, 409);
+    }
+    if (reservation !== "reserved") return reply({ error: "service_unavailable" }, 503);
+
+    // Re-read Auth after reserving the pair. A retry can finish a prior
+    // successful email update even if its response was lost.
+    const { data: account, error: accountError } = await admin.auth.admin.getUserById(viewerId);
+    if (accountError || account?.user?.id !== viewerId) {
+      return reply({ error: "service_unavailable" }, 503);
+    }
+    if (!account.user.email) {
       const { error: emailError } = await admin.auth.admin.updateUserById(viewerId, {
         email: internalEmail(telegramId),
         email_confirm: true,
       });
       if (emailError) throw emailError;
     }
-    const { error: insertError } = await admin.from("telegram_miniapp_links")
-      .insert({ telegram_id: telegramId, user_id: viewerId });
-    if (insertError) {
-      // Unique constraints prevent a concurrent request from reassigning ownership.
-      return reply({ error: "link_conflict" }, 409);
+
+    const { data: completed, error: completeError } = await admin.rpc("loopa_telegram_link_step", {
+      ...linkArgs, p_finish: true,
+    });
+    if (completeError) throw completeError;
+    if (completed !== "linked" && completed !== "already_linked") {
+      return reply({ error: "service_unavailable" }, 503);
     }
-    return reply({ status: "linked" });
+    return reply({ status: completed });
   } catch {
     // No details, initData, or credentials leaked to the caller or Edge logs.
     return reply({ error: "service_unavailable" }, 503);

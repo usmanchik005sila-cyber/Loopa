@@ -5401,7 +5401,8 @@ section[data-page="profile"]>#settings-detail>.settings-back{margin-bottom:14px}
       });
       const result=await response.json().catch(()=>({}));
       if(!response.ok){
-        const error=new Error(result.error||'backend_unavailable');
+        const message=action==='link'&&response.status===503?'telegram_link_retry':result.error||'backend_unavailable';
+        const error=new Error(message);
         error.status=response.status;
         error.retryAfter=Number(response.headers.get('Retry-After'));
         throw error;
@@ -5409,6 +5410,8 @@ section[data-page="profile"]>#settings-detail>.settings-back{margin-bottom:14px}
       return result;
     }
     function telegramMiniErrorMessage(error){
+      if(error?.message==='telegram_link_retry')
+        return 'Не удалось завершить привязку. Повтори попытку из этого же профиля.';
       if(error?.message==='telegram_rate_limited')
         return error.retryAfter>0
           ? 'Слишком много попыток. Повтори через '+error.retryAfter+' сек.'
@@ -5646,7 +5649,7 @@ section[data-page="profile"]>#settings-detail>.settings-back{margin-bottom:14px}
         }else{
           message=LOOPAAAccountContinuity.identityLinkError(error,'Telegram')||message;
         }
-        if(['reopen_miniapp','telegram_rate_limited'].includes(error?.message))message=telegramMiniErrorMessage(error);
+        if(['reopen_miniapp','telegram_rate_limited','telegram_link_retry'].includes(error?.message))message=telegramMiniErrorMessage(error);
         feedback('telegramAuthError',message,true);
       }finally{button.disabled=false;}
     };

@@ -25,13 +25,17 @@ function signedLaunch() {
   });
 }
 
-function mockBridge({ linked = true, issueError = false, claimError = false, actionBudget = { data: 0 } } = {}) {
+function mockBridge({ linked = true, issueError = false, claimError = false, actionBudget = { data: 0 }, linkFailure = "" } = {}) {
   const claims = new Set();
   let mintCount = 0;
   const authCalls = [];
   const budgetCalls = [];
   let handler;
   let link = linked ? { user_id: 'synthetic-profile' } : null;
+  let pending;
+  let email = linked ? 'synthetic@example.invalid' : '';
+  const linkCalls = [];
+  const emailUpdates = [];
   const admin = {
     from: () => ({
       select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: link }) }) }),
@@ -42,18 +46,58 @@ function mockBridge({ linked = true, issueError = false, claimError = false, act
         budgetCalls.push({ ...args });
         return actionBudget;
       }
+      if (name === 'loopa_telegram_link_step') {
+        const { p_user_id: userId, p_finish: finish } = args;
+        linkCalls.push({ userId, finish });
+        if (link?.user_id === userId) return { data: 'already_linked' };
+        if (pending && pending !== userId) return { data: 'telegram_already_linked_to_another_profile' };
+        if (!finish) {
+          pending = userId;
+          return { data: 'reserved' };
+        }
+        if (linkFailure === 'before_finish') {
+          linkFailure = '';
+          return { error: new Error('unavailable') };
+        }
+        assert.equal(pending, userId);
+        assert.ok(email);
+        pending = undefined;
+        link = { user_id: userId };
+        if (linkFailure === 'after_finish') {
+          linkFailure = '';
+          return { error: new Error('response lost') };
+        }
+        return { data: 'linked' };
+      }
       assert.equal(name, 'loopa_claim_telegram_login');
       if (claimError) return { error: new Error('unavailable') };
       if (claims.has(args.p_fingerprint)) return { data: false };
       claims.add(args.p_fingerprint);
       return { data: true };
     },
-    auth: { getUser: async () => {
+    auth: { getUser: async token => {
       authCalls.push('getUser');
-      return { data: { user: { id: 'synthetic-profile' } } };
+      return { data: { user: { id: token === 'other-session' ? 'other-profile' : 'synthetic-profile' } } };
     }, admin: {
-      createUser: async () => ({ data: { user: { id: 'synthetic-profile' } } }),
-      getUserById: async () => ({ data: { user: { email: 'synthetic@example.invalid' } } }),
+      createUser: async options => {
+        email = options.email;
+        return { data: { user: { id: 'synthetic-profile' } } };
+      },
+      getUserById: async id => ({ data: { user: { id, email } } }),
+      updateUserById: async (id, update) => {
+        emailUpdates.push(id);
+        assert.equal(pending, id);
+        if (linkFailure === 'before_email_update') {
+          linkFailure = '';
+          return { error: new Error('update not applied') };
+        }
+        email = update.email;
+        if (linkFailure === 'after_email_update') {
+          linkFailure = '';
+          return { error: new Error('response lost') };
+        }
+        return {};
+      },
       generateLink: async () => {
         mintCount++;
         if (issueError) throw new Error('ambiguous transport error');
@@ -84,6 +128,8 @@ function mockBridge({ linked = true, issueError = false, claimError = false, act
     mintCount: () => mintCount,
     budgetCalls,
     authCalls,
+    linkCalls,
+    emailUpdates,
   };
 }
 
@@ -146,3 +192,20 @@ test('allowed status and link requests still verify the Supabase session', async
   assert.equal((await bridge.request('link', fields, 'synthetic-session')).body.status, 'already_linked');
   assert.deepEqual(bridge.authCalls, ['getUser', 'getUser']);
 });
+
+for (const failure of ['before_email_update', 'after_email_update', 'before_finish', 'after_finish']) {
+  test('link retry recovers after ' + failure, async () => {
+    const bridge = mockBridge({ linked: false, linkFailure: failure });
+    const fields = signedLaunch();
+    assert.equal((await bridge.request('link', fields, 'synthetic-session')).code, 503);
+    if (failure !== 'after_finish') {
+      assert.equal((await bridge.request('login', fields)).body.status, 'unlinked');
+      assert.equal((await bridge.request('link', fields, 'other-session')).code, 409);
+    }
+    const retried = await bridge.request('link', fields, 'synthetic-session');
+    assert.equal(retried.body.status, failure === 'after_finish' ? 'already_linked' : 'linked');
+    assert.deepEqual(bridge.emailUpdates,
+      Array(failure === 'before_email_update' ? 2 : 1).fill('synthetic-profile'));
+    assert.equal((await bridge.request('login', fields)).body.status, 'login_ready');
+  });
+}
