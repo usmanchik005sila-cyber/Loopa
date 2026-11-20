@@ -55,3 +55,86 @@ test('guest transport buttons send the current room context and ignore stale rep
   await click(event);
   assert.deepEqual(applied, [[21, true]]);
 });
+
+test('host drops a pending fetch after the playback grant changed or the app was hidden', async () => {
+  const { c, calls } = setup();
+  c.roomState.control_generation = 7;
+  c.client.rpc = async () => {
+    c.roomState.control_generation = 8;
+    return { data: { pending: true, seq: 1, video: 'video', pos: 120, playing: false } };
+  };
+  await c.receiveGuestControl();
+  assert.deepEqual(calls, []);
+  c.client.rpc = async () => {
+    c.document.hidden = true;
+    return { data: { pending: true, seq: 2, video: 'video', pos: 130, playing: false } };
+  };
+  await c.receiveGuestControl();
+  assert.deepEqual(calls, []);
+});
+
+test('host does not queue an older click after switching video or sending a newer click', async () => {
+  const listenerStart = html.indexOf("    playbackControls.addEventListener('click',async e=>");
+  const listener = html.slice(listenerStart, html.indexOf('    // v85:', listenerStart));
+  let click;
+  let finishSync;
+  const writes = [];
+  const sandbox = {
+    roomState: { code: 'ROOM', video: 'video', pos: 21 },
+    roomEpoch: 1, hostTransportRequest: 0, sharedMode: false, rutubeAd: false,
+    mediaDuration: 0, timelineTarget: null, sample: null, applyingUntil: 0, pending: null,
+    performance: { now: () => 100 },
+    playbackControls: { addEventListener: (_name, handler) => { click = handler; } },
+    hostHere: () => Boolean(sandbox.roomState),
+    revealControls() {}, updatePlaybackControls() {}, commandPlayer() {},
+    syncPlayback: () => new Promise(resolve => { finishSync = resolve; }),
+    flushPlayback: () => writes.push({ ...sandbox.pending }),
+  };
+  vm.runInNewContext(listener, sandbox);
+  const event = { target: { closest: () => ({ id: 'roomToggle', dataset: {} }) } };
+
+  const beforeSwitch = click(event);
+  sandbox.roomState.video = 'new-video';
+  finishSync();
+  await beforeSwitch;
+  assert.deepEqual(writes, []);
+
+  const older = click(event);
+  const finishOlder = finishSync;
+  const newer = click(event);
+  finishSync();
+  await newer;
+  finishOlder();
+  await older;
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].video, 'new-video');
+});
+
+test('a fresh native player command survives an in-flight reply for the previous grant', async () => {
+  const start = html.indexOf('    function guestControlCurrent(');
+  const source = html.slice(start, html.indexOf('    // Pull until acknowledged', start));
+  const requests = [];
+  let finishOld;
+  const sandbox = {
+    currentUser: { id: 'guest' },
+    roomState: { code: 'ROOM', video: 'video', control_generation: 1 },
+    roomEpoch: 1, sharedMode: true, guestControlInflight: false, guestControlQueued: null,
+    guestManualUntil: 0, document: { hidden: false }, hostHere: () => false,
+    performance: { now: () => 100 },
+    client: { rpc: (_name, input) => {
+      requests.push({...input});
+      return requests.length === 1 ? new Promise(resolve => { finishOld = resolve; }) : Promise.resolve({});
+    } },
+    showToast: message => assert.fail(message),
+  };
+  vm.runInNewContext(source, sandbox);
+  const initial = { code: 'ROOM', video: 'video', user: 'guest', epoch: 1,
+    generation: 1, pos: 30, playing: true };
+  const old = sandbox.sendGuestControl(initial);
+  sandbox.roomState.control_generation = 2;
+  await sandbox.sendGuestControl({ ...initial, generation: 2, pos: 60, playing: false });
+  finishOld({ error: { message: 'stale context' } });
+  await old;
+  assert.deepEqual(requests.map(input => [input.expected_generation, input.position_seconds, input.is_playing]),
+    [[1, 30, true], [2, 60, false]]);
+});
