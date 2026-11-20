@@ -13,6 +13,13 @@ begin
  if (select control_generation from public.loopa_rooms16 where loopa_rooms16.code=test_code)<>gen then raise exception 'Renew changed generation'; end if;
  perform set_config('request.jwt.claim.sub',g::text,true);
  perform public.loopa_room16(op=>'join',room=>test_code);
+ if has_function_privilege('authenticated','loopa_private.loopa_collab27(text,text,boolean,double precision,boolean,bigint)','EXECUTE') then
+  raise exception 'Guest role can execute room control implementation directly';
+ end if;
+ begin
+  perform public.loopa_collab27(action=>'control',room_code=>test_code,position_seconds=>100,is_playing=>false);
+  raise exception 'TEST context-free command accepted';
+ exception when others then if sqlerrm<>'Команда недоступна. Обнови LOOPA' then raise; end if; end;
  result:=public.loopa_control_v2(test_code,v,gen,100,false);first_seq:=(result->>'seq')::bigint;
  perform public.loopa_control_v2(test_code,v,gen,200,false);
  perform set_config('request.jwt.claim.sub',h::text,true);

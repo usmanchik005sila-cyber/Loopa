@@ -2498,15 +2498,22 @@ section[data-page="profile"]>#settings-detail>.settings-back{margin-bottom:14px}
         if(!roomState.members?.some(m=>m.id===roomState.host&&m.online)){
           showToast('Создатель переподключается — управление пока недоступно');return;
         }
+        const target={code:roomState.code,video:roomState.video,generation:roomState.control_generation,
+          user:currentUser?.id,epoch:roomEpoch};
+        if(!guestControlCurrent(target))return;
         guestManualUntil=performance.now()+3000;
         try{
-          const {error}=await client.rpc('loopa_collab27',{
-            action:'control',room_code:roomState.code,position_seconds:pos,is_playing:playing
+          const {error}=await client.rpc('loopa_control_v2',{
+            room_code:target.code,expected_video:target.video,expected_generation:target.generation,
+            position_seconds:pos,is_playing:playing
           });
+          if(!guestControlCurrent(target))return;
           if(error)throw error;
           commandPlayer(pos,playing);
           sample={pos,playing,now:performance.now()};
         }catch(e){
+          if(!guestControlCurrent(target))return;
+          guestManualUntil=0;
           showToast('Не удалось передать управление: '+errorText(e));
           void roomRun('read');
           return;
