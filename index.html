@@ -411,6 +411,10 @@
     .friend-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin:0 0 16px;}
     .friend-head h2{font-size:19px;line-height:1.3;}
     .friend-count{flex:none;font-size:12px;color:#b4aeb0;}
+    .friend-list-tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin:0 0 14px;padding:4px;border:1px solid #ffffff19;border-radius:15px;background:#08080a66}
+    .friend-list-tabs button{display:flex;align-items:center;justify-content:center;gap:8px;min-width:0;min-height:40px;padding:7px 5px;border:1px solid transparent;border-radius:11px;background:none;color:#bdb8bc;font:600 13px system-ui;cursor:pointer}
+    .friend-list-tabs button[aria-selected="true"]{border-color:#ffffff25;background:#ffffff14;color:#f6f3f5}
+    .friend-list-tabs button:focus-visible{outline:2px solid #eee;outline-offset:-3px}
     .friend-search-label{display:block;font-size:12px;color:#bcb4b7;margin:16px 0 8px;}
     .friend-search-input{width:100%;min-height:48px;padding:13px 15px;border-radius:14px;border:1px solid rgba(255,255,255,.23);background:rgba(9,9,12,.32);color:#f5eeeb;font:inherit;font-size:14px;outline:none;}
     #friend-search{font-size:16px;}
@@ -993,8 +997,9 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
 .safety-dialog h2{font:600 clamp(20px,5vw,25px)/1.2 system-ui;margin:0 0 8px;letter-spacing:-.6px}
 .safety-dialog p{color:#b7b7be;font:13px/1.6 system-ui}
 .safety-dialog .field{margin:15px 0}
-.safety-dialog select,.safety-dialog textarea{display:block;width:100%;box-sizing:border-box;margin-top:8px;padding:12px;border:1px solid #ffffff27;border-radius:13px;background:#17171a;color:#f4f4f5;font:14px/1.5 system-ui}
-.safety-dialog textarea{min-height:88px;resize:vertical}
+.safety-dialog select{display:block;width:100%;box-sizing:border-box;margin-top:8px;padding:12px;border:1px solid #ffffff27;border-radius:13px;background:#17171a;color:#f4f4f5;font:14px/1.5 system-ui}
+.safety-dialog .dm-dialog-top h2{margin:0}
+#user-report-close{min-width:44px;min-height:44px;border:1px solid #ffffff22;border-radius:13px;background:#ffffff0c;color:#f0f0f1;font:23px system-ui;cursor:pointer}
 .safety-dialog-actions{display:flex;gap:9px;margin-top:18px}
 .safety-dialog-actions button{flex:1;min-height:46px;border:1px solid #ffffff22;border-radius:13px;background:#ffffff0c;color:#f3f3f4;font:600 13px system-ui;cursor:pointer}
 .safety-dialog-actions .primary{background:#ededee;color:#19191b}
@@ -1007,7 +1012,14 @@ body.roomViewing #moreRoom{height:44px;width:44px;min-width:44px;
 .safety-support-link:hover,.safety-support-link:focus-visible{border-color:rgba(70,190,250,.72);background:rgba(42,171,238,.22)}
 .auth-help-link{margin:18px 4px 0;color:#a8a3a5;font-size:12px;line-height:1.5;text-align:center}
 .auth-help-link a{color:#eee;text-underline-offset:3px}
-.dm-header #dmReportUser{margin-left:auto;min-width:38px;width:38px;height:38px;border:1px solid #ffffff20;border-radius:50%;background:#ffffff08;color:#ddd;font:20px system-ui}
+.dm-actions{position:relative;flex:none;z-index:3}
+.dm-header #dmActionsToggle{display:grid;place-items:center;min-width:44px;height:44px;border:1px solid #ffffff22;border-radius:50%;background:#ffffff08;color:#e9e7ea;font:20px system-ui}
+.dm-header #dmActionsToggle[aria-expanded="true"]{background:#ffffff16}
+.dm-actions-panel{position:absolute;top:calc(100% + 8px);right:0;width:190px;max-width:calc(100vw - 32px);padding:5px;border:1px solid #ffffff24;border-radius:16px;background:#252529;box-shadow:0 14px 38px #000a}
+.dm-header .dm-actions-panel button{display:block;width:100%;min-height:44px;height:auto;padding:9px 12px;border:0;border-radius:11px;background:none;color:#f0edf0;text-align:left;font:600 13px system-ui}
+.dm-header .dm-actions-panel button:focus-visible,.dm-header .dm-actions-panel button:hover{background:#ffffff13}
+.dm-header .dm-actions-panel .danger{color:#ffc1bd;border-top:1px solid #ffffff10}
+.dm-header .dm-actions-panel button:disabled{opacity:.55;cursor:default}
 .dm-message-report{display:block;margin:4px 0 0 auto;padding:2px 5px;border:0;border-radius:7px;background:transparent;color:#aaa;font:11px/1.3 system-ui;cursor:pointer}
 .dm-message-report:hover,.dm-message-report:focus-visible{background:#ffffff13;color:#fff}
 .safety-delete-entry{display:block;width:100%;margin:12px 0 4px;padding:13px 14px;text-align:left;border:1px solid #a34d4d44;border-radius:14px;background:#681f1f18;color:#efbaba;font:600 13px system-ui;cursor:pointer}
@@ -1618,12 +1630,16 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
             <div id="friend-search-results" aria-live="polite"></div>
           </div>
           <div class="panel glass friend-panel friend-list-panel">
-            <div class="friend-head"><h2>Мои друзья</h2><span class="friend-count" id="friend-count">0</span></div>
-            <div id="friend-list"><div class="friends-empty">Здесь появятся люди после принятия заявок.</div></div>
-          </div>
-          <div class="panel glass friend-panel" id="friend-outgoing-panel" hidden>
-            <div class="friend-head"><h2>Отправленные заявки</h2><span class="friend-count" id="friend-outgoing-count">0</span></div>
-            <div id="friend-outgoing"></div>
+            <div class="friend-list-tabs" role="tablist" aria-label="Друзья и отправленные заявки">
+              <button id="friend-list-tab" type="button" role="tab" aria-selected="true" aria-controls="friend-list-panel">Друзья <span class="friend-count" id="friend-count">0</span></button>
+              <button id="friend-outgoing-tab" type="button" role="tab" aria-selected="false" aria-controls="friend-outgoing-panel" tabindex="-1">Заявки <span class="friend-count" id="friend-outgoing-count">0</span></button>
+            </div>
+            <div id="friend-list-panel" role="tabpanel" aria-labelledby="friend-list-tab" tabindex="0">
+              <div id="friend-list"><div class="friends-empty">Здесь появятся люди после принятия заявок.</div></div>
+            </div>
+            <div id="friend-outgoing-panel" role="tabpanel" aria-labelledby="friend-outgoing-tab" tabindex="0" hidden>
+              <div id="friend-outgoing"><div class="friends-empty">Отправленных заявок пока нет.</div></div>
+            </div>
           </div>
           <p id="friends-feedback" class="friends-feedback" role="status" aria-live="polite" hidden></p>
         </div>
@@ -1657,7 +1673,18 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       <section data-page="dm" hidden>
         <div class="eyebrow">ЛИЧНОЕ ОБЩЕНИЕ</div>
         <div class="dm-screen">
-          <div class="dm-header"><button id="dmBack" aria-label="Назад к профилю" type="button">‹</button><button id="dmPeerAvatar" type="button" aria-label="Открыть профиль собеседника"></button><div class="dm-header-info"><strong id="dmPeerName">Собеседник</strong><small>Личные сообщения LOOPA</small></div><button id="dmReportUser" type="button" aria-label="Пожаловаться на пользователя" title="Пожаловаться">⋯</button></div>
+          <div class="dm-header">
+            <button id="dmBack" aria-label="Назад к профилю" type="button">‹</button>
+            <button id="dmPeerAvatar" type="button" aria-label="Открыть профиль собеседника"></button>
+            <div class="dm-header-info"><strong id="dmPeerName">Собеседник</strong><small>Личные сообщения LOOPA</small></div>
+            <div class="dm-actions" id="dmActions">
+              <button id="dmActionsToggle" type="button" aria-label="Действия с перепиской" aria-expanded="false" aria-controls="dmActionsPanel">⋯</button>
+              <div class="dm-actions-panel" id="dmActionsPanel" hidden>
+                <button id="dmReportUser" type="button">Пожаловаться</button>
+                <button id="dmBlockUser" class="danger" type="button">Заблокировать</button>
+              </div>
+            </div>
+          </div>
           <div class="dm-log" id="dmLog" aria-live="polite"><p class="dm-empty">Загрузка переписки…</p></div>
           <p id="dm-error" role="status" hidden></p>
           <form id="dmForm" class="dm-composer"><textarea id="dmInput" aria-label="Сообщение" placeholder="Сообщение…" maxlength="2000" rows="1" enterkeyhint="send" required></textarea><button id="dmSend" type="submit" aria-label="Отправить сообщение">↑</button></form>
@@ -1905,11 +1932,18 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     <button class="action dm-policy-save" type="button" id="dm-policy-save">Сохранить выбор</button>
     <p id="dm-policy-feedback" class="auth-feedback" role="status" aria-live="polite" hidden></p>
   </dialog>
+  <dialog id="dm-block-dialog" class="safety-dialog" aria-labelledby="dm-block-title" aria-describedby="dm-block-description">
+    <h2 id="dm-block-title">Заблокировать собеседника?</h2>
+    <p id="dm-block-description">Вы останетесь в друзьях. Отправка сообщений, аватары и статус активности будут недоступны друг другу.</p>
+    <div class="safety-dialog-actions">
+      <button id="dm-block-cancel" type="button" autofocus>Отмена</button>
+      <button id="dm-block-confirm" class="danger" type="button">Заблокировать</button>
+    </div>
+  </dialog>
   <dialog id="user-report-dialog" class="safety-dialog" aria-labelledby="user-report-title" aria-describedby="user-report-description">
-    <div class="dm-dialog-top"><span>БЕЗОПАСНОСТЬ LOOPA</span><button type="button" id="user-report-close" aria-label="Закрыть">×</button></div>
-    <h2 id="user-report-title">Пожаловаться</h2>
+    <div class="dm-dialog-top"><h2 id="user-report-title">Пожаловаться</h2><button type="button" id="user-report-close" aria-label="Закрыть">×</button></div>
     <p id="user-report-context">Жалоба будет отправлена владельцу LOOPA.</p>
-    <p id="user-report-description">Жалобу не увидят другие пользователи. Для жалобы на сообщение LOOPA сохранит его идентификатор, но не будет создавать отдельную копию текста.</p>
+    <p id="user-report-description">Жалобу увидит только команда LOOPA.</p>
     <form id="user-report-form">
       <label class="field">Причина
         <select id="user-report-reason" required>
@@ -1920,9 +1954,6 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
           <option value="scam">Обман или мошенничество</option>
           <option value="other">Другое</option>
         </select>
-      </label>
-      <label class="field">Комментарий <small>(необязательно, до 500 символов)</small>
-        <textarea id="user-report-details" maxlength="500" placeholder="Не указывай пароль, код входа или другие секреты."></textarea>
       </label>
       <div class="safety-dialog-actions"><button type="button" id="user-report-cancel">Отмена</button><button class="primary" type="submit" id="user-report-submit">Отправить</button></div>
       <p id="user-report-feedback" class="auth-feedback" role="status" aria-live="polite" hidden></p>
@@ -1958,7 +1989,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
   <script src="./assets/room-watch-reliability.js"></script>
   <script src="./assets/account-continuity.js"></script>
   <script src="./assets/resume-storage.js"></script>
-  <script src="./assets/direct-messages.js?v=profile-lookup"></script>
+  <script src="./assets/direct-messages.js?v=message-actions"></script>
   <script defer>
     'use strict';
     const SUPABASE_URL = 'https://wnubqzwsvclvcvozibtc.supabase.co';
@@ -4893,7 +4924,6 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       byId('user-report-context').textContent=ref
         ?'Жалоба на сообщение от '+(displayName||'пользователя')+'.'
         :'Жалоба на профиль '+(displayName||'пользователя')+'.';
-      byId('user-report-details').value='';
       byId('user-report-reason').value='';
       byId('user-report-submit').disabled=false;
       feedback('user-report-feedback','');
@@ -4918,8 +4948,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         const {data,error}=await client.rpc('loopa_submit_user_report',{
           p_target_user:target,
           p_message_ref:ref,
-          p_reason:byId('user-report-reason').value,
-          p_details:byId('user-report-details').value.trim()||null
+          p_reason:byId('user-report-reason').value
         });
         if(error)throw error;
         if(currentUser?.id!==actor)return;
@@ -5026,7 +5055,13 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     };
     const messages=LOOPADirectMessages.create({
       getClient:()=>client,getCurrentUser:()=>currentUser,getPage:()=>lastPage,
-      showPage,byId,document,friendAvatar,avatarForUser,openFriendProfile,openSafetyReport,showToast,lookupPublicProfiles
+      showPage,byId,document,friendAvatar,avatarForUser,openFriendProfile,openSafetyReport,showToast,lookupPublicProfiles,
+      blockUser:async userId=>{
+        if(!await blockSocialUser(userId))return false;
+        lastFriendSearchAt=0;
+        void refreshFriendLists();
+        return true;
+      }
     });
     const {openDirectMessage,refreshMessagesInbox,subscribeMessagesInbox,
       stopMessagesInbox,clearDirectMessageChannel}=messages;
@@ -5109,6 +5144,25 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       if(searchResult)row.appendChild(actionGroup);
       return row;
     }
+    const friendTabs=[byId('friend-list-tab'),byId('friend-outgoing-tab')];
+    function selectFriendTab(active,focus=false) {
+      for(const tab of friendTabs){
+        const selected=tab===active;
+        tab.setAttribute('aria-selected',String(selected));
+        tab.tabIndex=selected?0:-1;
+        byId(tab.getAttribute('aria-controls')).hidden=!selected;
+      }
+      if(focus)active.focus();
+    }
+    friendTabs.forEach((tab,index)=>{
+      tab.addEventListener('click',()=>selectFriendTab(tab));
+      tab.addEventListener('keydown',event=>{
+        const target={ArrowLeft:1-index,ArrowRight:1-index,Home:0,End:1}[event.key];
+        if(typeof target!=='number')return;
+        event.preventDefault();
+        selectFriendTab(friendTabs[target],true);
+      });
+    });
     function resetFriends() {
       friendSessionId=null;
       friendRelations=[];
@@ -5120,8 +5174,10 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       byId('friends-app').hidden=!currentUser;
       friendEmpty(byId('friend-search-results'),'Найди знакомого по никнейму.');
       friendEmpty(byId('friend-list'),'Здесь появятся люди после принятия заявок.');
-      byId('friend-outgoing-panel').hidden=true;
+      selectFriendTab(friendTabs[0]);
+      friendEmpty(byId('friend-outgoing'),'Отправленных заявок пока нет.');
       byId('friend-count').textContent='0';
+      byId('friend-outgoing-count').textContent='0';
       updateRequestBadges(0);
       lastIncomingCount=null;
       closeRequestsDialog();
@@ -5227,7 +5283,6 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         const sent=friendRelations.filter(rel=>rel.status==='pending' && rel.sender_id===owner);
         byId('friend-count').textContent=String(accepted.length);
         byId('friend-outgoing-count').textContent=String(sent.length);
-        byId('friend-outgoing-panel').hidden=!sent.length;
         updateRequestBadges(received.length);
         if (lastIncomingCount !== null && received.length > lastIncomingCount) {
           const added=received.length-lastIncomingCount;
@@ -5238,6 +5293,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
           const parent=byId(target);
           parent.replaceChildren();
           if (!list.length && kind==='accepted') {friendEmpty(parent,'Друзей пока нет. Найди человека и отправь заявку.');return;}
+          if (!list.length && kind==='outgoing') {friendEmpty(parent,'Отправленных заявок пока нет.');return;}
           for (const relation of list) {
             const peer=relation.sender_id===owner?relation.receiver_id:relation.sender_id;
             const profile=directory[peer] || {id:peer,display_name:'Пользователь LOOPA'};
@@ -5301,6 +5357,21 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       friendSearchGeneration++;
       friendSearchTimer=setTimeout(runFriendSearch,350);
     });
+    async function blockSocialUser(userId) {
+      const viewer=currentUser?.id;
+      if(!viewer||!client||!userId)return false;
+      const {error}=await client.rpc('loopa_block_user',{target_user:userId});
+      if(error)throw error;
+      if(currentUser?.id!==viewer)return false;
+      const prefix=userId+'/';
+      for(const key of avatarRequests.keys())if(key.startsWith(viewer+':'+prefix))avatarRequests.delete(key);
+      const cached=roomProfileCache.get(userId);
+      if(cached)cached.path=null;
+      for(const node of document.querySelectorAll('[data-avatar-path]')){
+        if(node.dataset.avatarPath.startsWith(prefix))void showAvatar(node,null,node.dataset.avatarName,node.dataset.avatarClass);
+      }
+      return true;
+    }
     async function handleFriendAction(button) {
       if (!client || !currentUser || button.disabled) return;
       const kind=button.dataset.friendAction;
@@ -5313,13 +5384,13 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         if (kind==='send') {
           result=await client.from('friend_requests').insert({sender_id:actor,receiver_id:button.dataset.userId,status:'pending'});
         } else if (kind==='block') {
-          const {error}=await client.rpc('loopa_block_user',{target_user:button.dataset.userId});
-          if(error) throw error;
+          if(!await blockSocialUser(button.dataset.userId))return;
           await loadBlockedUsers();
           result={error:null};
         } else if (kind==='unblock') {
           const {error}=await client.rpc('loopa_unblock_user',{target_user:button.dataset.userId});
           if(error) throw error;
+          roomProfileCache.delete(button.dataset.userId);
           await loadBlockedUsers();
           result={error:null};
         } else if (kind==='accept') {
