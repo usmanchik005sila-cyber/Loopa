@@ -2007,17 +2007,23 @@ section[data-page="profile"]>#settings-detail>.settings-back{margin-bottom:14px}
       guestControlInflight=true;
       try{
         let next=entry;
-        while(next&&guestControlCurrent(next)){
-          const {error}=await client.rpc('loopa_control_v2',{
-            room_code:next.code,expected_video:next.video,expected_generation:next.generation,position_seconds:next.pos,is_playing:next.playing
-          });
-          if(!guestControlCurrent(next))break;
-          if(error){
-            guestManualUntil=0;
-            showToast('Не удалось синхронизировать действие: '+errorText(error));
-            void roomRun('read');break;
+        while(next){
+          if(guestControlCurrent(next)){
+            let error;
+            try{
+              ({error}=await client.rpc('loopa_control_v2',{
+                room_code:next.code,expected_video:next.video,expected_generation:next.generation,
+                position_seconds:next.pos,is_playing:next.playing
+              }));
+            }catch(failure){error=failure;}
+            if(guestControlCurrent(next)){
+              if(error){
+                guestManualUntil=0;
+                showToast('Не удалось синхронизировать действие: '+errorText(error));
+                void roomRun('read');
+              }else guestManualUntil=performance.now()+2500;
+            }
           }
-          guestManualUntil=performance.now()+2500;
           next=guestControlQueued;guestControlQueued=null;
         }
       }finally{guestControlInflight=false;guestControlQueued=null;}
@@ -2028,33 +2034,33 @@ section[data-page="profile"]>#settings-detail>.settings-back{margin-bottom:14px}
       const ready=resumePlayerReady||(roomState?.video?.startsWith('https://rutube.ru/')&&rutubeSignalObserved);
       if(collabHostPolling||!client||!hostHere()||!sharedMode||!roomState?.video
         ||document.hidden||rutubeAd||!ready)return;
-      const code=roomState.code,video=roomState.video,epoch=roomEpoch;
+      const code=roomState.code,video=roomState.video,epoch=roomEpoch,generation=roomState.control_generation;
       collabHostPolling=true;
       try{
         const {data,error}=await client.rpc('loopa_collab27',{action:'pull',room_code:code});
         if(error)throw error;
         if(epoch!==roomEpoch||roomState?.code!==code||roomState.video!==video
-          ||!hostHere()||!sharedMode)return;
+          ||roomState.control_generation!==generation||!hostHere()||!sharedMode||document.hidden)return;
         if(!data?.pending||data.video!==video){pendingHostControl=null;return;}
         const seq=Number(data.seq),pos=Number(data.pos);
         if(!Number.isSafeInteger(seq)||seq<1||!Number.isFinite(pos)||pos<0||typeof data.playing!=='boolean')return;
         const now=performance.now();
         const pending=pendingHostControl;
-        const same=pending&&pending.seq===seq&&pending.epoch===epoch&&pending.video===video&&pending.code===code;
+        const same=pending&&pending.seq===seq&&pending.epoch===epoch&&pending.generation===generation&&pending.video===video&&pending.code===code;
         // ACK only a fresh observation made AFTER issuing this command.
         const confirmed=same&&sample?.observed&&sample.now>pending.issued&&now-sample.now<1500
           &&sample.playing===data.playing&&Math.abs(sample.pos-(pos+(data.playing?Math.max(0,(sample.now-pending.started)/1000):0)))<=1.5;
         if(!confirmed){
           if(!same||now-pending.issued>2500){
             const started=same?pending.started:now;
-            pendingHostControl={seq,epoch,code,video,issued:now,started};
+            pendingHostControl={seq,epoch,code,video,generation,issued:now,started};
             applyingUntil=now+1700;commandPlayer(pos+(data.playing?(now-started)/1000:0),data.playing,true);
           }
           return;
         }
         const ack=await client.rpc('loopa_collab27',{action:'ack',room_code:code,sequence:seq});
         if(ack.error)throw ack.error;
-        if(ack.data?.applied)pendingHostControl=null;
+        if(ack.data?.applied&&pendingHostControl===pending)pendingHostControl=null;
         if(epoch===roomEpoch&&roomState?.code===code)updatePlaybackControls();
       }catch(error){
         // A failed acknowledgment leaves the command queued for a later retry.
@@ -2409,12 +2415,12 @@ section[data-page="profile"]>#settings-detail>.settings-back{margin-bottom:14px}
     let renewingSharedControl=false;
     setInterval(async()=>{
       if(renewingSharedControl||!client||!roomState||!hostHere()||!sharedMode||document.hidden)return;
-      const code=roomState.code,video=roomState.video,epoch=roomEpoch;
+      const code=roomState.code,video=roomState.video,epoch=roomEpoch,generation=roomState.control_generation;
       renewingSharedControl=true;
       try{
         const {data,error}=await client.rpc('loopa_collab27',{action:'renew',room_code:code});
         if(error)throw error;
-        if(epoch!==roomEpoch||roomState?.code!==code||roomState.video!==video)return;
+        if(epoch!==roomEpoch||roomState?.code!==code||roomState.video!==video||roomState.control_generation!==generation)return;
         if(data?.shared_control&&data?.shared_control_until)
           roomState.shared_control_until=data.shared_control_until;
         else {roomState.shared_control=false;renderSharedMode();}
@@ -2476,7 +2482,7 @@ section[data-page="profile"]>#settings-detail>.settings-back{margin-bottom:14px}
       if(!hostHere()&&syncSnapshot?.playing){commandPlayer(positionNow(),true);}
       guestManualUntil=0;void syncPlayback({forceCorrection:true});
     });
-    let timelineTarget=null;
+    let timelineTarget=null,hostTransportRequest=0;
     async function runTransportAction({seconds,playing}){
       timelineTarget={seconds,playing};
       byId('roomToggle').click();
@@ -2498,25 +2504,36 @@ section[data-page="profile"]>#settings-detail>.settings-back{margin-bottom:14px}
         if(!roomState.members?.some(m=>m.id===roomState.host&&m.online)){
           showToast('Создатель переподключается — управление пока недоступно');return;
         }
+        const target={code:roomState.code,video:roomState.video,generation:roomState.control_generation,
+          user:currentUser?.id,epoch:roomEpoch};
+        if(!guestControlCurrent(target))return;
         guestManualUntil=performance.now()+3000;
         try{
-          const {error}=await client.rpc('loopa_collab27',{
-            action:'control',room_code:roomState.code,position_seconds:pos,is_playing:playing
+          const {error}=await client.rpc('loopa_control_v2',{
+            room_code:target.code,expected_video:target.video,expected_generation:target.generation,
+            position_seconds:pos,is_playing:playing
           });
+          if(!guestControlCurrent(target))return;
           if(error)throw error;
           commandPlayer(pos,playing);
           sample={pos,playing,now:performance.now()};
         }catch(e){
+          if(!guestControlCurrent(target))return;
+          guestManualUntil=0;
           showToast('Не удалось передать управление: '+errorText(e));
           void roomRun('read');
           return;
         }
         updatePlaybackControls();revealControls();return;
       }
+      const target={video:roomState.video,code:roomState.code,epoch:roomEpoch};
+      const request=++hostTransportRequest;
       commandPlayer(pos,playing);
       sample={pos,playing,now:performance.now()};
       await syncPlayback();
-      pending={op:playing?'play':'pause',seconds:pos,video:roomState.video,code:roomState.code,epoch:roomEpoch};
+      if(request!==hostTransportRequest||!hostHere()||target.epoch!==roomEpoch
+        ||target.code!==roomState.code||target.video!==roomState.video)return;
+      pending={op:playing?'play':'pause',seconds:pos,...target};
       flushPlayback();updatePlaybackControls();revealControls();
     });
     // v85: do not force captions via unsupported IFrame API "track" settings.
