@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -9,12 +10,19 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 )
 
 var videoID = regexp.MustCompile(`^[a-fA-F0-9]{32}$`)
-var client = &http.Client{Timeout: 10 * time.Second}
+var client = &http.Client{
+	Timeout: 10 * time.Second,
+	CheckRedirect: func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	},
+}
 
 const supabaseURL = "https://wnubqzwsvclvcvozibtc.supabase.co"
+const requestBodyLimit = 4096
 const publishableKey = "sb_publishable_yuWa66reRpb7j2q3Z4mnAA_bkGwIhpp"
 
 func respond(w http.ResponseWriter, status int, body interface{}) {
@@ -34,8 +42,38 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	token := r.Header.Get("X-Loopa-Authorization")
-	if !strings.HasPrefix(token, "Bearer ") || len(token) > 8192 {
+	credential, ok := strings.CutPrefix(token, "Bearer ")
+	if !ok || credential == "" || len(token) > 8192 || strings.IndexFunc(credential, unicode.IsSpace) >= 0 {
 		fail(w, 401, "Войди в аккаунт LOOPA")
+		return
+	}
+	var input struct {
+		Q    string `json:"q"`
+		Page int    `json:"page"`
+	}
+	body := http.MaxBytesReader(w, r.Body, requestBodyLimit)
+	defer body.Close()
+	decoder := json.NewDecoder(body)
+	err := decoder.Decode(&input)
+	if err == nil {
+		var extra json.RawMessage
+		err = decoder.Decode(&extra)
+	}
+	var oversized *http.MaxBytesError
+	switch {
+	case errors.As(err, &oversized):
+		fail(w, 413, "Запрос слишком большой")
+		return
+	case err != io.EOF:
+		fail(w, 400, "Некорректный запрос")
+		return
+	}
+	input.Q = strings.TrimSpace(input.Q)
+	if input.Page == 0 {
+		input.Page = 1
+	}
+	if len([]rune(input.Q)) < 2 || len([]rune(input.Q)) > 100 || input.Page < 1 || input.Page > 100 {
+		fail(w, 400, "Проверь название и страницу поиска")
 		return
 	}
 	auth, err := http.NewRequestWithContext(r.Context(), "GET", supabaseURL+"/auth/v1/user", nil)
@@ -47,28 +85,17 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	auth.Header.Set("apikey", publishableKey)
 	user, err := client.Do(auth)
 	if err != nil {
-		fail(w, 502, "Не удалось проверить вход")
+		fail(w, 503, "Не удалось проверить вход")
 		return
 	}
 	user.Body.Close()
-	if user.StatusCode != http.StatusOK {
+	switch user.StatusCode {
+	case http.StatusOK:
+	case http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden:
 		fail(w, 401, "Войди в аккаунт LOOPA")
 		return
-	}
-	var input struct {
-		Q    string `json:"q"`
-		Page int    `json:"page"`
-	}
-	if json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&input) != nil {
-		fail(w, 400, "Некорректный запрос")
-		return
-	}
-	input.Q = strings.TrimSpace(input.Q)
-	if input.Page == 0 {
-		input.Page = 1
-	}
-	if len([]rune(input.Q)) < 2 || len([]rune(input.Q)) > 100 || input.Page < 1 || input.Page > 100 {
-		fail(w, 400, "Проверь название и страницу поиска")
+	default:
+		fail(w, 503, "Не удалось проверить вход")
 		return
 	}
 	// The same durable account quota applies even when this public URL is called directly.

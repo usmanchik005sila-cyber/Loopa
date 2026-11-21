@@ -3,14 +3,20 @@ const headers={'Access-Control-Allow-Origin':'*','Access-Control-Expose-Headers'
 function reply(body:unknown,status=200,extra:Record<string,string>={}){return Response.json(body,{status,headers:{...headers,...extra}});}
 const suggestionCache=new Map<string,{expires:number,values:string[]}>();
 const rutubeCache=new Map<string,{expires:number,data:any}>();
-function searchReply(data:any,status=200){return {data,status};}
+function searchReply(data:any,status=200,extra:Record<string,string>={}){return {data,status,extra};}
+function quotaReply(retryAfter:unknown){
+ const retry=Math.max(1,Math.min(60,Math.ceil(Number(retryAfter)||1)));
+ return searchReply({message:'Слишком много запросов. Подожди немного и попробуй снова.',retry_after:retry},429,{'Retry-After':String(retry)});
+}
 async function rutubePage(term:string,pageNumber:number,auth:string,timeout=25000){
  const key=JSON.stringify([term.toLocaleLowerCase('ru'),pageNumber]);
  const cached=rutubeCache.get(key);
  if(cached&&cached.expires>Date.now())return searchReply(cached.data);
  const response=await fetch('https://functions.yandexcloud.net/d4e8n1se4iuc8ql4rm82',{
  method:'POST',headers:{'Content-Type':'application/json','X-Loopa-Authorization':auth},
- body:JSON.stringify({q:term,page:pageNumber}),signal:AbortSignal.timeout(timeout)});
+ body:JSON.stringify({q:term,page:pageNumber}),signal:AbortSignal.timeout(timeout),redirect:'error'});
+ if(response.status===429)return quotaReply(response.headers.get('Retry-After'));
+ if(response.status===503)return searchReply({message:'Поиск временно недоступен. Попробуй ещё раз.'},503);
  let data;try{data=await response.json();}catch{return searchReply({message:'Поиск RUTUBE ещё не готов. Проверь настройку облачной функции.'},502);}
  if(!response.ok)return searchReply({message:typeof data.message==='string'?data.message:'Облачная функция RUTUBE недоступна. Проверь её версию и публичный доступ.'},response.status===401?401:502);
  if(!Array.isArray(data.items))return searchReply({message:'Обнови код функции RUTUBE в Yandex Cloud.'},502);
@@ -21,9 +27,11 @@ async function rutubePage(term:string,pageNumber:number,auth:string,timeout=2500
 }
 Deno.serve(async req=>{
  if(req.method==='OPTIONS')return new Response(null,{headers});
+ if(req.method!=='POST')return reply({message:'Используй поиск из LOOPA'},405);
  try{
  const auth=req.headers.get('Authorization')||'';
- const user=await fetch(Deno.env.get('SUPABASE_URL')+'/auth/v1/user',{headers:{Authorization:auth,apikey:Deno.env.get('SUPABASE_ANON_KEY')!}});
+ const user=await fetch(Deno.env.get('SUPABASE_URL')+'/auth/v1/user',{headers:{Authorization:auth,apikey:Deno.env.get('SUPABASE_ANON_KEY')!},redirect:'error',signal:AbortSignal.timeout(2500)}).catch(()=>null);
+ if(!user||user.status>=500||user.status===429)return reply({message:'Не удалось проверить вход. Попробуй ещё раз.'},503);
  if(!user.ok)return reply({message:'Войди в аккаунт'},401);
  const {provider,q,page,mode}=await req.json();
  if(typeof q!=='string'||q.trim().length<2||q.length>100)return reply({message:'Введи название видео'},400);
@@ -34,12 +42,12 @@ Deno.serve(async req=>{
  try{
  const quota=await fetch(Deno.env.get('SUPABASE_URL')+'/rest/v1/rpc/loopa_search_budget',{
   method:'POST',headers:{Authorization:auth,apikey:Deno.env.get('SUPABASE_ANON_KEY')!,'Content-Type':'application/json'},
-  body:JSON.stringify({p_mode:mode==='suggest'?'suggest':'search'}),signal:AbortSignal.timeout(2500)});
+  body:JSON.stringify({p_mode:mode==='suggest'?'suggest':'search'}),signal:AbortSignal.timeout(2500),redirect:'error'});
  const budget=await quota.json();
  if(!quota.ok||typeof budget?.allowed!=='boolean')return reply({message:'Поиск временно недоступен. Попробуй ещё раз.'},503);
  if(!budget.allowed){
-  const retry=Math.max(1,Math.min(60,Number(budget.retry_after)||1));
-  return reply({message:'Слишком много запросов. Подожди немного и попробуй снова.',retry_after:retry},429,{'Retry-After':String(retry)});
+  const rejection=quotaReply(budget.retry_after);
+  return reply(rejection.data,rejection.status,rejection.extra);
  }
  }catch{return reply({message:'Поиск временно недоступен. Попробуй ещё раз.'},503);}
  if(mode==='suggest'){
@@ -72,7 +80,7 @@ Deno.serve(async req=>{
  const pageNumber=page==null?1:Number(page);
  if(!Number.isInteger(pageNumber)||pageNumber<1||pageNumber>100)return reply({message:'Некорректная страница'},400);
  const result=await rutubePage(q.trim(),pageNumber,auth);
- return reply(result.data,result.status);
+ return reply(result.data,result.status,result.extra);
  }
  if(provider!=='vk')return reply({message:'Неизвестный источник'},400);
  const token=Deno.env.get('VK_VIDEO_TOKEN');if(!token)return reply({message:'Поиск VK Видео ещё не подключён'});

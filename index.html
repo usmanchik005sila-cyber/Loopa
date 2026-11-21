@@ -3947,7 +3947,12 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       try{
         const {data,error}=await client.functions.invoke('video-search',{body:{provider,q:catalogQuery,page:more?nextPage:null}});
         if(revision!==catalogRevision||roomState?.code!==code||currentUser?.id!==owner)return;
-        if(error?.context?.status===429)throw Error('Слишком много запросов. Подожди немного и попробуй снова.');
+        if(error?.context?.status===429){
+          const retry=Number(error.context.headers?.get('Retry-After'));
+          throw Error(Number.isInteger(retry)&&retry>0&&retry<=60
+            ? 'Слишком много запросов. Повтори через '+retry+' сек.'
+            : 'Слишком много запросов. Подожди немного и попробуй снова.');
+        }
         if(error||!Array.isArray(data?.items))throw Error(data?.message||'Не удалось загрузить видео. Попробуй ещё раз или открой по ссылке.');
         for(const hit of data.items){
           if(typeof hit.url!=='string'||typeof hit.title!=='string')continue;

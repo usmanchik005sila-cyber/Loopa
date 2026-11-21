@@ -2,7 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const {stripTypeScriptTypes}=require('node:module');
 const source=stripTypeScriptTypes(fs.readFileSync(path.join(__dirname,'../supabase/functions/video-search/index.ts'),'utf8'));
-function server({items=[],fail=false,budgetAllowed=true,budgetFail=false,suggestions=['поиск','поиск видео']}={}){
+function server({items=[],fail=false,budgetAllowed=true,budgetFail=false,bridgeStatus=200,suggestions=['поиск','поиск видео']}={}){
  let handler,authorized=true,now=1000;const calls=[],budgetCalls=[];let lastResponse;
  class Clock extends Date{static now(){return now;}}
  const context={Response,URLSearchParams,AbortSignal,Date:Clock,Deno:{env:{get:key=>key==='SUPABASE_URL'?'https://test.supabase.co':'fixture'},serve:fn=>handler=fn},fetch:async(url,options)=>{
@@ -11,6 +11,7 @@ function server({items=[],fail=false,budgetAllowed=true,budgetFail=false,suggest
   calls.push({url,options});
   if(fail)throw new Error('provider unavailable');
   if(url.includes('suggestqueries.google.com'))return Response.json(['query',suggestions]);
+  if(bridgeStatus!==200)return new Response(null,{status:bridgeStatus,headers:{'Retry-After':'4'}});
   return Response.json({items,next:'2'});
  }};
  vm.runInNewContext(source,context);
@@ -128,4 +129,12 @@ test('quota outages fail closed without calling upstream',async()=>{
  const s=server({budgetFail:true});
  assert.equal((await s.invoke({provider:'youtube',q:'природа'})).status,503);
  assert.equal(s.calls.length,0);
+});
+test('RUTUBE bridge quota exhaustion keeps its status and retry interval',async()=>{
+ const s=server({bridgeStatus:429});
+ const outcome=await s.invoke({provider:'rutube',q:'природа'});
+ assert.equal(outcome.status,429);
+ assert.equal(outcome.data.retry_after,4);
+ assert.equal(s.lastResponse().headers.get('Retry-After'),'4');
+ assert.equal(s.calls[0].options.redirect,'error');
 });
