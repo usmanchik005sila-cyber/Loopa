@@ -89,3 +89,43 @@ test('resume point table is self-owned and unavailable to anonymous API-key clie
   assert.match(setup, /собственный домен.*платным дополнением/i);
   assert.match(setup, /SQL Editor/i);
 });
+
+test('Telegram welcome checks an existing link before offering explicit registration', async () => {
+  const start = html.indexOf('    async function tryTelegramMiniLogin(');
+  const source = html.slice(start, html.indexOf('    async function refreshTelegramMiniStatus', start));
+  const elements = Object.fromEntries(['tmaMiniGuest', 'tmaMiniGuestText', 'tmaMiniRetry', 'tmaMiniContinue']
+    .map(id => [id, { hidden: true, textContent: '' }]));
+  const actions = [];
+  const pages = [];
+  const account = { id: 'user-fixture' };
+  let openedInvite = false;
+  const context = {
+    isTelegramMiniApp: true, currentUser: null, telegramMiniBusy: false, telegramMiniLinked: false,
+    lastPage: 'home', pendingInvite: 'ABCD01234567',
+    byId: id => elements[id],
+    telegramMiniRequest: async action => {
+      actions.push(action);
+      return action === 'login' ? { status: 'unlinked' } : { status: 'login_ready', token_hash: 'fixture' };
+    },
+    client: { auth: { verifyOtp: async () => ({ data: { user: account } }) } },
+    showPage: page => { pages.push(page); context.lastPage = page; },
+    displayAccount: async user => assert.equal(user, account),
+    acceptInvite: async () => { openedInvite = true; },
+    showToast() {},
+    telegramMiniErrorMessage: error => { throw error; },
+  };
+  vm.runInNewContext(source, context);
+  await context.tryTelegramMiniLogin();
+  assert.deepEqual(actions, ['login']);
+  assert.deepEqual(pages, ['profile']);
+  assert.equal(elements.tmaMiniContinue.hidden, false);
+  assert.equal(context.currentUser, null);
+  assert.equal(openedInvite, false);
+
+  await context.tryTelegramMiniLogin({ register: true });
+  assert.deepEqual(actions, ['login', 'register']);
+  assert.deepEqual(pages, ['profile'], 'registration should leave navigation to the pending invitation');
+  assert.equal(context.currentUser, account);
+  assert.equal(context.telegramMiniLinked, true);
+  assert.equal(openedInvite, true);
+});
