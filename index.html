@@ -650,6 +650,7 @@ body.roomViewing #room-active,body.roomViewing #videoStage{
 #auth-icloud-form{padding:2px 4px 13px}
 #auth-icloud-form .action{margin-top:16px}
 #auth-icloud-form .field-note{margin-top:10px!important;line-height:1.55!important}
+#auth-icloud-link-note{margin-bottom:0}
 .icloud-delivery{margin:12px 0 0;padding:12px 13px;border-radius:12px;border:1px solid #b7cbb64b;background:#a5c4a515;color:#e0eadf;font:12px/1.6 system-ui;overflow-wrap:anywhere}
 .auth-legacy-email{border-top:1px solid #ffffff1b;margin-top:10px;padding:13px 5px 0}
 .auth-legacy-email>summary{color:#a9a9b1;font:12px/1.5 system-ui;cursor:pointer;list-style:none;text-decoration:underline;text-decoration-color:#ffffff40;text-underline-offset:3px;padding:7px 0}
@@ -1522,13 +1523,16 @@ html[data-loopa-entry="browser"] #browser-entry{
 }
 .browser-entry-card h1{font:400 clamp(48px,12vw,68px)/1 Georgia,serif;letter-spacing:.1em;margin:0 0 18px}
 .browser-entry-card p{color:#c2c0c6;margin:0 auto 24px;max-width:26ch;line-height:1.5}
-.browser-entry-card .browser-entry-primary{
+.browser-entry-primary{
   display:grid;place-items:center;min-height:48px;padding:4px 14px;border-radius:14px;
   background:linear-gradient(155deg,#176faa,#174881);border:1px solid #8bddff65;
   color:#fff;font-weight:650;text-decoration:none;box-sizing:border-box
 }
 .browser-entry-links{display:flex;flex-wrap:wrap;justify-content:center;gap:8px 18px;margin-top:20px}
 .browser-entry-links a{color:#c2c0c6;font-size:13px;text-underline-offset:3px;padding:6px 0}
+#recovery-telegram-return{display:none}
+html[data-loopa-entry="recovery"] #recovery-telegram-return{display:block}
+#recovery-telegram-return p{margin:0 0 12px}
 html[data-loopa-entry="recovery"] .bottom,
 html[data-loopa-entry="recovery"] .top-actions,
 html[data-loopa-entry="recovery"] #content>section:not([data-page="profile"]),
@@ -1734,6 +1738,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
                   </label>
                   <button class="action" id="auth-icloud-verify" type="button">Подтвердить и войти</button>
                   <button id="auth-icloud-resend" type="button">Отправить код повторно</button>
+                  <p class="field-note" id="auth-icloud-link-note">Если в письме только ссылка, она откроет страницу восстановления в браузере. Чтобы войти прямо в Telegram, введи код на этом экране.</p>
                 </div>
               </form>
               <details class="auth-legacy-email" id="auth-legacy-email">
@@ -1770,6 +1775,10 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
             <div class="settings-user-text"><h2 id="settings-user-name">Профиль LOOPA</h2><p id="settings-user-email"></p></div>
             <span class="settings-user-chevron" aria-hidden="true">›</span>
           </button>
+          <div class="panel glass" id="recovery-telegram-return">
+            <p>Вход выполнен в браузере. Комнаты, друзья и сообщения доступны в Telegram.</p>
+            <a class="browser-entry-primary" href="https://t.me/LOOPAvideo_bot/loopa" rel="noreferrer">Открыть LOOPA в Telegram</a>
+          </div>
           <div class="settings-group-title">ТВОИ НАСТРОЙКИ</div>
           <button class="setting-row glass" type="button" data-settings="account"><span class="setting-icon"><svg><use href="#i-person"/></svg></span><span><strong>Личные данные</strong><small>Аватар, имя и информация аккаунта</small></span><span class="chevron">›</span></button>
           <button class="setting-row glass" type="button" data-settings="privacy"><span class="setting-icon"><svg><use href="#i-lock"/></svg></span><span><strong>Конфиденциальность</strong><small>Безопасность и доступ к аккаунту</small></span><span class="chevron">›</span></button>
@@ -6035,7 +6044,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         icloudPendingEmail=email;
         icloudNextSend=Date.now()+60000;
         const status=byId('auth-icloud-status');
-        status.textContent='Код отправлен на '+email+'. Введи шесть цифр из письма. Если письма нет, проверь папку «Спам».';
+        status.textContent='Письмо отправлено на '+email+'. Если письма нет, проверь папку «Спам».';
         status.hidden=false;
         byId('auth-icloud-code-panel').hidden=false;
         byId('auth-icloud-send').hidden=true;
