@@ -2,8 +2,10 @@
   'use strict';
   // Owns conversation state, paging, rendering, and realtime subscriptions.
   function create({getClient,getCurrentUser,getPage,showPage,byId,document,
-    friendAvatar,avatarForUser,openFriendProfile,openSafetyReport,showToast,lookupPublicProfiles}){
+    friendAvatar,avatarForUser,openFriendProfile,openSafetyReport,showToast,lookupPublicProfiles,blockUser}){
     let dmPeer=null,dmChannel=null,dmHistory=[],dmBusy=false,dmPageReturn='friend-profile';
+    let dmCanSend=true,dmBlockedHere=false;
+    const blockDialog=byId('dm-block-dialog');
     let messagesInboxGeneration=0,messagesInboxChannel=null,messagesInboxOwner=null;
     let inboxRows=new Map(),inboxCursor=null,inboxHasMore=false,inboxPaging=false;
     function stopMessagesInbox(){
@@ -119,7 +121,7 @@
     }
     function renderDirectMessages(){
       const log=byId('dmLog');log.replaceChildren();
-      if(!dmHistory.length){const el=document.createElement('p');el.className='dm-empty';el.textContent='Сообщений пока нет. Напиши первым.';log.append(el);return;}
+      if(!dmHistory.length){const el=document.createElement('p');el.className='dm-empty';el.textContent=dmCanSend?'Сообщений пока нет. Напиши первым.':'Сообщений пока нет.';log.append(el);return;}
       if(dmHasOlder){const more=document.createElement('button');more.type='button';more.className='action';more.textContent='Загрузить ранние сообщения';more.onclick=()=>loadDirectMessages(true);log.append(more);}
       const groups=[];
       for(const msg of dmHistory){
@@ -155,62 +157,136 @@
       }
       log.scrollTop=log.scrollHeight;
     }
+    function setDmActions(open,focus=false){
+      byId('dmActionsPanel').hidden=!open;
+      const trigger=byId('dmActionsToggle');
+      trigger.setAttribute('aria-expanded',String(open));
+      if(focus)(open?byId('dmReportUser'):trigger).focus();
+    }
+    function isCurrentConversation(owner,peer,epoch){
+      return getCurrentUser()?.id===owner&&dmPeer?.id===peer&&dmHistoryEpoch===epoch;
+    }
+    function setDmCanSend(allowed){
+      dmCanSend=allowed;
+      byId('dmInput').disabled=!allowed;
+      byId('dmSend').disabled=!allowed||dmBusy;
+      const status=byId('dm-error');
+      status.hidden=allowed;
+      status.textContent=allowed?'':'Отправка сообщений в этой переписке ограничена.';
+    }
+    async function refreshDmPermission(owner,peer,epoch){
+      try{
+        const {data,error}=await getClient().rpc('loopa_dm_may_send_v87',{target:peer});
+        if(!error&&typeof data==='boolean'&&isCurrentConversation(owner,peer,epoch)&&!dmBlockedHere){
+          setDmCanSend(data);
+          if(!data&&!dmHistory.length)renderDirectMessages();
+        }
+      }catch{/* Row-level security still enforces sending permissions. */}
+    }
     async function openDirectMessage(profile,preserveReturn=false){
       if(!getCurrentUser()||!profile?.id)return;
       if(profile.id===getCurrentUser().id)return;
       if(!preserveReturn)dmPageReturn=getPage()==='friend-profile'?'friend-profile':(getPage()==='messages'?'messages':'friends');
-      dmHistoryEpoch++;dmOlderBusy=false;dmHasOlder=false;dmHistory=[];
+      const epoch=++dmHistoryEpoch,owner=getCurrentUser().id,peerId=profile.id;
+      dmOlderBusy=false;dmHasOlder=false;dmHistory=[];dmBusy=false;dmBlockedHere=false;
       dmPeer={...profile};
       byId('dmPeerName').textContent=profile.display_name||'Друг';
       byId('dmPeerAvatar').replaceChildren(avatarForUser(profile));
       byId('dmInput').value='';
-      byId('dm-error').hidden=true;
+      setDmCanSend(true);
+      setDmActions(false);
+      if(blockDialog.open)blockDialog.close();
+      byId('dmBlockUser').disabled=false;
+      byId('dmBlockUser').textContent='Заблокировать';
       byId('dmLog').replaceChildren();
       clearDirectMessageChannel();
       showPage('dm');
-      await loadDirectMessages();
-      if(!dmPeer||dmPeer.id!==profile.id||!getCurrentUser()||getPage()!=='dm')return;
-      const owner=getCurrentUser().id;
-      const peerId=profile.id;
+      await Promise.all([loadDirectMessages(),refreshDmPermission(owner,peerId,epoch)]);
+      if(!isCurrentConversation(owner,peerId,epoch)||getPage()!=='dm')return;
       dmChannel=getClient().channel('loopa-dm-'+owner+'-'+peerId)
         .on('postgres_changes',{event:'INSERT',schema:'public',table:'loopa_dm_messages_v87',filter:'recipient_id=eq.'+owner},payload=>{
           if(dmPeer?.id===payload.new.sender_id)loadDirectMessages();
         }).subscribe();
     }
-    byId('dmPeerAvatar').onclick=()=>{if(dmPeer)openFriendProfile?.(dmPeer);};
+    byId('dmPeerAvatar').onclick=()=>{setDmActions(false);if(dmPeer)openFriendProfile?.(dmPeer);};
     byId('dmBack').onclick=()=>{
+      setDmActions(false);
       clearDirectMessageChannel();
       showPage(dmPageReturn==='friend-profile'?'friend-profile':(dmPageReturn==='messages'?'messages':'friends'));
     };
+    byId('dmActionsToggle').onclick=()=>setDmActions(byId('dmActionsPanel').hidden,true);
+    document.addEventListener('click',event=>{
+      if(!byId('dmActionsPanel').hidden&&!byId('dmActions').contains(event.target))setDmActions(false);
+    });
+    document.addEventListener('keydown',event=>{
+      if(event.key==='Escape'&&!byId('dmActionsPanel').hidden){
+        event.preventDefault();
+        setDmActions(false,true);
+      }
+    });
     byId('dmReportUser').onclick=()=>{
+      setDmActions(false,true);
       if(dmPeer)openSafetyReport({userId:dmPeer.id,displayName:dmPeer.display_name||'пользователя'});
+    };
+    byId('dmBlockUser').onclick=()=>{
+      if(!dmPeer||!getCurrentUser())return;
+      setDmActions(false,true);
+      blockDialog.showModal();
+    };
+    byId('dm-block-cancel').onclick=()=>blockDialog.close();
+    byId('dm-block-confirm').onclick=async()=>{
+      const button=byId('dmBlockUser');
+      if(!blockDialog.open||getPage()!=='dm'||!dmPeer||!getCurrentUser()||button.disabled)return;
+      const owner=getCurrentUser().id,peer=dmPeer.id,epoch=dmHistoryEpoch;
+      blockDialog.close();
+      button.disabled=true;
+      try{
+        if(!await blockUser(peer)||!isCurrentConversation(owner,peer,epoch))return;
+        dmBlockedHere=true;
+        dmPeer.avatar_path=null;
+        byId('dmPeerAvatar').replaceChildren(avatarForUser(dmPeer));
+        setDmCanSend(false);
+        renderDirectMessages();
+        button.textContent='Заблокирован';
+        showToast('Пользователь заблокирован');
+      }catch{
+        if(isCurrentConversation(owner,peer,epoch))showToast('Не удалось заблокировать пользователя. Попробуй ещё раз.');
+      }finally{
+        if(isCurrentConversation(owner,peer,epoch))button.disabled=dmBlockedHere;
+      }
     };
     byId('dmForm').addEventListener('submit',async event=>{
       event.preventDefault();
       const body=byId('dmInput').value.trim();
-      if(!body||!dmPeer||!getCurrentUser()||dmBusy)return;
+      if(!body||!dmPeer||!getCurrentUser()||dmBusy||!dmCanSend)return;
       dmBusy=true;byId('dmSend').disabled=true;byId('dm-error').hidden=true;
-      const peerId=dmPeer.id,owner=getCurrentUser().id;
+      const peerId=dmPeer.id,owner=getCurrentUser().id,epoch=dmHistoryEpoch;
       try{
         const {data,error}=await getClient().from('loopa_dm_messages_v87')
            .insert({sender_id:owner,recipient_id:peerId,body})
            .select('id,sender_id,recipient_id,body,created_at').single();
         if(error)throw error;
-        if(dmPeer?.id===peerId&&getCurrentUser()?.id===owner){
+        if(isCurrentConversation(owner,peerId,epoch)){
           byId('dmInput').value='';
           if(!dmHistory.some(item=>item.id===data.id))dmHistory.push(data);
           renderDirectMessages();
         }
       }catch(e){
+        if(!isCurrentConversation(owner,peerId,epoch)||dmBlockedHere)return;
         const el=byId('dm-error');el.hidden=false;
         el.textContent=/Слишком много сообщений/.test(e.message||'')?e.message:/row.level.security|violates row.level|permission denied/i.test(e.message||'')
           ?'Сообщение не отправлено: получатель ограничил переписку или вы заблокированы.'
-          :'Не удалось отправить сообщение. Проверь SQL v87 и подключение к Supabase.';
-      }finally{dmBusy=false;byId('dmSend').disabled=false;}
+          :'Не удалось отправить сообщение. Проверь подключение и попробуй ещё раз.';
+        if(e?.code==='42501')void refreshDmPermission(owner,peerId,epoch);
+      }finally{
+        if(isCurrentConversation(owner,peerId,epoch)){dmBusy=false;byId('dmSend').disabled=!dmCanSend;}
+      }
     });
     function reset(){
       messagesInboxGeneration++;stopMessagesInbox();clearDirectMessageChannel();
       dmHistoryEpoch++;dmPeer=null;dmHistory=[];dmOlderBusy=false;dmHasOlder=false;
+      dmBusy=false;dmBlockedHere=false;setDmCanSend(true);setDmActions(false);
+      if(blockDialog.open)blockDialog.close();
       inboxRows=new Map();inboxCursor=null;inboxHasMore=false;inboxPaging=false;
     }
     return Object.freeze({resumeDirectMessage:()=>{const draft=byId('dmInput').value;const pending=openDirectMessage(dmPeer,true);byId('dmInput').value=draft;return pending;},openDirectMessage,refreshMessagesInbox,subscribeMessagesInbox,
