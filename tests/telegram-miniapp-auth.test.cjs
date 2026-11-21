@@ -275,3 +275,14 @@ test('request stream is capped by bytes without requiring Content-Length', async
   assert.ok(cancelled || chunks.length === 0);
   assert.equal(bridge.budgetCalls.length, 0);
 });
+
+test('an existing Telegram binding confirms only the matching Supabase session', async () => {
+  const bridge = mockBridge();
+  const fields = signedLaunch();
+  const owner = await bridge.request('status', fields, 'synthetic-session');
+  assert.deepEqual(owner.body, { status: 'linked' });
+
+  const anotherProfile = await bridge.request('status', fields, 'other-session');
+  assert.deepEqual(anotherProfile.body, { status: 'claimed_by_another_profile' });
+  assert.equal(bridge.mintCount(), 0);
+});
