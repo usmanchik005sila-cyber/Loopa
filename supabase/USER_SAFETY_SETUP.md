@@ -8,8 +8,9 @@ This operator guide is committed to a public repository and is therefore publicl
 2. Run `migrations/20261110180000_user_safety_requests.sql` in Supabase SQL Editor if it has not already been applied.
 3. Run `migrations/20261110190000_dm_policy_default_everyone.sql` if it has not already been applied.
 4. Run `migrations/20261112100000_account_deletion_approval.sql`. It checks required tables before installing the cleanup RPC.
-5. To receive Telegram notifications, set the optional Edge Function secret `LOOPA_OWNER_TELEGRAM_ID` as described in `BOT_WELCOME_SETUP.md`, then redeploy `loopa-bot`.
-6. Publish the matching site build.
+5. Run `migrations/20261121082249_preserve_account_deletion_subscription.sql` before deploying the updated `loopa-bot` function.
+6. To receive Telegram notifications, set the optional Edge Function secret `LOOPA_OWNER_TELEGRAM_ID` as described in `BOT_WELCOME_SETUP.md`, then redeploy `loopa-bot`.
+7. Publish the matching site build.
 
 New profiles default to `everyone`; the privacy settings let each user choose between `everyone` and `friends`. The migrations change only the column default and the new-profile trigger. They do not update existing profile rows or overwrite users' saved preferences.
 
@@ -50,7 +51,7 @@ where id = 'REPORT_UUID';
 
 Normally the account is removed automatically after the user checks the confirmation box and presses **Удалить сейчас**. The bot receives an informational message; it does not approve the deletion. The request row is removed after the Auth account and associated data are deleted.
 
-If a technical failure happens after the Auth account is removed, the request remains in `processing` so cleanup can be retried. The owner bot message includes the request ID and `/retrydelete <UUID>` command. To inspect stuck requests:
+The bot removes avatar files before deleting the Auth user. If the Auth deletion outcome is uncertain or later cleanup fails, the request remains in `processing`. The owner bot message includes the request ID and `/retrydelete <UUID>` command. Wait at least two minutes after the last attempt before retrying a processing request. To inspect stuck requests:
 
 ```sql
 select id, user_id, requested_at, status, handled_at
