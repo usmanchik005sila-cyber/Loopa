@@ -2699,4 +2699,6 @@ VALUES ('avatars', 'avatars', false, 5242880, ARRAY['image/jpeg', 'image/png', '
 
 ALTER PUBLICATION supabase_realtime ADD TABLE public.loopa_dm_messages_v87;
 
+NOTIFY pgrst, 'reload schema';
+
 COMMIT;
