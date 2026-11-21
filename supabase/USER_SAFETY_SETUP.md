@@ -8,7 +8,7 @@ This operator guide is committed to a public repository and is therefore publicl
 2. Run `migrations/20261110180000_user_safety_requests.sql` in Supabase SQL Editor if it has not already been applied.
 3. Run `migrations/20261110190000_dm_policy_default_everyone.sql` if it has not already been applied.
 4. Run `migrations/20261112100000_account_deletion_approval.sql`. It checks required tables before installing the cleanup RPC.
-5. Run `migrations/20261121082249_preserve_account_deletion_subscription.sql` before deploying the updated `loopa-bot` function.
+5. Run `migrations/20261121083957_preserve_account_deletion_subscription.sql` before deploying the updated `loopa-bot` function.
 6. To receive Telegram notifications, set the optional Edge Function secret `LOOPA_OWNER_TELEGRAM_ID` as described in `BOT_WELCOME_SETUP.md`, then redeploy `loopa-bot`.
 7. Publish the matching site build.
 
