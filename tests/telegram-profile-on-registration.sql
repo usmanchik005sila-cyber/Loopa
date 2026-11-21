@@ -28,6 +28,11 @@ begin
     or exists (select 1 from public.profiles where id=unmarked) then
     raise exception 'Telegram profile import did not preserve existing profiles or username rules';
   end if;
+  begin
+    update public.profiles set avatar_path=next_user::text || '/telegram-avatar.jpg' where id=legacy_user;
+    raise exception 'Another profile avatar path was accepted';
+  exception when check_violation then null;
+  end;
   insert into storage.objects(bucket_id,name) values('avatars',legacy_user::text || '/telegram-avatar.jpg');
   if public.loopa_repair_telegram_profile('27105',legacy_user,false)->>'eligible' is distinct from 'true'
      or public.loopa_repair_telegram_profile('27104',legacy_user,false)->>'eligible' is distinct from 'false' then
