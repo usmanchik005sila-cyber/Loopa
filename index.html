@@ -120,14 +120,13 @@
     .page-enter{animation:loopaPageIn .28s cubic-bezier(.2,.65,.25,1) both;}
     @keyframes loopaPageIn{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:translateY(0)}}
     @media(prefers-reduced-motion:reduce){.page-enter{animation:none!important}}
-    .home-greeting{margin-bottom:10px;}
-    .home-title{margin:0 0 31px;font-size:clamp(39px,9.1vw,58px);line-height:1.08;letter-spacing:-1.8px;}
     .join-wrap{display:flex;justify-content:center;margin-top:21px;}
     .join-pill{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:39px;padding:8px 18px;border:1px solid rgba(255,255,255,.18);border-radius:999px;background:rgba(255,255,255,.045);color:#c9c3c2;font-size:12px;cursor:pointer;transition:background .2s ease,transform .2s ease;}
     .join-pill svg{width:15px;height:15px;}
     .join-pill:active{transform:scale(.97);background:rgba(255,255,255,.11);}
 
     main {position:relative;padding:35px 20px 36px;}
+    main:has(>[data-page="home"]:not([hidden])){padding-top:18px;}
     .eyebrow {font-size:10px;letter-spacing:3.1px;font-weight:650;color:#b9aca4;}
     h1 {
       margin:19px 0 31px;
@@ -491,7 +490,7 @@
 :root{--ink:#ededed;--muted:#9b9b9b;--silver:#d6d6d6;--line:rgba(226,229,240,.12)}
 html,body{background:#090909;color:var(--ink)}.app{background:radial-gradient(ellipse 80% 34% at 105% 22%,#28282830,transparent 80%),linear-gradient(135deg,#0a0a0a,#0c0c0c 60%,#090909)}
 .scenery{inset:0;opacity:1}.scenery::before,.scenery::after{display:none}.scenery-art{position:absolute;top:0;right:0;width:100%;height:1250px;max-width:none;stroke:none;pointer-events:none}.scenery-art path{stroke-linecap:butt;stroke-linejoin:miter}
-.top{background:linear-gradient(115deg,#0a0a0a96,#17171738);border-bottom-color:#eeeeee09;box-shadow:none;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}.brand{color:#f2f2f2;text-shadow:0 1px 16px #ffffff07}.circle{border-color:#e7e7e71e;background:linear-gradient(145deg,#ffffff0b,#ffffff02);box-shadow:inset 0 1px #ffffff09,0 4px 14px #00000033}.circle:active{background:#ffffff13}.circle.profile-with-photo{box-shadow:0 0 0 1px #e7e7e734,0 4px 14px #00000044}.top-profile-initial{color:#e7e7e7}.eyebrow,.panel-note,.settings-group-title{color:#a6a6a6!important}.home-title,h1{color:#f0f0f0;text-shadow:0 2px 24px #00000055}.tagline{color:#949494}
+.top{background:linear-gradient(115deg,#0a0a0a96,#17171738);border-bottom-color:#eeeeee09;box-shadow:none;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}.brand{color:#f2f2f2;text-shadow:0 1px 16px #ffffff07}.circle{border-color:#e7e7e71e;background:linear-gradient(145deg,#ffffff0b,#ffffff02);box-shadow:inset 0 1px #ffffff09,0 4px 14px #00000033}.circle:active{background:#ffffff13}.circle.profile-with-photo{box-shadow:0 0 0 1px #e7e7e734,0 4px 14px #00000044}.top-profile-initial{color:#e7e7e7}.eyebrow,.panel-note,.settings-group-title{color:#a6a6a6!important}h1{color:#f0f0f0;text-shadow:0 2px 24px #00000055}.tagline{color:#949494}
 .glass{border-color:#ebebeb1b;background:radial-gradient(ellipse 105% 65% at 0 0,#ededed09,transparent 75%),linear-gradient(145deg,#26262669,#12121291 60%,#0c0c0c99);box-shadow:inset 0 1px #ffffff0b,inset 1px 0 #ffffff05,0 15px 36px #00000044;backdrop-filter:blur(18px) saturate(100%);-webkit-backdrop-filter:blur(18px) saturate(100%)}.glass::after{background:linear-gradient(130deg,#ffffff03,transparent 35%,transparent 80%,#ffffff02)}.card svg{filter:none;color:#e7e7e7}.card small,.panel p,.empty,.friend-help{color:#989898}.card:active{border-color:#ebebeb39;background-color:#ffffff06}.text-link,.join-link,.friend-count,.friend-search-label{color:#a7a7a7}
 .action{background:linear-gradient(155deg,#eeeeee,#d8d8d8);border-color:#f1f1f17d;color:#161616;box-shadow:inset 0 1px #ffffff66,0 4px 12px #00000022}.action.secondary{background:linear-gradient(145deg,#ffffff0c,#ffffff03);border-color:#ebebeb21;color:#e6e6e6;box-shadow:inset 0 1px #ffffff07}.friend-small-action,.requests-trigger,.friend-actions-trigger,.avatar-upload{background:linear-gradient(145deg,#ffffff0a,#ffffff03);border-color:#ebebeb22;color:#d9d9d9}.friend-small-action.primary,.requests-trigger-count,.auth-switch button.selected{background:#e0e0e0;color:#1c1c1c;border-color:#f4f4f44d}.friend-actions-menu{background:#161616f8;border-color:#ebebeb25;box-shadow:0 12px 35px #00000088}.friend-avatar,.account-avatar,.settings-mini-avatar{background:linear-gradient(135deg,#d2d2d2,#8f8f8f);color:#1f1f1f}.friend-person-status,.settings-user p,.privacy-item-body small{color:#949494}
 .field input,.friend-search-input,.auth-switch,.wideJoin{background:#0a0a0a80;border-color:#e7e7e724;color:#eaeaea;box-shadow:inset 0 1px #ffffff05}.field input::placeholder,.friend-search-input::placeholder,.wideJoin input::placeholder{color:#7b7b7b}.field input:focus,.friend-search-input:focus{border-color:#c3c3c36b;box-shadow:0 0 0 2px #c9c9c909}.wideJoin:focus-within{border-color:#c9c9c96b}.wideJoin button{background:linear-gradient(#e8e8e8,#c7c7c7);border-color:#f0f0f04d;color:#161616}.inline-link{color:#c6c6c6}button:focus-visible{outline-color:#e7e7e7}
@@ -1591,10 +1590,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     </header>
 
     <main id="content">
-      <section data-page="home">
-        <div class="eyebrow home-greeting">ДОБРО ПОЖАЛОВАТЬ</div>
-        <h1 class="home-title">Ближе, даже<br>на расстоянии.</h1>
-        <!-- Показывать блок продолжения просмотра только после появления настоящих комнат -->
+      <section data-page="home" aria-label="Главная">
         <div class="cards">
           <button class="card glass" type="button" data-room="create">
             <svg><use href="#i-plus"/></svg><span><strong>Создать комнату</strong><small>Начать просмотр</small></span>
@@ -4465,6 +4461,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       byId('settings-detail').hidden = !signed || which === 'home';
       ['account','privacy','theme'].forEach(id => byId('settings-' + id).hidden = which !== id);
       if(signed){
+        if(which==='privacy')void loadBlockedUsers();
         window.scrollTo({top:0,behavior:'instant'});
         const pane=which==='home'?byId('settings-home'):byId('settings-'+which);
         if(pane)animateContent(pane);
@@ -4762,18 +4759,27 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       const el=this, previous=el.dataset.previous||'friends'; el.dataset.previous=el.value;
       saveCommunicationSetting({room_invite_policy:el.value},el,previous);
     });
+    let blockedUsersGeneration=0;
     async function loadBlockedUsers() {
-      const list=byId('blocked-users-list'); if(!list||!client||!currentUser) return;
-      list.replaceChildren();
+      const list=byId('blocked-users-list'),viewer=currentUser?.id;
+      if(!client||!viewer)return;
+      const revision=++blockedUsersGeneration;
+      const isCurrent=()=>revision===blockedUsersGeneration&&currentUser?.id===viewer;
+      list.textContent='Загрузка списка…';
       try {
-        const {data,error}=await client.from('blocked_users').select('blocked_id').eq('blocker_id',currentUser.id);
+        const {data,error}=await client.from('blocked_users').select('blocked_id').eq('blocker_id',viewer);
+        if(!isCurrent())return;
         if(error) throw error;
         const ids=(data||[]).map(row=>row.blocked_id);
         if(!ids.length){list.textContent='Список пуст';return;}
         const {data:profiles,error:profileError}=await lookupPublicProfiles(ids);
+        if(!isCurrent())return;
         if(profileError) throw profileError;
+        list.replaceChildren();
         for(const profile of profiles||[]) list.appendChild(friendRow(profile,null,[{label:'Разблокировать',action:'unblock',userId:profile.id}]));
-      } catch(err){list.textContent='Не удалось загрузить список: '+errorText(err);}
+      } catch(err){
+        if(isCurrent())list.textContent='Не удалось загрузить список: '+errorText(err);
+      }
     }
 
     // Presence is server-backed. RLS permits reading only visible rows or your own.
