@@ -25,7 +25,7 @@ function signedLaunch(profile = {}) {
   });
 }
 
-function mockBridge({ linked = true, issueError = false, claimError = false, actionBudget = { data: 0 }, linkFailure = '', registrationFailure = '', telegramFetch = async () => Response.json({ ok: true, result: { photos: [] } }) } = {}) {
+function mockBridge({ linked = true, issueError = false, claimError = false, actionBudget = { data: 0 }, linkFailure = '', registrationFailure = '', repairCandidate = false, telegramFetch = async () => Response.json({ ok: true, result: { photos: [] } }) } = {}) {
   const claims = new Set();
   let mintCount = 0;
   const authCalls = [];
@@ -37,12 +37,17 @@ function mockBridge({ linked = true, issueError = false, claimError = false, act
   let createCount = 0;
   let createdOptions;
   const uploads = [];
+  const repairCalls = [];
   let email = linked ? 'synthetic@example.invalid' : '';
   const linkCalls = [];
   const emailUpdates = [];
   const admin = {
     from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: link }) }) }) }),
     rpc: async (name, args) => {
+      if (name === 'loopa_repair_telegram_profile') {
+        repairCalls.push({...args});
+        return { data: args.p_apply ? { imported:true } : { eligible:true, avatar_missing:true } };
+      }
       if (name === 'loopa_take_telegram_action_budget') {
         budgetCalls.push({ ...args });
         return actionBudget;
@@ -93,7 +98,9 @@ function mockBridge({ linked = true, issueError = false, claimError = false, act
     }) },
     auth: { getUser: async token => {
       authCalls.push('getUser');
-      return { data: { user: { id: token === 'other-session' ? 'other-profile' : 'synthetic-profile' } } };
+      return { data: { user: { id: token === 'other-session' ? 'other-profile' : 'synthetic-profile',
+        app_metadata: repairCandidate ? { loopa_telegram_registration:'1234' } : {},
+      } } };
     }, admin: {
       createUser: async options => {
         assert.equal(options.app_metadata.loopa_telegram_registration, '1234');
@@ -137,6 +144,7 @@ function mockBridge({ linked = true, issueError = false, claimError = false, act
     fetch: telegramFetch,
     TextEncoder,
     TextDecoder,
+    URL,
     URLSearchParams,
     Deno: {
       env: { get: key => key === 'TELEGRAM_BOT_TOKEN' ? syntheticBotToken : 'mock-setting' },
@@ -157,6 +165,7 @@ function mockBridge({ linked = true, issueError = false, claimError = false, act
     createCount: () => createCount,
     createdOptions: () => createdOptions,
     uploads,
+    repairCalls,
     budgetCalls,
     authCalls,
     linkCalls,
@@ -316,7 +325,7 @@ test('registration imports signed profile fields and copies a JPEG only from the
   assert.equal(bridge.createdOptions().app_metadata.loopa_telegram_username, 'masha_01');
   assert.equal(bridge.uploads.length, 1);
   assert.equal(bridge.uploads[0].bucket, 'avatars');
-  assert.equal(bridge.uploads[0].path, 'synthetic-profile/avatar.jpg');
+  assert.equal(bridge.uploads[0].path, 'synthetic-profile/telegram-avatar.jpg');
   assert.equal(bridge.uploads[0].options.upsert, false);
   assert.deepEqual(visited, ['getUserProfilePhotos', 'getFile', 'photo.jpg']);
 
@@ -331,4 +340,23 @@ test('a long username and unavailable avatar do not block Telegram registration'
   assert.equal((await bridge.request('register', fields)).body.status, 'login_ready');
   assert.equal(bridge.createdOptions().app_metadata.loopa_telegram_username, null);
   assert.equal(bridge.uploads.length, 0);
+});
+
+test('an existing placeholder imports once through the verified session, including a signed Telegram photo', async () => {
+  const visited = [];
+  const bridge = mockBridge({ repairCandidate:true, telegramFetch:async (url, init) => {
+    visited.push(String(url));
+    assert.equal(init.redirect,'error');
+    return new Response(Uint8Array.of(255,216,255,224,255,217));
+  } });
+  const fields = signedLaunch({ first_name:'Алексей', username:'alex_test',
+    photo_url:'https://t.me/i/userpic/320/fixture.jpg' });
+  assert.equal((await bridge.request('status',fields,'other-session')).body.status,'claimed_by_another_profile');
+  assert.equal(bridge.repairCalls.length,0);
+  assert.equal((await bridge.request('status',fields,'synthetic-session')).body.status,'linked');
+  assert.deepEqual(visited,['https://t.me/i/userpic/320/fixture.jpg']);
+  assert.equal(bridge.repairCalls.length,2);
+  assert.equal(bridge.repairCalls[1].p_display_name,'Алексей');
+  assert.equal(bridge.repairCalls[1].p_username,'alex_test');
+  assert.equal(bridge.uploads[0].path,'synthetic-profile/telegram-avatar.jpg');
 });

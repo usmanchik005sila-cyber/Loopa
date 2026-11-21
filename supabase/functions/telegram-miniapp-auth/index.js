@@ -148,39 +148,71 @@ async function readBoundedBytes(input, limit) {
   }
 }
 
-async function importAvatar(admin, token, telegramId, userId) {
-  // Photo import is optional. Use the Bot API and a single time limit across
-  // all requests. Never download an arbitrary URL from the profile payload.
+function telegramPhotoUrl(value) {
+  if (typeof value !== "string") return null;
   try {
-    const signal = AbortSignal.timeout(2400);
-    const api = "https://api.telegram.org/bot" + token + "/";
-    const request = async (method, payload) => {
-      const response = await fetch(api + method, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload), signal, redirect: "error",
-      });
-      if (!response.ok) return null;
-      const body = await response.json();
-      return body.ok ? body.result : null;
-    };
-    const photos = await request("getUserProfilePhotos", { user_id: Number(telegramId), limit: 1 });
-    const size = photos?.photos?.[0]?.find(photo => photo.width >= 160 && photo.height >= 160)
-      || photos?.photos?.[0]?.[0];
-    if (!size?.file_id || size.file_size > MAX_AVATAR_BYTES) return;
-    const file = await request("getFile", { file_id: size.file_id });
-    if (file?.file_size > MAX_AVATAR_BYTES ||
-        !/^[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)*\.jpe?g$/i.test(file?.file_path || "")) return;
-    const response = await fetch("https://api.telegram.org/file/bot" + token + "/" + file.file_path, {
-      signal, redirect: "error",
-    });
-    if (!response.ok) return;
-    const image = await readBoundedBytes(response, MAX_AVATAR_BYTES);
-    if (!image || image[0] !== 0xff || image[1] !== 0xd8 || image[2] !== 0xff) return;
-    const path = userId + "/avatar.jpg";
+    const url = new URL(value);
+    if (url.protocol !== "https:" || url.username || url.password || url.port) return null;
+    if (url.hostname === "t.me" && url.pathname.startsWith("/i/userpic/")) return url;
+    if (/^cdn[0-9]{1,2}\.telesco\.pe$/.test(url.hostname) && url.pathname.startsWith("/file/")) return url;
+  } catch {}
+  return null;
+}
+
+async function downloadJpeg(url, signal) {
+  const response = await fetch(url, { signal, redirect: "error" });
+  if (!response.ok) return null;
+  const image = await readBoundedBytes(response, MAX_AVATAR_BYTES);
+  return image?.[0] === 0xff && image[1] === 0xd8 && image[2] === 0xff ? image : null;
+}
+
+async function importAvatar(admin, token, telegram, userId) {
+  // Only download from Telegram with an enforced size and time limit.
+  try {
+    const photo = telegramPhotoUrl(telegram.user.photo_url);
+    let image = photo ? await downloadJpeg(photo, AbortSignal.timeout(1200)).catch(() => null) : null;
+    if (!image) {
+      const signal = AbortSignal.timeout(2400);
+      const api = "https://api.telegram.org/bot" + token + "/";
+      const request = async (method, payload) => {
+        const response = await fetch(api + method, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload), signal, redirect: "error",
+        });
+        if (!response.ok) return null;
+        const body = await response.json();
+        return body.ok ? body.result : null;
+      };
+      const photos = await request("getUserProfilePhotos", { user_id: Number(telegram.telegramId), limit: 1 });
+      const size = photos?.photos?.[0]?.find(photo => photo.width >= 160 && photo.height >= 160)
+        || photos?.photos?.[0]?.[0];
+      if (!size?.file_id || size.file_size > MAX_AVATAR_BYTES) return;
+      const file = await request("getFile", { file_id: size.file_id });
+      if (file?.file_size > MAX_AVATAR_BYTES ||
+          !/^[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)*\.jpe?g$/i.test(file?.file_path || "")) return;
+      image = await downloadJpeg("https://api.telegram.org/file/bot" + token + "/" + file.file_path, signal);
+    }
+    if (!image) return;
     const bucket = admin.storage.from("avatars");
-    await bucket.upload(path, image, { contentType: "image/jpeg", upsert: false });
+    await bucket.upload(userId + "/telegram-avatar.jpg", image, { contentType: "image/jpeg", upsert: false });
   } catch {
-    // Registration can continue with the default avatar.
+    // An unavailable Telegram photo must not block login or registration.
+  }
+}
+
+async function repairTelegramProfile(admin, token, telegram, account) {
+  if (account.app_metadata?.loopa_telegram_registration !== telegram.telegramId) return;
+  const args = { p_telegram_id: telegram.telegramId, p_user_id: account.id };
+  try {
+    const { data, error } = await admin.rpc("loopa_repair_telegram_profile", { ...args, p_apply: false });
+    if (error || !data?.eligible) return;
+    const profile = telegramProfile(telegram.user);
+    if (data.avatar_missing) await importAvatar(admin, token, telegram, account.id);
+    await admin.rpc("loopa_repair_telegram_profile", {
+      ...args, p_apply: true, p_display_name: profile.displayName, p_username: profile.username,
+    });
+  } catch {
+    // Login remains available if the optional profile import fails.
   }
 }
 
@@ -244,10 +276,14 @@ Deno.serve(async (request) => {
             password,
             email_confirm: true,
             user_metadata: { display_name: profile.displayName },
-            app_metadata: { loopa_telegram_registration: telegramId, loopa_telegram_username: profile.username },
+            app_metadata: {
+              loopa_telegram_registration: telegramId,
+              loopa_telegram_profile_seed: true,
+              loopa_telegram_username: profile.username,
+            },
           });
           if (!creationError && created?.user?.id) {
-            await importAvatar(admin, token, telegramId, created.user.id);
+            await importAvatar(admin, token, telegram, created.user.id);
           }
           registration = await completeRegistration(admin, telegramId);
           if (registration.status === "missing" && creationError && creationError.status >= 500) {
@@ -279,6 +315,7 @@ Deno.serve(async (request) => {
       });
       if (claimError) throw claimError;
       if (claimed !== true) return reply({ error: "reopen_miniapp" }, 409);
+      if (action === "login") await repairTelegramProfile(admin, token, telegram, userResponse.user);
 
       // The link is minted ONLY for the UUID bound to verified Telegram initData.
       // The hash is single-use and is never written to URLs or logs.
@@ -306,7 +343,9 @@ Deno.serve(async (request) => {
     if (action === "status") {
       const existing = await lookup(admin, telegramId);
       if (existing) {
-        return reply({ status: existing.user_id === viewerId ? "linked" : "claimed_by_another_profile" });
+        if (existing.user_id !== viewerId) return reply({ status: "claimed_by_another_profile" });
+        await repairTelegramProfile(admin, token, telegram, viewer.user);
+        return reply({ status: "linked" });
       }
       const { data: other, error } = await admin.from("telegram_miniapp_links")
         .select("telegram_id").eq("user_id", viewerId).maybeSingle();

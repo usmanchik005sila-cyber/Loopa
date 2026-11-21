@@ -5296,7 +5296,7 @@ section[data-page="profile"]>#settings-detail>.settings-back{margin-bottom:14px}
       byId('guest-save-panel').hidden = !user.is_anonymous;
       byId('auth-account').hidden = false;
       byId('tmaMiniLinkBox').hidden = !isTelegramMiniApp || telegramMiniLinked;
-      if(isTelegramMiniApp && !telegramMiniLinked)void refreshTelegramMiniStatus(user.id);
+      const telegramStatus=isTelegramMiniApp&&!telegramMiniLinked?refreshTelegramMiniStatus(user.id):null;
       if(isTelegramMiniApp&&telegramMiniLinked)byId('guest-save-panel').hidden=true;
       refreshTelegramLinkUI(user);
       openSettings('home');
@@ -5313,6 +5313,8 @@ section[data-page="profile"]>#settings-detail>.settings-back{margin-bottom:14px}
       refreshSettingsIdentity();
       feedback('profile-feedback','');
       try {
+        await telegramStatus;
+        if(currentUser?.id!==user.id)return;
         const {data, error} = await client.from('profiles').select('display_name,username,avatar_path,allow_friend_requests,room_invite_policy').eq('id', user.id).maybeSingle();
         if (currentUser?.id !== user.id) return;
         if (error) {
