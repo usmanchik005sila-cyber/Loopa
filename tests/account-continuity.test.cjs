@@ -129,3 +129,23 @@ test('Telegram welcome checks an existing link before offering explicit registra
   assert.equal(context.telegramMiniLinked, true);
   assert.equal(openedInvite, true);
 });
+
+test('browser entry keeps Telegram launches and auth recovery callbacks on their own paths', () => {
+  const start = html.indexOf('    const entryRoot=');
+  const source = html.slice(start, html.indexOf('    try{const m=localStorage', start));
+  const chooseEntry = (search, hash, inTelegram = false) => {
+    const root = { dataset: {}, classList: { contains: () => inTelegram } };
+    vm.runInNewContext(source, {
+      URLSearchParams,
+      location: { search, hash },
+      document: { documentElement: root },
+    });
+    return root.dataset.loopaEntry;
+  };
+  assert.equal(chooseEntry('', ''), 'browser');
+  assert.equal(chooseEntry('?room=ABCDEF012345', ''), 'browser');
+  assert.equal(chooseEntry('?recovery=1', ''), 'recovery');
+  assert.equal(chooseEntry('?code=fixture', ''), 'recovery');
+  assert.equal(chooseEntry('', '#access_token=fixture&type=recovery'), 'recovery');
+  assert.equal(chooseEntry('?recovery=1', '', true), 'telegram');
+});
