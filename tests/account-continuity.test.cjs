@@ -76,7 +76,8 @@ test('the account page links the current identity and syncs only the signed-in o
   assert.match(html, /Регистрация созда[её]т новый профиль/i);
   assert.match(html, /не объединит их автоматически/i);
   assert.match(telegramBridge, /admin\.auth\.getUser\(match\[1\]\)/);
-  assert.match(telegramBridge, /insert\(\{ telegram_id: telegramId, user_id: viewerId \}\)/);
+  assert.match(telegramBridge, /p_telegram_id: telegramId, p_user_id: viewerId/);
+  assert.match(telegramBridge, /rpc\("loopa_telegram_link_step", \{\s*\.\.\.linkArgs, p_finish: true,/);
 });
 
 test('resume point table is self-owned and unavailable to anonymous API-key clients', () => {
