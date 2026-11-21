@@ -7,6 +7,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 const ALLOWED_ORIGIN = "https://loopacinema.ru";
 const MAX_INIT_DATA_AGE_SECONDS = 600; // 10 minutes
 const MAX_BODY_BYTES = 12000;
+const MAX_AVATAR_BYTES = 1024 * 1024;
 const encoder = new TextEncoder();
 
 function reply(body, status = 200, retryAfter = 0) {
@@ -86,7 +87,7 @@ async function verifyTelegramInitData(initData, botToken) {
   if (!user || !Number.isSafeInteger(user.id) || user.id <= 0) {
     throw new Error("invalid_user");
   }
-  return { telegramId: String(user.id), authDate, signature: calculatedHash };
+  return { telegramId: String(user.id), authDate, signature: calculatedHash, user };
 }
 
 function adminClient() {
@@ -117,17 +118,25 @@ async function completeRegistration(admin, telegramId) {
   return data;
 }
 
-async function readRequestBody(request) {
-  if (Number(request.headers.get("Content-Length") || "0") > MAX_BODY_BYTES) return null;
-  if (!request.body) return "";
-  const reader = request.body.getReader();
-  const bytes = new Uint8Array(MAX_BODY_BYTES);
+function telegramProfile(user) {
+  const fullName = [user.first_name, user.last_name].filter(value => typeof value === "string")
+    .join(" ").replace(/[\x00-\x1f\x7f]/g, " ").replace(/\s+/g, " ").trim();
+  const displayName = [...fullName].slice(0, 40).join("").trim() || "Участник LOOPA";
+  const handle = typeof user.username === "string" ? user.username.toLowerCase() : "";
+  return { displayName, username: /^[a-z][a-z0-9_]{3,15}$/.test(handle) ? handle : null };
+}
+
+async function readBoundedBytes(input, limit) {
+  if (Number(input.headers.get("Content-Length") || "0") > limit) return null;
+  if (!input.body) return new Uint8Array();
+  const reader = input.body.getReader();
+  const bytes = new Uint8Array(limit);
   let length = 0;
   try {
     for (;;) {
       const { done, value } = await reader.read();
-      if (done) return new TextDecoder().decode(bytes.subarray(0, length));
-      if (length + value.byteLength > MAX_BODY_BYTES) {
+      if (done) return bytes.subarray(0, length);
+      if (length + value.byteLength > limit) {
         void reader.cancel().catch(() => {});
         return null;
       }
@@ -139,6 +148,42 @@ async function readRequestBody(request) {
   }
 }
 
+async function importAvatar(admin, token, telegramId, userId) {
+  // Photo import is optional. Use the Bot API and a single time limit across
+  // all requests. Never download an arbitrary URL from the profile payload.
+  try {
+    const signal = AbortSignal.timeout(2400);
+    const api = "https://api.telegram.org/bot" + token + "/";
+    const request = async (method, payload) => {
+      const response = await fetch(api + method, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload), signal, redirect: "error",
+      });
+      if (!response.ok) return null;
+      const body = await response.json();
+      return body.ok ? body.result : null;
+    };
+    const photos = await request("getUserProfilePhotos", { user_id: Number(telegramId), limit: 1 });
+    const size = photos?.photos?.[0]?.find(photo => photo.width >= 160 && photo.height >= 160)
+      || photos?.photos?.[0]?.[0];
+    if (!size?.file_id || size.file_size > MAX_AVATAR_BYTES) return;
+    const file = await request("getFile", { file_id: size.file_id });
+    if (file?.file_size > MAX_AVATAR_BYTES ||
+        !/^[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)*\.jpe?g$/i.test(file?.file_path || "")) return;
+    const response = await fetch("https://api.telegram.org/file/bot" + token + "/" + file.file_path, {
+      signal, redirect: "error",
+    });
+    if (!response.ok) return;
+    const image = await readBoundedBytes(response, MAX_AVATAR_BYTES);
+    if (!image || image[0] !== 0xff || image[1] !== 0xd8 || image[2] !== 0xff) return;
+    const path = userId + "/avatar.jpg";
+    const bucket = admin.storage.from("avatars");
+    await bucket.upload(path, image, { contentType: "image/jpeg", upsert: false });
+  } catch {
+    // Registration can continue with the default avatar.
+  }
+}
+
 Deno.serve(async (request) => {
   if (request.headers.get("Origin") !== ALLOWED_ORIGIN) {
     return reply({ error: "origin_not_allowed" }, 403);
@@ -147,10 +192,10 @@ Deno.serve(async (request) => {
   if (request.method !== "POST") return reply({ error: "method_not_allowed" }, 405);
 
   try {
-    const raw = await readRequestBody(request);
+    const raw = await readBoundedBytes(request, MAX_BODY_BYTES);
     if (raw === null) return reply({ error: "request_too_large" }, 413);
     let body;
-    try { body = JSON.parse(raw); }
+    try { body = JSON.parse(new TextDecoder().decode(raw)); }
     catch { return reply({ error: "invalid_json" }, 400); }
 
     const token = Deno.env.get("TELEGRAM_BOT_TOKEN");
@@ -193,13 +238,17 @@ Deno.serve(async (request) => {
           // at creation so a retry can finish the same UUID without deleting it.
           const passwordBytes = crypto.getRandomValues(new Uint8Array(32));
           const password = Array.from(passwordBytes, b => b.toString(16).padStart(2, "0")).join("");
-          const { error: creationError } = await admin.auth.admin.createUser({
+          const profile = telegramProfile(telegram.user);
+          const { data: created, error: creationError } = await admin.auth.admin.createUser({
             email: "miniapp-" + telegramId + "@auth.loopacinema.invalid",
             password,
             email_confirm: true,
-            user_metadata: { display_name: "Участник LOOPA" },
-            app_metadata: { loopa_telegram_registration: telegramId },
+            user_metadata: { display_name: profile.displayName },
+            app_metadata: { loopa_telegram_registration: telegramId, loopa_telegram_username: profile.username },
           });
+          if (!creationError && created?.user?.id) {
+            await importAvatar(admin, token, telegramId, created.user.id);
+          }
           registration = await completeRegistration(admin, telegramId);
           if (registration.status === "missing" && creationError && creationError.status >= 500) {
             throw creationError;

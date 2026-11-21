@@ -11,11 +11,11 @@ const source = readFileSync(join(__dirname, '../supabase/functions/telegram-mini
 const syntheticBotToken = 'synthetic-test-token';
 const origin = 'https://loopacinema.ru';
 
-function signedLaunch() {
+function signedLaunch(profile = {}) {
   const fields = {
     auth_date: String(Math.floor(Date.now() / 1000)),
     query_id: 'synthetic-launch',
-    user: JSON.stringify({ id: 1234 }),
+    user: JSON.stringify({ id: 1234, ...profile }),
   };
   const canonical = Object.keys(fields).sort().map(key => key + '=' + fields[key]).join('\n');
   const key = createHmac('sha256', 'WebAppData').update(syntheticBotToken).digest();
@@ -25,7 +25,7 @@ function signedLaunch() {
   });
 }
 
-function mockBridge({ linked = true, issueError = false, claimError = false, actionBudget = { data: 0 }, linkFailure = '', registrationFailure = '' } = {}) {
+function mockBridge({ linked = true, issueError = false, claimError = false, actionBudget = { data: 0 }, linkFailure = '', registrationFailure = '', telegramFetch = async () => Response.json({ ok: true, result: { photos: [] } }) } = {}) {
   const claims = new Set();
   let mintCount = 0;
   const authCalls = [];
@@ -35,6 +35,8 @@ function mockBridge({ linked = true, issueError = false, claimError = false, act
   let pending;
   let candidate;
   let createCount = 0;
+  let createdOptions;
+  const uploads = [];
   let email = linked ? 'synthetic@example.invalid' : '';
   const linkCalls = [];
   const emailUpdates = [];
@@ -86,6 +88,9 @@ function mockBridge({ linked = true, issueError = false, claimError = false, act
       claims.add(args.p_fingerprint);
       return { data: true };
     },
+    storage: { from: bucket => ({
+      upload: async (path, image, options) => { uploads.push({ bucket, path, image, options }); return {}; },
+    }) },
     auth: { getUser: async token => {
       authCalls.push('getUser');
       return { data: { user: { id: token === 'other-session' ? 'other-profile' : 'synthetic-profile' } } };
@@ -93,6 +98,7 @@ function mockBridge({ linked = true, issueError = false, claimError = false, act
       createUser: async options => {
         assert.equal(options.app_metadata.loopa_telegram_registration, '1234');
         assert.equal(++createCount, 1);
+        createdOptions = options;
         email = options.email;
         candidate = 'synthetic-profile';
         if (registrationFailure === 'after_auth_commit') {
@@ -127,6 +133,8 @@ function mockBridge({ linked = true, issueError = false, claimError = false, act
     createClient: () => admin,
     crypto: webcrypto,
     Response,
+    AbortSignal,
+    fetch: telegramFetch,
     TextEncoder,
     TextDecoder,
     URLSearchParams,
@@ -147,6 +155,8 @@ function mockBridge({ linked = true, issueError = false, claimError = false, act
     },
     mintCount: () => mintCount,
     createCount: () => createCount,
+    createdOptions: () => createdOptions,
+    uploads,
     budgetCalls,
     authCalls,
     linkCalls,
@@ -285,4 +295,40 @@ test('an existing Telegram binding confirms only the matching Supabase session',
   const anotherProfile = await bridge.request('status', fields, 'other-session');
   assert.deepEqual(anotherProfile.body, { status: 'claimed_by_another_profile' });
   assert.equal(bridge.mintCount(), 0);
+});
+
+test('registration imports signed profile fields and copies a JPEG only from the Telegram Bot API', async () => {
+  const visited = [];
+  const bridge = mockBridge({ linked: false, telegramFetch: async url => {
+    const endpoint = new URL(url);
+    assert.equal(endpoint.hostname, 'api.telegram.org');
+    visited.push(endpoint.pathname.split('/').at(-1));
+    if (url.endsWith('/getUserProfilePhotos')) {
+      return Response.json({ ok: true, result: { photos: [[{ file_id: 'fixture', width: 160, height: 160 }]] } });
+    }
+    if (url.endsWith('/getFile')) return Response.json({ ok: true, result: { file_path: 'photos/photo.jpg' } });
+    return new Response(Uint8Array.of(255,216,255,224,255,217));
+  } });
+  const fields = signedLaunch({ first_name: '  Маша ', last_name: ' Иванова', username: 'Masha_01',
+    photo_url: 'https://example.invalid/ignored.jpg' });
+  assert.equal((await bridge.request('register', fields)).body.status, 'login_ready');
+  assert.equal(bridge.createdOptions().user_metadata.display_name, 'Маша Иванова');
+  assert.equal(bridge.createdOptions().app_metadata.loopa_telegram_username, 'masha_01');
+  assert.equal(bridge.uploads.length, 1);
+  assert.equal(bridge.uploads[0].bucket, 'avatars');
+  assert.equal(bridge.uploads[0].path, 'synthetic-profile/avatar.jpg');
+  assert.equal(bridge.uploads[0].options.upsert, false);
+  assert.deepEqual(visited, ['getUserProfilePhotos', 'getFile', 'photo.jpg']);
+
+  assert.equal((await bridge.request('status', fields, 'synthetic-session')).body.status, 'linked');
+  assert.equal(bridge.uploads.length, 1);
+  assert.equal(bridge.createCount(), 1);
+});
+
+test('a long username and unavailable avatar do not block Telegram registration', async () => {
+  const bridge = mockBridge({ linked: false, telegramFetch: async () => { throw new Error('fixture offline'); } });
+  const fields = signedLaunch({ username: 'very_long_telegram_username' });
+  assert.equal((await bridge.request('register', fields)).body.status, 'login_ready');
+  assert.equal(bridge.createdOptions().app_metadata.loopa_telegram_username, null);
+  assert.equal(bridge.uploads.length, 0);
 });

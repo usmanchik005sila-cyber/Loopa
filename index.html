@@ -4368,6 +4368,11 @@ section[data-page="profile"]>#settings-detail>.settings-back{margin-bottom:14px}
         if(pane)animateContent(pane);
       }
     }
+    let loadedProfileAvatar=null;
+    function profileAvatarPath(user){
+      return user?.user_metadata?.avatar_path
+        || (loadedProfileAvatar?.userId===user?.id ? loadedProfileAvatar?.path : null);
+    }
     function refreshTopProfileAvatar() {
       const button = byId('top-profile-button');
       if (!button) return;
@@ -4389,8 +4394,7 @@ section[data-page="profile"]>#settings-detail>.settings-back{margin-bottom:14px}
         letter.textContent = (nickname.charAt(0) || 'L').toUpperCase();
         button.appendChild(letter);
       };
-      // Use authenticated user metadata directly: do not rely on whether the profile tab was opened.
-      const path = currentUser.user_metadata?.avatar_path;
+      const path = profileAvatarPath(currentUser);
       if (!path || !client) { fallback(); return; }
       const {data} = client.storage.from('avatars').getPublicUrl(path);
       if (!data?.publicUrl) { fallback(); return; }
@@ -5315,6 +5319,8 @@ section[data-page="profile"]>#settings-detail>.settings-back{margin-bottom:14px}
           feedback('profile-feedback','Для поиска людей сначала выполни SQL из LOOPA-friends-setup.sql в Supabase. '+errorText(error),true);
         } else {
           byId('profile-username').value=data?.username||'';
+          loadedProfileAvatar={userId:user.id,path:data?.avatar_path||null};
+          if(loadedProfileAvatar.path&&!user.user_metadata?.avatar_path)renderAvatar(currentUser);
           if (data?.display_name) {
             byId('profile-name').value = data.display_name;
             renderName(data.display_name);
@@ -5354,7 +5360,7 @@ section[data-page="profile"]>#settings-detail>.settings-back{margin-bottom:14px}
     }
     function renderAvatar(user) {
       const avatar = byId('account-avatar');
-      const path = user?.user_metadata?.avatar_path;
+      const path = profileAvatarPath(user);
       avatar.replaceChildren();
       if (path && client) {
         const {data} = client.storage.from('avatars').getPublicUrl(path);
@@ -5402,7 +5408,7 @@ section[data-page="profile"]>#settings-detail>.settings-back{margin-bottom:14px}
     function renderName(name) {
       const title = name.trim() || 'Профиль LOOPA';
       byId('profile-display-name').textContent=title;
-      if (!currentUser?.user_metadata?.avatar_path) byId('account-avatar').textContent = (name.trim().charAt(0) || 'L').toUpperCase();
+      if (!profileAvatarPath(currentUser)) byId('account-avatar').textContent = (name.trim().charAt(0) || 'L').toUpperCase();
       refreshSettingsIdentity();
     }
     async function syncSession() {
@@ -5497,7 +5503,7 @@ section[data-page="profile"]>#settings-detail>.settings-back{margin-bottom:14px}
         const response=await telegramMiniRequest(register?'register':'login');
         if(currentUser)return;
         if(response.status==='unlinked'){
-          note.textContent='Создай профиль, чтобы смотреть видео вместе с друзьями.';
+          note.textContent='Имя, ник и доступное фото из Telegram появятся в профиле LOOPA. Их можно изменить.';
           continueButton.hidden=false;
           showPage('profile');
           return;
