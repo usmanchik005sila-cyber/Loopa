@@ -19,9 +19,9 @@ begin
  if not found then raise exception 'Owner cannot update settings'; end if;
  update public.profiles set notification_sound=true where id=peer;
  if found then raise exception 'Peer settings writable'; end if;
- select count(*) into n from public.loopa_public_profiles() where id=peer and display_name='Privacy Peer';
+ select count(*) into n from public.loopa_profiles_by_ids(array[peer]) where id=peer and display_name='Privacy Peer';
  if n<>1 then raise exception 'Public directory broken'; end if;
- if exists(select 1 from public.loopa_public_profiles() d where to_jsonb(d)?|array['dm_policy','notification_sound','room_invite_policy','allow_friend_requests']) then
+ if exists(select 1 from public.loopa_profiles_by_ids(array[peer]) d where to_jsonb(d)?|array['dm_policy','notification_sound','room_invite_policy','allow_friend_requests']) then
   raise exception 'Directory exposes private fields';
  end if;
  insert into public.friend_requests(sender_id,receiver_id) values(own,peer);
@@ -78,7 +78,7 @@ reset role;
 set local role anon;
 do $test$
 begin
- if has_function_privilege('anon','public.loopa_public_profiles()','EXECUTE') then
+ if has_function_privilege('anon','public.loopa_profiles_by_ids(uuid[])','EXECUTE') then
   raise exception 'Unauthenticated directory access';
  end if;
 end $test$;

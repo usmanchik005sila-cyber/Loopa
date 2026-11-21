@@ -40,13 +40,13 @@ begin
   if exists (select 1 from public.profiles where id = owner_id) then
     raise exception 'Another user can read the private profile row';
   end if;
-  select to_jsonb(p) into preview from public.loopa_public_profiles() p where p.username = 'edited_fixture';
+  select to_jsonb(p) into preview from public.loopa_profiles_by_ids(array[owner_id]) p where p.username = 'edited_fixture';
   if preview->>'display_name' is distinct from 'Edited fixture'
      or preview->>'avatar_path' is distinct from (owner_id::text || '/avatar.jpg')
      or (preview - array['id','display_name','username','avatar_path','updated_at']) is distinct from '{}'::jsonb then
     raise exception 'Unexpected profile search fields';
   end if;
-  if has_function_privilege('anon','public.loopa_public_profiles()','EXECUTE') then
+  if has_function_privilege('anon','public.loopa_profiles_by_ids(uuid[])','EXECUTE') then
     raise exception 'Anonymous profile directory access';
   end if;
 end;

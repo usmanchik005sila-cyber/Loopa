@@ -48,7 +48,7 @@ begin
 
   roster := public.loopa_room16('read', room_key)->'members';
   if exists (select 1 from public.loopa_visible_presence(array[owner_id]))
-     or exists (select 1 from public.loopa_public_profiles() where id = owner_id and avatar_path is not null)
+     or exists (select 1 from public.loopa_profiles_by_ids(array[owner_id]) where id = owner_id and avatar_path is not null)
      or public.loopa_avatar_can_read(owner_id) is distinct from false
      or not roster @> jsonb_build_array(jsonb_build_object('id', owner_id, 'online', false)) then
     raise exception 'The blocked viewer still has access';
