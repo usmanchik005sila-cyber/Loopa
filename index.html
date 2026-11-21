@@ -1807,7 +1807,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
               <p class="panel-note">ЛИЧНОЕ ПРОСТРАНСТВО</p><h2>Конфиденциальность</h2>
               <p class="privacy-section-note">Решай, кто сможет видеть твою активность и взаимодействовать с тобой в LOOPA.</p>
               <div class="privacy-group"><h3>ВИДИМОСТЬ</h3>
-                <div class="privacy-item"><span class="privacy-item-icon"><svg><use href="#i-person"/></svg></span><span class="privacy-item-body"><strong>Показывать активность</strong><small>Только друзья видят, когда ты в сети и когда заходил в LOOPA</small></span><label class="presence-switch" aria-label="Показывать активность"><input id="presence-visible" type="checkbox" checked disabled><span class="presence-switch-track"></span></label></div>
+                <div class="privacy-item"><span class="privacy-item-icon"><svg><use href="#i-person"/></svg></span><span class="privacy-item-body"><strong>Показывать активность</strong><small>Вошедшие пользователи видят, когда ты в сети и когда заходил в LOOPA</small></span><label class="presence-switch" aria-label="Показывать активность"><input id="presence-visible" type="checkbox" checked disabled><span class="presence-switch-track"></span></label></div>
                 <div class="privacy-item"><span class="privacy-item-icon"><svg><use href="#i-person"/></svg></span><span class="privacy-item-body"><strong>Показывать просмотр друзьям</strong><small>Друзья видят «В комнате» или «Смотрит видео». Приватные комнаты защищены.</small></span><label class="presence-switch" aria-label="Показывать просмотр друзьям"><input id="presence-share-room" type="checkbox" checked disabled><span class="presence-switch-track"></span></label></div>
                 <div class="privacy-item"><span class="privacy-item-icon"><svg><use href="#i-arrow"/></svg></span><span class="privacy-item-body"><strong>Мой статус</strong><small id="presence-status">Подключаем статус…</small></span><span id="presence-indicator" class="presence-dot" aria-hidden="true"></span></div>
                 <p id="presence-feedback" class="auth-feedback" role="status" aria-live="polite" hidden></p>
@@ -2714,7 +2714,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     window.addEventListener('online',()=>{if(roomState){roomRun('read');syncPlayback();}});
 
     // User portraits come from the existing public LOOPA profile, regardless of auth provider.
-    const roomProfileCache=new Map(),roomProfilePending=new Set();
+    const roomProfileCache=new Map(),roomProfilePending=new Map();
     let roomPeopleTimer=0,roomFlashKey='',watchPeerSession='',watchPeerSeen=new Set();
     const peopleFlash=document.createElement('div');peopleFlash.id='roomParticipantsFlash';peopleFlash.setAttribute('aria-live','polite');
     videoStage.append(peopleFlash);
@@ -2723,42 +2723,30 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       if(userId)item.dataset.avatarUser=userId;
       item.textContent=(name||'Г').trim().charAt(0).toLocaleUpperCase('ru')||'Г';
       const profile=roomProfileCache.get(userId);
-      if(profile?.url){
-        const image=document.createElement('img');image.src=profile.url;image.alt='';image.loading='lazy';
-        image.onerror=()=>{image.remove();item.textContent=(name||'Г').charAt(0).toUpperCase();};
-        item.replaceChildren(image);
-      }
+      if(profile?.path) showAvatar(item,profile.path,name);
       return item;
     }
     function refreshRoomAvatars(){
       document.querySelectorAll('.loopa-room-avatar[data-avatar-user]').forEach(item=>{
         const profile=roomProfileCache.get(item.dataset.avatarUser);
-        if(!profile?.url||item.querySelector('img'))return;
-        const image=document.createElement('img');image.src=profile.url;image.alt='';image.loading='lazy';
-        const original=item.textContent;image.onerror=()=>{image.remove();item.textContent=original;};
-        item.replaceChildren(image);
+        if(profile?.path&&!item.dataset.avatarPath)showAvatar(item,profile.path,profile.name);
       });
     }
     async function loadRoomProfiles(ids){
       if(!client||!currentUser)return;
       const unknown=[...new Set(ids.filter(id=>typeof id==='string'&&/^[a-f0-9-]{36}$/i.test(id)))].filter(id=>!roomProfileCache.has(id)&&!roomProfilePending.has(id)).slice(0,80);
       if(!unknown.length)return;
-      unknown.forEach(id=>roomProfilePending.add(id));
+      const viewer=currentUser.id;
+      unknown.forEach(id=>roomProfilePending.set(id,viewer));
       try{
         const {data,error}=await client.rpc('loopa_public_profiles').select('id,display_name,avatar_path,updated_at').in('id',unknown);
         if(error)throw error;
-        for(const id of unknown)roomProfileCache.set(id,{url:null});
-        for(const person of data||[]){
-          let url=null;
-          if(person.avatar_path?.startsWith(person.id+'/avatar.')){
-            url=client.storage.from('avatars').getPublicUrl(person.avatar_path)?.data?.publicUrl||null;
-            if(url&&person.updated_at)url+='?v='+encodeURIComponent(person.updated_at);
-          }
-          roomProfileCache.set(person.id,{name:person.display_name,url});
-        }
+        if(currentUser?.id!==viewer)return;
+        for(const id of unknown)roomProfileCache.set(id,{path:null});
+        for(const person of data||[])roomProfileCache.set(person.id,{name:person.display_name,path:person.avatar_path});
         refreshRoomAvatars();
       }catch{/* The initials remain visible if public profile lookup is unavailable. */}
-      finally{unknown.forEach(id=>roomProfilePending.delete(id));}
+      finally{unknown.forEach(id=>{if(roomProfilePending.get(id)===viewer)roomProfilePending.delete(id);});}
     }
     function showRoomPeople(members,caption='Вы смотрите вместе'){
       if(!members?.length)return;
@@ -4441,12 +4429,72 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         if(pane)animateContent(pane);
       }
     }
+    const avatarRequests = new Map();
+    let avatarViewer=null;
+    function resetAvatarViewer(viewer) {
+      if(viewer===avatarViewer)return;
+      avatarViewer=viewer;
+      avatarRequests.clear();
+      roomProfileCache.clear();
+      roomProfilePending.clear();
+    }
+    async function requestAvatar(path,viewer) {
+      const {data:{session}} = await client.auth.getSession();
+      if(session?.user.id!==viewer)return null;
+      const response=await fetch(SUPABASE_URL+'/functions/v1/loopa-avatar?'+new URLSearchParams({path}),{
+        headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+session.access_token},
+        cache:'no-store',
+        signal:AbortSignal.timeout(10000)
+      });
+      return response.ok?response.blob():null;
+    }
+    async function showAvatar(node,path,name,imageClass='') {
+      const viewer=currentUser?.id;
+      node.dataset.avatarPath=path||'';
+      node.dataset.avatarName=name||'';
+      node.dataset.avatarClass=imageClass;
+      const fallback=(name?.trim().charAt(0)||'L').toLocaleUpperCase('ru');
+      const showInitial=()=>{
+        if(imageClass!=='top-profile-avatar'){node.textContent=fallback;return;}
+        const letter=document.createElement('span');
+        letter.className='top-profile-initial';
+        letter.textContent=fallback;
+        node.replaceChildren(letter);
+      };
+      if(!node.querySelector('img'))showInitial();
+      if(!path||!viewer||!client){showInitial();return;}
+      const key=viewer+':'+path;
+      if(!avatarRequests.has(key)){
+        const request=requestAvatar(path,viewer).catch(()=>null);
+        avatarRequests.set(key,request);
+        setTimeout(()=>{if(avatarRequests.get(key)===request)avatarRequests.delete(key);},15000);
+      }
+      const image=await avatarRequests.get(key);
+      if(node.dataset.avatarPath!==path||currentUser?.id!==viewer)return;
+      if(!image){showInitial();return;}
+      const img=document.createElement('img');
+      const url=URL.createObjectURL(image);
+      img.className=imageClass;
+      img.alt='';
+      img.decoding='async';
+      img.onload=()=>URL.revokeObjectURL(url);
+      img.onerror=()=>{URL.revokeObjectURL(url);if(node.firstChild===img)showInitial();};
+      img.src=url;
+      node.replaceChildren(img);
+    }
+    setInterval(()=>{
+      if(document.hidden||!currentUser)return;
+      for(const node of document.querySelectorAll('[data-avatar-path]')){
+        if(node.dataset.avatarPath)showAvatar(node,node.dataset.avatarPath,node.dataset.avatarName,node.dataset.avatarClass);
+      }
+    },15000);
     let loadedProfileAvatar=null;
     function profileAvatarPath(user){
       return user?.user_metadata?.avatar_path
         || (loadedProfileAvatar?.userId===user?.id ? loadedProfileAvatar?.path : null);
     }
     function refreshTopProfileAvatar() {
+      resetAvatarViewer(currentUser?.id??null);
       const button = byId('top-profile-button');
       if (!button) return;
       const profileAction = currentUser ? 'Открыть личные данные' : 'Войти или зарегистрироваться';
@@ -4455,39 +4503,20 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       button.replaceChildren();
       button.classList.remove('profile-with-photo');
       if (!currentUser) {
+        delete button.dataset.avatarPath;
         button.innerHTML = '<svg><use href="#i-person"/></svg>';
         return;
       }
       button.classList.add('profile-with-photo');
       const nickname = byId('profile-name').value.trim() || currentUser.user_metadata?.display_name || '';
-      const fallback = () => {
-        button.replaceChildren();
-        const letter = document.createElement('span');
-        letter.className = 'top-profile-initial';
-        letter.textContent = (nickname.charAt(0) || 'L').toUpperCase();
-        button.appendChild(letter);
-      };
-      const path = profileAvatarPath(currentUser);
-      if (!path || !client) { fallback(); return; }
-      const {data} = client.storage.from('avatars').getPublicUrl(path);
-      if (!data?.publicUrl) { fallback(); return; }
-      const img = document.createElement('img');
-      img.className = 'top-profile-avatar';
-      img.alt = '';
-      img.decoding = 'async';
-      img.src = data.publicUrl + '?v=' + encodeURIComponent(currentUser.user_metadata?.avatar_version || '1');
-      img.addEventListener('error', fallback, {once:true});
-      button.appendChild(img);
+      void showAvatar(button,profileAvatarPath(currentUser),nickname,'top-profile-avatar');
     }
     function refreshSettingsIdentity() {
       const name = byId('profile-name').value.trim() || 'Профиль LOOPA';
       byId('settings-user-name').textContent = name;
       byId('settings-user-email').textContent = loopaAccountIdentity(currentUser);
       const mini = byId('settings-mini-avatar');
-      mini.replaceChildren();
-      const actual = byId('account-avatar').querySelector('img');
-      if (actual) mini.appendChild(actual.cloneNode());
-      else mini.textContent = (name.charAt(0) || 'L').toUpperCase();
+      void showAvatar(mini,profileAvatarPath(currentUser),name);
       refreshTopProfileAvatar();
     }
     const wallpaperMedia=window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -4733,7 +4762,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       try {
         const {error} = await client.from('user_presence').upsert({user_id:currentUser.id,last_active_at:new Date().toISOString()},{onConflict:'user_id'});
         if (error) throw error;
-        if (byId('presence-visible').checked) presenceStatus('В сети · видно только друзьям',true);
+        if (byId('presence-visible').checked) presenceStatus('В сети · видно другим пользователям',true);
         else presenceStatus('Активность скрыта');
       } catch(e) {
         presenceStatus('Не удалось обновить статус');
@@ -4773,8 +4802,8 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       try {
         const {error} = await client.from('user_presence').update({visible:desired}).eq('user_id',currentUser.id);
         if (error) throw error;
-        presenceStatus(desired ? 'В сети · видно только друзьям' : 'Активность скрыта',desired);
-        feedback('presence-feedback',desired?'Теперь только друзья видят твою активность.':'Твоя активность, просмотр и последнее посещение скрыты.');
+        presenceStatus(desired ? 'В сети · видно другим пользователям' : 'Активность скрыта',desired);
+        feedback('presence-feedback',desired?'Теперь вошедшие пользователи могут видеть твою активность.':'Твоя активность, просмотр и последнее посещение скрыты.');
       } catch(e) {
         this.checked = !desired;
         feedback('presence-feedback',errorText(e),true);
@@ -4824,19 +4853,8 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       const avatar = document.createElement('div');
       avatar.className = 'friend-avatar';
       const name = profile?.display_name || 'LOOPA';
-      avatar.textContent = name.charAt(0).toUpperCase();
       const path = profile?.avatar_path;
-      if (path && client && typeof profile.id === 'string' && path.startsWith(profile.id + '/avatar.')) {
-        const {data} = client.storage.from('avatars').getPublicUrl(path);
-        if (data?.publicUrl) {
-          const img = document.createElement('img');
-          img.alt = '';
-          img.loading = 'lazy';
-          img.src = data.publicUrl + (profile.updated_at ? '?v=' + encodeURIComponent(profile.updated_at) : '');
-          img.onerror = () => { img.remove(); avatar.textContent = name.charAt(0).toUpperCase(); };
-          avatar.replaceChildren(img);
-        }
-      }
+      void showAvatar(avatar,path&&profile.id&&path.startsWith(profile.id+'/')?path:null,name);
       return avatar;
     }
     function friendPresenceLabel(row) {
@@ -5141,7 +5159,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     }
     async function getPublicPresence(ids) {
       if (!ids.length) return {};
-      const {data,error} = await client.from('user_presence').select('user_id,last_active_at').in('user_id',ids);
+      const {data,error} = await client.rpc('loopa_visible_presence',{p_users:ids});
       if (error) throw error;
       return Object.fromEntries((data||[]).map(row=>[row.user_id,friendPresenceLabel(row)]));
     }
@@ -5435,17 +5453,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     }
     function renderAvatar(user) {
       const avatar = byId('account-avatar');
-      const path = profileAvatarPath(user);
-      avatar.replaceChildren();
-      if (path && client) {
-        const {data} = client.storage.from('avatars').getPublicUrl(path);
-        const img = document.createElement('img');
-        img.alt = '';
-        img.src = data.publicUrl + '?v=' + encodeURIComponent(user?.user_metadata?.avatar_version || '1');
-        img.onload = refreshSettingsIdentity;
-        img.onerror = () => { avatar.replaceChildren(); avatar.textContent = (byId('profile-name').value.trim().charAt(0) || 'L').toUpperCase(); refreshSettingsIdentity(); };
-        avatar.appendChild(img);
-      } else avatar.textContent = (byId('profile-name').value.trim().charAt(0) || 'L').toUpperCase();
+      void showAvatar(avatar,profileAvatarPath(user),byId('profile-name').value);
       refreshSettingsIdentity();
     }
     byId('avatar-file').addEventListener('change', async (event) => {
@@ -5471,6 +5479,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         const result = await client.auth.updateUser({data:{avatar_path:path,avatar_version:Date.now()}});
         if (result.error) throw result.error;
         currentUser = result.data.user;
+        avatarRequests.delete(currentUser.id+':'+path);
         renderAvatar(currentUser);
         const {error:directoryAvatarError} = await client.from('profiles').update({avatar_path:path,updated_at:new Date().toISOString()}).eq('id',currentUser.id);
         feedback('profile-feedback',directoryAvatarError
