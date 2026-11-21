@@ -25,8 +25,8 @@ test('profile saves a normalized optional username with the display name', () =>
 });
 
 test('friend search includes exact usernames and displays the matching handle', () => {
-  assert.ok(html.includes(".eq('username',handle).limit(1)"));
-  assert.ok(html.includes("'id,display_name,username,avatar_path,updated_at'"));
+  assert.ok(html.includes("client.rpc('loopa_search_profiles',{p_term:term})"));
+  assert.ok(html.includes('data?.profiles||[]'));
   assert.ok(html.includes("handle.textContent='@'+profile.username"));
   assert.match(html, /#friend-search\{[^}]*font-size:16px/);
 });

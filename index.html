@@ -1957,7 +1957,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
   <script src="./assets/room-watch-reliability.js"></script>
   <script src="./assets/account-continuity.js"></script>
   <script src="./assets/resume-storage.js"></script>
-  <script src="./assets/direct-messages.js"></script>
+  <script src="./assets/direct-messages.js?v=profile-lookup"></script>
   <script defer>
     'use strict';
     const SUPABASE_URL = 'https://wnubqzwsvclvcvozibtc.supabase.co';
@@ -2739,7 +2739,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       const viewer=currentUser.id;
       unknown.forEach(id=>roomProfilePending.set(id,viewer));
       try{
-        const {data,error}=await client.rpc('loopa_public_profiles').select('id,display_name,avatar_path,updated_at').in('id',unknown);
+        const {data,error}=await lookupPublicProfiles(unknown);
         if(error)throw error;
         if(currentUser?.id!==viewer)return;
         for(const id of unknown)roomProfileCache.set(id,{path:null});
@@ -4729,7 +4729,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         if(error) throw error;
         const ids=(data||[]).map(row=>row.blocked_id);
         if(!ids.length){list.textContent='Список пуст';return;}
-        const {data:profiles,error:profileError}=await client.rpc('loopa_public_profiles').select('id,display_name,avatar_path,updated_at').in('id',ids);
+        const {data:profiles,error:profileError}=await lookupPublicProfiles(ids);
         if(profileError) throw profileError;
         for(const profile of profiles||[]) list.appendChild(friendRow(profile,null,[{label:'Разблокировать',action:'unblock',userId:profile.id}]));
       } catch(err){list.textContent='Не удалось загрузить список: '+errorText(err);}
@@ -4949,7 +4949,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       showPage('friend-profile');
       try{
         const [p,stats,prs]=await Promise.all([
-          client.rpc('loopa_public_profiles').select('id,display_name,avatar_path,updated_at').eq('id',profile.id).maybeSingle(),
+          client.rpc('loopa_profiles_by_ids',{p_ids:[profile.id]}).maybeSingle(),
           client.rpc('loopa_friend_stats_v88',{peer_id:profile.id}),
           getPublicPresence([profile.id]).catch(()=>({}))
         ]);
@@ -4989,7 +4989,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       const fallback={id:userId,display_name:roomProfileCache.get(userId)?.name||visibleName||'Участник'};
       if(byId('roomSheet').open)byId('roomSheet').close();
       try{
-        const {data}=await client.rpc('loopa_public_profiles').select('id,display_name,avatar_path,updated_at').eq('id',userId).maybeSingle();
+        const {data}=await client.rpc('loopa_profiles_by_ids',{p_ids:[userId]}).maybeSingle();
         if(currentUser&&roomState)openFriendProfile(data||fallback);
         else if(currentUser)openFriendProfile(data||fallback);
       }catch{if(currentUser)openFriendProfile(fallback);}
@@ -5015,7 +5015,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     };
     const messages=LOOPADirectMessages.create({
       getClient:()=>client,getCurrentUser:()=>currentUser,getPage:()=>lastPage,
-      showPage,byId,document,friendAvatar,avatarForUser,openFriendProfile,openSafetyReport,showToast
+      showPage,byId,document,friendAvatar,avatarForUser,openFriendProfile,openSafetyReport,showToast,lookupPublicProfiles
     });
     const {openDirectMessage,refreshMessagesInbox,subscribeMessagesInbox,
       stopMessagesInbox,clearDirectMessageChannel}=messages;
@@ -5166,6 +5166,17 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       const overlay=byId('requests-overlay');
       if (overlay) overlay.hidden=true;
     }
+    async function lookupPublicProfiles(ids) {
+      const db=client,viewer=currentUser?.id;
+      const data=[];
+      for(let offset=0;offset<ids.length;offset+=150){
+        if(!db||!viewer||currentUser?.id!==viewer)return {data:[],error:null};
+        const result=await db.rpc('loopa_profiles_by_ids',{p_ids:ids.slice(offset,offset+150)});
+        if(result.error)return result;
+        data.push(...(result.data||[]));
+      }
+      return {data,error:null};
+    }
     async function getPublicPresence(ids) {
       if (!ids.length) return {};
       const {data,error} = await client.rpc('loopa_visible_presence',{p_users:ids});
@@ -5189,8 +5200,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         let directory={};
         let presence={};
         if (ids.length) {
-          const {data:profiles,error:profileError} = await client.rpc('loopa_public_profiles')
-            .select('id,display_name,avatar_path,updated_at').in('id',ids);
+          const {data:profiles,error:profileError} = await lookupPublicProfiles(ids);
           if (profileError) throw profileError;
           directory=Object.fromEntries((profiles||[]).map(profile=>[profile.id,profile]));
           presence=await getPublicPresence(ids);
@@ -5245,23 +5255,14 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       if (term.length<2) {friendEmpty(parent,'Введи хотя бы 2 символа, чтобы найти пользователя.');return;}
       friendEmpty(parent,'Ищем…');
       try {
-        const escaped=term.replace(/[\%_]/g,'\\$&');
-        const handle=term.replace(/^@/,'').trim().toLowerCase();
-        const columns='id,display_name,username,avatar_path,updated_at';
-        const nameSearch=client.rpc('loopa_public_profiles').select(columns).ilike('display_name','%'+escaped+'%').limit(15);
-        const usernameSearch=/^[a-z][a-z0-9_]{3,15}$/.test(handle)
-          ?client.rpc('loopa_public_profiles').select(columns).eq('username',handle).limit(1)
-          :Promise.resolve({data:[],error:null});
-        const [nameResult,handleResult]=await Promise.all([nameSearch,usernameSearch]);
-        if(nameResult.error)throw nameResult.error;
-        if(handleResult.error)throw handleResult.error;
-        if (generation!==friendSearchGeneration || currentUser?.id!==owner) return;
-        const candidateProfiles=new Map();
-        for(const profile of [...(handleResult.data||[]),...(nameResult.data||[])])candidateProfiles.set(profile.id,profile);
-        const {data:blockedRows,error:blockError}=await client.from('blocked_users').select('blocked_id').eq('blocker_id',owner);
-        if(blockError) throw blockError;
-        const blockedIds=new Set((blockedRows||[]).map(row=>row.blocked_id));
-        const matches=[...candidateProfiles.values()].filter(profile=>profile.id!==owner&&!blockedIds.has(profile.id));
+        const {data,error}=await client.rpc('loopa_search_profiles',{p_term:term});
+        if(error)throw error;
+        if(generation!==friendSearchGeneration||currentUser?.id!==owner)return;
+        if(data?.retry_after){
+          friendEmpty(parent,'Слишком много поисковых запросов. Повтори через '+data.retry_after+' сек.');
+          return;
+        }
+        const matches=data?.profiles||[];
         const presence=await getPublicPresence(matches.map(profile=>profile.id));
         if (generation!==friendSearchGeneration || currentUser?.id!==owner) return;
         if (!matches.length) {friendEmpty(parent,'Никого не нашли. Проверь написание никнейма.');return;}
