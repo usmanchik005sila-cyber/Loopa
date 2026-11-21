@@ -1,15 +1,17 @@
 # Server abuse limits
 
-Per-account token buckets live in loopa_private.request_budgets (RLS, no application grants, auth.users FK with cascading removal). At most four rows per account. Counters are updated under a row lock, shared by all devices and Edge isolates. Values refill continuously; these are burst budgets, not exact rolling-minute caps.
+Per-account token buckets live in loopa_private.request_budgets (RLS, no application grants, auth.users FK with cascading removal). At most six rows per account. Counters are updated under a row lock, shared by all devices and Edge isolates. Values refill continuously.
 
 | Action | Initial burst | Refill |
 | --- | --- | --- |
 | DM and room chat combined | 8 messages | 1 message/second |
 | Create room | 5 rooms | 1 room/12 seconds |
+| Send friend request | 5 requests | 1 request/12 seconds |
+| Send or resend room invitation | 20 invitations | 1 invitation/3 seconds |
 | Full catalog search (all providers) | 10 requests | 1 request/3 seconds |
 | Autocomplete (all providers) | 30 requests | 10 requests/second |
 
-Message and room creation checks are AFTER INSERT database triggers, so direct DM inserts and room RPC calls cannot bypass them. Failed transactions do not consume budget. Trusted maintenance without an end-user JWT bypasses insert limits. Existing invite/report limits remain unchanged. Room reads, playback synchronization, joining rooms, history and inbox paging do not consume these budgets.
+Database triggers enforce the limits on message and room creation, friend requests, and invitation sends. Resending an invitation consumes a token when the send time changes. The room RPC also keeps its existing room-invitation limits. Accepting a request or invitation and marking an invitation as notified do not consume a token. Failed transactions do not consume budget. Trusted maintenance without an end-user JWT bypasses insert limits. Room reads, playback synchronization, joining rooms, history and inbox paging do not consume these budgets.
 
 video-search checks an authenticated RPC budget before serving cached responses or calling an external API. Exhaustion returns HTTP 429, Retry-After and a Russian message; unavailable quota service returns 503 with no external search. The RPC takes no user id or adjustable quota. Authentication is still validated separately.
 
