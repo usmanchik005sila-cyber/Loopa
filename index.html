@@ -4838,6 +4838,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     let friendSessionId = null;
     let friendSearchTimer = null;
     let friendSearchGeneration = 0;
+    let lastFriendSearchAt = 0;
     let friendAutoRefresh = null;
     let lastIncomingCount = null;
     const friendPresenceWindow = 90000; // same 90-second threshold as own presence
@@ -5172,6 +5173,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       for(let offset=0;offset<ids.length;offset+=150){
         if(!db||!viewer||currentUser?.id!==viewer)return {data:[],error:null};
         const result=await db.rpc('loopa_profiles_by_ids',{p_ids:ids.slice(offset,offset+150)});
+        if(currentUser?.id!==viewer)return {data:[],error:null};
         if(result.error)return result;
         data.push(...(result.data||[]));
       }
@@ -5240,7 +5242,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         else friendEmpty(byId('friend-incoming'),'Новых заявок пока нет.');
         showRelations('friend-outgoing',sent,'outgoing');filterNotices();
         const term=byId('friend-search').value.trim();
-        if (term.length>=2) runFriendSearch();
+        if(lastPage==='friends'&&term.length>=2&&Date.now()-lastFriendSearchAt>=30000)runFriendSearch();
         feedback('friends-feedback','');
       } catch(err) {
         if (currentUser?.id===owner) feedback('friends-feedback','Не удалось загрузить друзей. Проверь, что SQL-настройка LOOPA v12 выполнена: '+errorText(err),true);
@@ -5253,6 +5255,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       const generation=++friendSearchGeneration;
       const parent=byId('friend-search-results');
       if (term.length<2) {friendEmpty(parent,'Введи хотя бы 2 символа, чтобы найти пользователя.');return;}
+      lastFriendSearchAt=Date.now();
       friendEmpty(parent,'Ищем…');
       try {
         const {data,error}=await client.rpc('loopa_search_profiles',{p_term:term});
@@ -5317,6 +5320,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         } else return;
         if (result.error) throw result.error;
         if (currentUser?.id!==actor) return;
+        lastFriendSearchAt=0;
         await refreshFriendLists();
         showToast(kind==='block'?'Пользователь заблокирован':kind==='unblock'?'Пользователь разблокирован':kind==='send'?'Заявка отправлена':kind==='accept'?'Теперь вы друзья!':kind==='remove'?'Пользователь удалён из друзей':kind==='cancel'?'Заявка отменена':'Заявка отклонена');
       } catch(err) {
