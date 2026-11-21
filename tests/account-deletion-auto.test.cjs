@@ -32,7 +32,7 @@ test("bot authenticates the user and automatically removes their Auth and public
   assert.match(bot, /db\.auth\.admin\.deleteUser\(userId\)/);
   assert.match(bot, /p_action:"purge"/);
   assert.match(bot, /p_action:"complete"/);
-  assert.match(bot, /storage\.from\("avatars"\)\.remove\(paths\)/);
+  assert.match(bot, /storage\.from\("avatars"\)[\s\S]*avatars\.remove\(/);
 });
 
 test("bot CORS allows the Supabase client info header", () => {
@@ -59,4 +59,74 @@ test("deletion screen clearly warns and invokes server cleanup after confirmatio
   assert.match(html, /client\.auth\.signOut\(\{scope:'local'\}\)/);
   assert.match(safetyGuide, /removed automatically/i);
   assert.match(safetyGuide, /request row is removed|request row is removed/i);
+});
+
+test("file cleanup precedes Auth deletion and a cleanup retry supports an already absent account", async () => {
+  const vm = require("node:vm");
+  const start = bot.indexOf("async function clearAccountAvatars(");
+  const calls = [];
+  const account = "11111111-1111-4111-8111-111111111111";
+  const request = "22222222-2222-4222-8222-222222222222";
+  const telegramId = "81001";
+  const rules = { missing: false, storageError: false, purgeError: false };
+  const files = new Map([
+    [account, Array.from({ length: 100 }, (_, i) => ({ id: i + 1, name: i + ".jpg" }))
+      .concat({ id: null, name: "nested" })],
+    [account + "/nested", [{ id: 101, name: "extra.jpg" }]],
+  ]);
+  const db = {
+    auth: { admin: {
+      getUserById: async () => rules.missing
+        ? { error: { status: 404 } } : { data: { user: { id: account } } },
+      deleteUser: async () => {
+        assert.ok([...files.values()].flat().every(file => !file.id));
+        calls.push("delete");
+        rules.missing = true;
+        return {};
+      },
+    } },
+    storage: { from: bucket => {
+      assert.equal(bucket, "avatars");
+      return {
+        list: async (prefix, { limit, offset }) => ({ data: files.get(prefix).slice(offset, offset + limit) }),
+        remove: async paths => {
+          calls.push("remove");
+          if (rules.storageError) return { error: new Error("fixture") };
+          for (const [prefix, children] of files)
+            files.set(prefix, children.filter(child => !paths.includes(prefix + "/" + child.name)));
+          return {};
+        },
+      };
+    } },
+    rpc: async (_name, args) => {
+      calls.push(args.p_action);
+      switch (args.p_action) {
+        case "claim": return { data: { status: "processing", user_id: account, telegram_id: telegramId } };
+        case "purge": return rules.purgeError ? { error: new Error("fixture") } : { data: { status: "purged" } };
+        case "complete": return { data: { status: "completed" } };
+        case "release": return {};
+      }
+    },
+  };
+  const context = {
+    REQUEST_ID_RE: /^[0-9a-f-]{36}$/,
+    isMissingAuthUser: error => error?.status === 404,
+    botAPI: async (_token, _method, payload) => { calls.push("notice:" + payload.chat_id); },
+    editDeletionNotice: async () => {}, console: { error() {} },
+  };
+  vm.runInNewContext(bot.slice(start, bot.indexOf("async function miniAppAction(", start)), context);
+  const run = (actor = account) => context.processAccountDeletion(db, "fake", request, actor, null);
+
+  rules.storageError = true;
+  assert.equal((await run()).error, "account_deletion_failed");
+  assert.deepEqual(calls.splice(0), ["claim", "remove", "release"]);
+
+  rules.storageError = false;
+  rules.purgeError = true;
+  assert.equal((await run()).error, "account_deleted_cleanup_incomplete");
+  assert.deepEqual(calls.splice(0), ["claim", "remove", "remove", "delete", "purge"]);
+
+  rules.purgeError = false;
+  assert.equal((await run(null)).status, "completed");
+  assert.deepEqual(calls, ["claim", "purge", "complete", "notice:81001"]);
 });

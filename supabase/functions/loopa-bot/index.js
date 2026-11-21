@@ -46,6 +46,34 @@ async function editDeletionNotice(token,chatId,messageId,requestId,status){
     });
   }catch{}
 }
+async function clearAccountAvatars(db,userId){
+  const avatars=db.storage.from("avatars");
+  const prefixes=[userId];
+  const paths=[];
+  const pageSize=100;
+  for(const prefix of prefixes){
+    for(let offset=0;;offset+=pageSize){
+      const {data:files,error}=await avatars.list(prefix,{
+        limit:pageSize,offset,sortBy:{column:"name",order:"asc"}
+      });
+      if(error)throw error;
+      const page=files||[];
+      for(const file of page){
+        const name=file?.name;
+        if(typeof name!=="string"||!name||name==="."||name===".."||name.includes("/"))
+          throw Error("invalid_avatar_object_name");
+        const path=prefix+"/"+name;
+        if(file.id)paths.push(path);
+        else prefixes.push(path);
+      }
+      if(page.length<pageSize)break;
+    }
+  }
+  for(let offset=0;offset<paths.length;offset+=pageSize){
+    const {error}=await avatars.remove(paths.slice(offset,offset+pageSize));
+    if(error)throw error;
+  }
+}
 async function processAccountDeletion(db,token,requestId,actorId,ownerId){
   const {data:claim,error:claimError}=await db.rpc("loopa_account_deletion_process_v1",{
     p_action:"claim",p_request_id:requestId,p_actor:actorId||null
@@ -54,7 +82,7 @@ async function processAccountDeletion(db,token,requestId,actorId,ownerId){
   if(claim?.status==="already_processing")return {error:"deletion_already_processing",httpStatus:409};
   if(claim?.status!=="processing")return {error:"delete_request_not_pending",httpStatus:409};
   const userId=String(claim.user_id||"");
-  if(!/^[0-9a-f-]{36}$/i.test(userId))return {error:"invalid_delete_owner",httpStatus:500};
+  if(!REQUEST_ID_RE.test(userId))return {error:"invalid_delete_owner",httpStatus:500};
 
   let notice;
   if(ownerId){
@@ -65,30 +93,25 @@ async function processAccountDeletion(db,token,requestId,actorId,ownerId){
         parse_mode:"HTML",
         link_preview_options:{is_disabled:true}
       });
-    }catch(error){
-      console.error("deletion_owner_notice_unavailable",String(error?.message||"telegram_error").slice(0,120));
+    }catch{
+      console.error("deletion_owner_notice_unavailable");
     }
   }
 
-  let authDeleted=false;
+  let authDeleted=false,authDeleteStarted=false;
   try{
     const {data:userResult,error:userLookupError}=await db.auth.admin.getUserById(userId);
     if(userLookupError&&!isMissingAuthUser(userLookupError))throw userLookupError;
+    authDeleted=!userResult?.user;
 
-    if(userResult?.user){
+    await clearAccountAvatars(db,userId);
+    if(!authDeleted){
+      authDeleteStarted=true;
       const {error:deleteError}=await db.auth.admin.deleteUser(userId);
       if(deleteError&&!isMissingAuthUser(deleteError))throw deleteError;
-    }
-    authDeleted=true;
-
-    const {data:files,error:listError}=await db.storage.from("avatars").list(userId,{limit:1000});
-    if(listError)throw listError;
-    const paths=(files||[])
-      .filter(file=>file?.id&&typeof file.name==="string"&&file.name.length>0)
-      .map(file=>userId+"/"+file.name);
-    if(paths.length){
-      const {error:removeError}=await db.storage.from("avatars").remove(paths);
-      if(removeError)throw removeError;
+      authDeleted=true;
+      // Remove any final upload that completed while Auth was being deleted.
+      await clearAccountAvatars(db,userId);
     }
 
     const {data:purged,error:purgeError}=await db.rpc("loopa_account_deletion_process_v1",{
@@ -114,11 +137,11 @@ async function processAccountDeletion(db,token,requestId,actorId,ownerId){
       }catch{}
     }
     return {status:"completed",request_id:requestId};
-  }catch(error){
-    console.error("account_deletion_failed",String(error?.message||"internal_error").slice(0,160));
-    if(!authDeleted&&actorId){
+  }catch{
+    console.error(authDeleted?"account_deletion_cleanup_failed":"account_deletion_failed");
+    if(!authDeleted&&!authDeleteStarted){
       await db.rpc("loopa_account_deletion_process_v1",{
-        p_action:"release",p_request_id:requestId,p_actor:actorId
+        p_action:"release",p_request_id:requestId,p_actor:actorId||null
       }).catch(()=>{});
     }
     const status=authDeleted?"failed_after_auth":"failed";
