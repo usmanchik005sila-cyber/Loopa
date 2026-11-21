@@ -67,7 +67,7 @@ The retry command is for recovering a failed cleanup only; it is not an approval
 | Category | Data currently used |
 | --- | --- |
 | Sign-in | Supabase Auth account ID and the email, phone, or provider identity supplied by the selected sign-in method. Telegram linking records a Telegram ID. |
-| Profile | Display name, avatar path/image, notification preference, DM policy, friend-request and room-invite preferences. Avatar images use the `avatars` storage bucket and the app currently serves their public URL. |
+| Profile | Display name, avatar path/image, notification preference, DM policy, friend-request and room-invite preferences. Avatar images use the private `avatars` storage bucket. The `loopa-avatar` Edge Function checks the viewer session and blocks before serving a photo. |
 | Social graph | Friend requests and accepted relationships, plus directional blocks. |
 | Direct messages | Sender, recipient, message text, row ID, and timestamp in `loopa_dm_messages_v87`. The UI loads the latest 100 for a conversation; this is a display limit, not a deletion rule. |
 | Watch rooms | Room code, host, access mode, members, current media URL and playback position; room-chat author, text, and timestamp. `loopa_room16` returns the latest 60 chat rows; this is not a retention limit. |

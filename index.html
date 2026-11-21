@@ -4932,7 +4932,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       item.classList.add('friend-avatar');
       return item;
     }
-    async function openFriendProfile(profile,presence=null){
+    async function openFriendProfile(profile){
       if(!currentUser||!profile?.id)return;
       const requestId=++friendProfileRequest;
       profilePageReturn=lastPage;
@@ -4940,8 +4940,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       profilePeer={...profile};
       byId('friendPageName').textContent=profile.display_name||'Пользователь LOOPA';
       byId('friendPageAvatar').replaceChildren(avatarForUser(profile));
-      const pageActivity=friendActivity[profile.id];
-      byId('friendPageStatus').textContent=pageActivity?(pageActivity.private?'В сети · В приватной комнате':pageActivity.state==='watching'?'В сети · Смотрит видео':'В сети · В комнате'):(presence?.label||'Статус недоступен');
+      byId('friendPageStatus').textContent='Загружаем статус…';
       byId('friendPageTime').textContent='Загружаем…';
       byId('friendPageJoined').textContent='—';
       byId('friend-profile-missing').hidden=true;
@@ -4956,9 +4955,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         ]);
         if(requestId!==friendProfileRequest||profilePeer?.id!==profile.id)return;
         if(p.data){profilePeer={...p.data};byId('friendPageName').textContent=p.data.display_name||'Пользователь LOOPA';byId('friendPageAvatar').replaceChildren(avatarForUser(p.data));}
-        const status=prs?.[profile.id];
-        const liveActivity=friendActivity[profile.id];
-        byId('friendPageStatus').textContent=liveActivity?(liveActivity.private?'В сети · В приватной комнате':liveActivity.state==='watching'?'В сети · Смотрит видео':'В сети · В комнате'):(status?.label||presence?.label||'Статус скрыт');
+        renderFriendPageStatus(profile.id,prs?.[profile.id]);
         if(stats.error){
           byId('friendPageTime').textContent='—';
           byId('friend-profile-missing').textContent='Для общей статистики выполни дополнительный SQL LOOPA v88 в Supabase.';
@@ -4978,6 +4975,12 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       }catch(e){
         if(requestId===friendProfileRequest){byId('friendPageTime').textContent='—';}
       }
+    }
+    function renderFriendPageStatus(peerId,status) {
+      const activity=friendActivity[peerId];
+      byId('friendPageStatus').textContent=status&&activity
+        ? (activity.private?'В сети · В приватной комнате':activity.state==='watching'?'В сети · Смотрит видео':'В сети · В комнате')
+        : status?.label||'Статус скрыт';
     }
     async function openRoomPeer(userId,visibleName){
       if(!currentUser||!client||!userId||userId===currentUser.id)return;
@@ -5049,11 +5052,11 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         row.tabIndex=0;
         row.addEventListener('click',event=>{
           if(event.target.closest('button,a,input,select,.friend-actions'))return;
-          openFriendProfile(profile,presence);
+          openFriendProfile(profile);
         });
         row.addEventListener('keydown',event=>{
           if(event.target===row&&(event.key==='Enter'||event.key===' ')){
-            event.preventDefault();openFriendProfile(profile,presence);
+            event.preventDefault();openFriendProfile(profile);
           }
         });
       }
@@ -5124,8 +5127,14 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       friendRelations=[];
       friendActivity={};
       clearInterval(friendAutoRefresh);
-      friendAutoRefresh=setInterval(()=>{
-        if (document.visibilityState==='visible') refreshFriendLists();
+      friendAutoRefresh=setInterval(async ()=>{
+        if(document.visibilityState!=='visible')return;
+        await refreshFriendLists();
+        const peerId=profilePeer?.id,viewer=currentUser?.id,requestId=friendProfileRequest;
+        if(lastPage!=='friend-profile'||!peerId||!viewer)return;
+        const presence=await getPublicPresence([peerId]).catch(()=>({}));
+        if(lastPage==='friend-profile'&&requestId===friendProfileRequest&&currentUser?.id===viewer)
+          renderFriendPageStatus(peerId,presence[peerId]);
       },30000);
     }
     function updateRequestBadges(count) {
