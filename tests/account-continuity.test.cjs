@@ -149,3 +149,30 @@ test('browser entry keeps Telegram launches and auth recovery callbacks on their
   assert.equal(chooseEntry('', '#access_token=fixture&type=recovery'), 'recovery');
   assert.equal(chooseEntry('?recovery=1', '', true), 'telegram');
 });
+
+test('cached sessions in the Mini App open only after the signed Telegram pairing is confirmed', async () => {
+  const start = html.indexOf('    async function syncSession()');
+  const source = html.slice(start, html.indexOf("    document.addEventListener('click', function", start));
+  const user = { id: 'fixture-profile' };
+  for (const status of ['linked', 'unlinked', 'claimed_by_another_profile', 'profile_linked_elsewhere', 'offline']) {
+    const events = [];
+    const session = { user, access_token: 'fixture-session' };
+    const context = {
+      isTelegramMiniApp: true, currentUser: null, telegramMiniLinked: false,
+      client: { auth: { getSession: async () => ({ data: { session } }) } },
+      telegramMiniRequest: async (action, token) => {
+        events.push(action);
+        assert.equal(token, session.access_token);
+        if (status === 'offline') throw new Error('fixture');
+        return { status };
+      },
+      displayAccount: async value => { assert.equal(value, user); events.push('account'); },
+      displayGuest: () => events.push('guest'),
+      acceptInvite: () => events.push('invite'),
+    };
+    vm.runInNewContext(source, context);
+    await context.syncSession();
+    assert.deepEqual(events, status==='linked' ? ['status','account','invite'] : ['status','guest']);
+    assert.equal(context.currentUser, status==='linked' ? user : null);
+  }
+});

@@ -5490,7 +5490,22 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       if (!client) return;
       const {data, error} = await client.auth.getSession();
       if (error) showToast(errorText(error));
-      currentUser = data?.session?.user || null;
+      let session = data?.session;
+      if(isTelegramMiniApp&&session?.user){
+        // A WebView can reuse a stored session from another Telegram launch.
+        // Resolve the signed launch against the session before showing any account data.
+        try{
+          const status=await telegramMiniRequest('status',session.access_token);
+          if(status.status==='linked'){
+            const latest=(await client.auth.getSession()).data?.session;
+            session=latest?.user?.id===session.user.id?latest:null;
+          }else session=null;
+        }catch{
+          session=null;
+        }
+        telegramMiniLinked=!!session;
+      }
+      currentUser = session?.user || null;
       if (currentUser) {await displayAccount(currentUser);acceptInvite();}
       else displayGuest();
     }
@@ -6086,6 +6101,11 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
           // Run outside the auth callback to avoid blocking Supabase internal locks.
           setTimeout(() => {
             const newUser = session?.user || null;
+            if(isTelegramMiniApp&&newUser&&newUser.id!==currentUser?.id){
+              // Auth events alone do not confirm which Telegram account opened the app.
+              if(currentUser){currentUser=null;displayGuest();}
+              return;
+            }
             if (newUser?.id !== currentUser?.id) {
               currentUser = newUser;
               if (newUser) {displayAccount(newUser);acceptInvite();}
