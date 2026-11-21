@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ru">
+<html lang="ru" data-loopa-entry="browser">
 <head>
 <!-- LOOPA v91: expanded cinema player, unobstructed chat, subtle PWA support -->
   <meta charset="utf-8">
@@ -17,6 +17,14 @@
 <script>
     // Detect Telegram before the stylesheet paints to prevent a flash of the app.
     try{const tg=window.Telegram?.WebApp;if(tg?.initData){document.documentElement.classList.add('telegram-miniapp');try{tg.setHeaderColor?.('#090a0c');tg.setBackgroundColor?.('#090a0c');}catch{}}}catch{}
+    // This switch only selects a view. Account access is validated by Auth and the server.
+    const entryRoot=document.documentElement;
+    const entryQuery=new URLSearchParams(location.search);
+    const entryFragment=new URLSearchParams(location.hash.slice(1));
+    const entryAuthCallback=entryQuery.has('code')||entryQuery.has('error_code')
+      ||entryFragment.has('access_token')||entryFragment.has('error_code');
+    entryRoot.dataset.loopaEntry=entryRoot.classList.contains('telegram-miniapp')?'telegram'
+      :entryQuery.get('recovery')==='1'||entryAuthCallback?'recovery':'browser';
     try{const m=localStorage.getItem('loopa-wallpaper-motion');document.documentElement.dataset.wallpaperExplicit=String(m==='on');document.documentElement.dataset.wallpaperMotion=m==='off'?'off':'on';}catch{document.documentElement.dataset.wallpaperExplicit='false';document.documentElement.dataset.wallpaperMotion='on';}
   </script>
   <style>
@@ -1486,9 +1494,57 @@ body.roomViewing #room-active .roomBar{height:auto!important;min-height:56px;ali
 #roomInviteNotice .inviteNoticeSender{padding:3px 7px 3px 4px}
 #roomInviteNotice .inviteVideoPlaceholder{width:24px;height:24px;font-size:10px}
 section[data-page="profile"]>#settings-detail>.settings-back{margin-bottom:14px}
+#browser-entry{display:none}
+html[data-loopa-entry="browser"] body>.app,
+html[data-loopa-entry="browser"] #loopaLaunchSplash{display:none!important}
+html[data-loopa-entry="browser"] #browser-entry{
+  display:grid;place-items:center;min-height:100vh;min-height:100svh;
+  box-sizing:border-box;padding:32px 20px;
+  background:radial-gradient(ellipse at 80% 0%,#ffffff12,transparent 54%),#090a0c
+}
+.browser-entry-card{
+  width:min(100%,420px);box-sizing:border-box;padding:42px 26px;
+  text-align:center;border:1px solid #ffffff24;border-radius:24px;
+  background:linear-gradient(145deg,#202126,#111217 70%);
+  box-shadow:0 20px 60px #0007
+}
+.browser-entry-card h1{font:400 clamp(48px,12vw,68px)/1 Georgia,serif;letter-spacing:.1em;margin:0 0 18px}
+.browser-entry-card p{color:#c2c0c6;margin:0 auto 24px;max-width:26ch;line-height:1.5}
+.browser-entry-card .browser-entry-primary{
+  display:grid;place-items:center;min-height:48px;padding:4px 14px;border-radius:14px;
+  background:linear-gradient(155deg,#176faa,#174881);border:1px solid #8bddff65;
+  color:#fff;font-weight:650;text-decoration:none;box-sizing:border-box
+}
+.browser-entry-links{display:flex;flex-wrap:wrap;justify-content:center;gap:8px 18px;margin-top:20px}
+.browser-entry-links a{color:#c2c0c6;font-size:13px;text-underline-offset:3px;padding:6px 0}
+html[data-loopa-entry="recovery"] .bottom,
+html[data-loopa-entry="recovery"] .top-actions,
+html[data-loopa-entry="recovery"] #content>section:not([data-page="profile"]),
+html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth-mode-note,.auth-methods){
+  display:none!important
+}
 </style>
 </head>
 <body>
+  <main id="browser-entry">
+    <div class="browser-entry-card">
+      <h1>LOOPA</h1>
+      <p>Смотри видео вместе с друзьями в Telegram.</p>
+      <a class="browser-entry-primary" id="browser-open-telegram" href="https://t.me/LOOPAvideo_bot/loopa">Открыть в Telegram</a>
+      <div class="browser-entry-links">
+        <a href="/?recovery=1">Восстановить доступ</a>
+        <a href="https://t.me/loopasupport" rel="noopener noreferrer">Поддержка</a>
+      </div>
+    </div>
+  </main>
+  <script>
+    if(entryRoot.dataset.loopaEntry==='browser'){
+      const code=entryQuery.get('room');
+      if(/^[a-f0-9]{12}$/i.test(code||'')){
+        document.getElementById('browser-open-telegram').href='https://t.me/LOOPAvideo_bot/loopa?startapp=room_'+code.toLowerCase();
+      }
+    }
+  </script>
   <svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden" xmlns="http://www.w3.org/2000/svg">
     <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></symbol>
     <symbol id="i-room" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9 6 3-6 3z"/></symbol>
@@ -3240,7 +3296,7 @@ section[data-page="profile"]>#settings-detail>.settings-back{margin-bottom:14px}
     const telegramWebApp = window.Telegram?.WebApp || null;
     const isTelegramMiniApp = !!telegramWebApp?.initData;
     let invitationBusy=false;
-    let pendingInvite=new URL(location.href).searchParams.get('room');
+    let pendingInvite=entryRoot.dataset.loopaEntry==='recovery'?null:new URL(location.href).searchParams.get('room');
     // BotFather Main Mini App direct links can carry startapp=room_<12-hex-code>.
     // The room join RPC still enforces permissions; this is not authentication.
     if(!pendingInvite&&isTelegramMiniApp){
@@ -6063,9 +6119,16 @@ section[data-page="profile"]>#settings-detail>.settings-back{margin-bottom:14px}
         }
       }
     }
-    selectAuthMode('signup');
-    resetFriends();
-    init();
+    if(entryRoot.dataset.loopaEntry!=='browser'){
+      const recovery=entryRoot.dataset.loopaEntry==='recovery';
+      selectAuthMode(recovery?'login':'signup');
+      resetFriends();
+      if(recovery){
+        showPageNow('profile');
+        byId('auth-icloud-details').open=true;
+      }
+      init();
+    }
 
   </script>
 <script async src="https://www.youtube.com/iframe_api"></script><script async src="https://vkvideo.ru/js/api/videoplayer.js"></script>
