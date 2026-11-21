@@ -1,6 +1,11 @@
 name: Verify Yandex Cloud access
 on:
   workflow_dispatch:
+    inputs:
+      audit_certificate:
+        description: Base64-encoded public certificate for a private IAM and logging report
+        required: false
+        type: string
   push:
     branches: [main]
     paths: ['.github/workflows/verify-yandex-cloud.yml']
@@ -10,13 +15,14 @@ concurrency:
   cancel-in-progress: false
 jobs:
   verify:
-    if: github.repository == 'usmanchik005sila-cyber/Loopa'
+    if: github.repository == 'usmanchik005sila-cyber/Loopa' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Verify service-account access (read-only)
         env:
           YC_SA_JSON_CREDENTIALS: ${{ secrets.YC_SA_JSON_CREDENTIALS }}
+          YC_AUDIT_CERTIFICATE: ${{ inputs.audit_certificate }}
         shell: bash
         run: |
           python3 - <<'PYCODE'
@@ -27,12 +33,16 @@ jobs:
           import tempfile
           import time
           import urllib.error
+          import urllib.parse
           import urllib.request
           
           SA_ID = 'ajejjebhmvkkfhjg5vo4'
           FUNCTION_ID = 'd4e8n1se4iuc8ql4rm82'
           IAM_URL = 'https://iam.api.cloud.yandex.net/iam/v1/tokens'
           API_URL = 'https://serverless-functions.api.cloud.yandex.net/functions/v1'
+          RESOURCE_URL = 'https://resource-manager.api.cloud.yandex.net/resource-manager/v1'
+          ORG_URL = 'https://organization-manager.api.cloud.yandex.net/organization-manager/v1'
+          LOG_URL = 'https://logging.api.cloud.yandex.net/logging/v1'
           
           class ProbeError(Exception):
               pass
@@ -54,6 +64,110 @@ jobs:
                   raise ProbeError(f'{stage}: HTTP {error.code}') from None
               except Exception:
                   raise ProbeError(f'{stage}: network or response error') from None
+
+          def read_optional(url, stage, token):
+              try:
+                  return request_json(url, stage, token=token), None
+              except ProbeError as error:
+                  return {}, str(error)
+
+          def list_all(url, result_key, stage, token, **options):
+              records = []
+              cursor = ''
+              for _ in range(20):
+                  params = {'pageSize': '100', **options}
+                  if cursor:
+                      params['pageToken'] = cursor
+                  page, error = read_optional(url + '?' + urllib.parse.urlencode(params), stage, token)
+                  if error:
+                      return [], error
+                  records.extend(page.get(result_key, []))
+                  cursor = page.get('nextPageToken', '')
+                  if not cursor:
+                      return records, None
+              return [], f'{stage}: page limit reached'
+
+          def audit_bindings(url, stage, token):
+              bindings, error = list_all(url + ':listAccessBindings', 'accessBindings', stage, token)
+              if error:
+                  return {'unavailable': error}
+              roles = {}
+              for binding in bindings:
+                  subject = binding.get('subject', {})
+                  subject_id = subject.get('id')
+                  if subject_id == SA_ID and subject.get('type') == 'serviceAccount':
+                      roles.setdefault('service_account', set()).add(binding['roleId'])
+                  if subject_id in ('allUsers', 'allAuthenticatedUsers', 'system:allUsers', 'system:allAuthenticatedUsers'):
+                      roles.setdefault(subject_id, set()).add(binding['roleId'])
+              return {'roles': {key: sorted(value) for key, value in roles.items()},
+                      'group_bindings': sum(b.get('subject', {}).get('type') == 'group' for b in bindings)}
+
+          def audit_report(token, function, version, key_id):
+              function_url = API_URL + '/functions/' + FUNCTION_ID
+              folder_id = function['folderId']
+              folder_url = RESOURCE_URL + '/folders/' + folder_id
+              folder, folder_error = read_optional(folder_url, 'Read folder hierarchy', token)
+              report = {
+                  'version_id': version['id'],
+                  'runtime_service_account_attached': bool(version.get('serviceAccountId')),
+                  'runtime_credentials_configured': bool(version.get('secrets') or version.get('environment')),
+                  'function_iam': audit_bindings(function_url, 'Read function IAM', token),
+                  'folder_iam': audit_bindings(folder_url, 'Read folder IAM', token),
+              }
+              if folder.get('cloudId'):
+                  cloud_url = RESOURCE_URL + '/clouds/' + folder['cloudId']
+                  report['cloud_iam'] = audit_bindings(cloud_url, 'Read cloud IAM', token)
+                  cloud, cloud_error = read_optional(cloud_url, 'Read cloud hierarchy', token)
+                  if cloud.get('organizationId'):
+                      report['organization_iam'] = audit_bindings(
+                          ORG_URL + '/organizations/' + cloud['organizationId'], 'Read organization IAM', token)
+                  else:
+                      report['organization_iam'] = {'unavailable': cloud_error or 'Organization unknown'}
+              else:
+                  report['cloud_iam'] = {'unavailable': folder_error or 'Cloud unknown'}
+                  report['organization_iam'] = {'unavailable': 'Cloud hierarchy unavailable'}
+
+              keys, key_error = list_all('https://iam.api.cloud.yandex.net/iam/v1/keys',
+                                         'keys', 'List service account keys', token, serviceAccountId=SA_ID)
+              report['keys'] = {'unavailable': key_error} if key_error else {
+                  'count': len(keys),
+                  'deployment_key_created_at': next((key.get('createdAt') for key in keys if key.get('id') == key_id), None),
+              }
+              options = version.get('logOptions') or {}
+              logging = {'disabled': bool(options.get('disabled')),
+                         'minimum_level': options.get('minLevel') or 'default',
+                         'uses_custom_group': bool(options.get('logGroupId'))}
+              if not logging['disabled']:
+                  if options.get('logGroupId'):
+                      group, error = read_optional(LOG_URL + '/logGroups/' + options['logGroupId'],
+                                                   'Read log group retention', token)
+                  else:
+                      groups, error = list_all(LOG_URL + '/logGroups', 'groups', 'Read default log group',
+                                               token, folderId=options.get('folderId') or folder_id)
+                      group = next((item for item in groups if item.get('name') == 'default'), {})
+                  logging['retention'] = group.get('retentionPeriod')
+                  if not logging['retention']:
+                      logging['retention_unavailable'] = error or 'Log group retention unavailable'
+              report['logging'] = logging
+              return report
+
+          def print_sealed_report(certificate, report):
+              try:
+                  public_certificate = base64.b64decode(certificate, validate=True)
+                  if not public_certificate.startswith(b'-----BEGIN CERTIFICATE-----') or len(public_certificate) > 8192:
+                      raise ValueError()
+              except ValueError:
+                  raise ProbeError('Invalid public audit certificate') from None
+              with tempfile.TemporaryDirectory(prefix='yc-audit-') as directory:
+                  certificate_path = os.path.join(directory, 'audit.pem')
+                  with open(certificate_path, 'wb') as handle:
+                      handle.write(public_certificate)
+                  sealed = subprocess.run(
+                      ['openssl', 'cms', '-encrypt', '-binary', '-aes256', '-outform', 'DER', certificate_path],
+                      input=json.dumps(report).encode(), capture_output=True)
+              if sealed.returncode:
+                  raise ProbeError('Could not encrypt audit report')
+              print('SEALED_YC_AUDIT=' + base64.b64encode(sealed.stdout).decode())
           
           def main():
               raw = os.environ.get('YC_SA_JSON_CREDENTIALS', '')
@@ -108,6 +222,9 @@ jobs:
                                 'memory_bytes': latest.get('resources', {}).get('memory'),
                                 'runtime_service_account_id': latest.get('serviceAccountId'),
                                 'environment_variable_count': len(latest.get('environment', {}))}))
+              certificate = os.environ.get('YC_AUDIT_CERTIFICATE', '')
+              if certificate:
+                  print_sealed_report(certificate, audit_report(token, function, version, kid))
           
           if __name__ == '__main__':
               try:
