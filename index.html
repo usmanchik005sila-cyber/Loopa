@@ -2356,23 +2356,36 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
           clearTimeout(rutubeResumeTimer);rutubeResumeTimer=0;rutubeResumeTarget=null;
           rutubeResumeAttempts=0;rutubeResumeLastSeek=0;
         }
+        function rutubeResumeSeconds(target){
+          return Math.floor(mediaDuration>0?Math.min(target.pos,Math.max(0,mediaDuration-1)):target.pos);
+        }
         function retryRutubeResume(){
           const target=rutubeResumeTarget;if(!target)return;
           if(!rutubeResumeContextValid(target)){cancelRutubeResume();return;}
           if(!resumePlayerReady||rutubeAd)return;
-          const now=performance.now();if(now-rutubeResumeLastSeek<650)return;
-          if(rutubeResumeAttempts>=30){cancelRutubeResume();showToast('Rutube не подтвердил перемотку. Нажми «Продолжить» ещё раз');return;}
+          const now=performance.now();if(rutubeResumeAttempts&&now-rutubeResumeLastSeek<650)return;
+          if(rutubeResumeAttempts>=30){
+            cancelRutubeResume();
+            resumePrompt=target;
+            showResumePromptIfReady();
+            showToast('RUTUBE не подтвердил перемотку. Нажми «Продолжить» ещё раз');
+            return;
+          }
           rutubeResumeAttempts++;rutubeResumeLastSeek=now;
-          const seconds=Math.floor(mediaDuration>0?Math.min(target.pos,Math.max(0,mediaDuration-1)):target.pos);
-          sendRutube('player:setCurrentTime',{time:seconds});sendRutube('player:play');
+          sendRutube('player:setCurrentTime',{time:rutubeResumeSeconds(target)});
+          sendRutube('player:play');
           clearTimeout(rutubeResumeTimer);rutubeResumeTimer=setTimeout(retryRutubeResume,700);
         }
         function observeRutubeResumeTime(time){
           const target=rutubeResumeTarget;if(!target)return false;
           if(!rutubeResumeContextValid(target)){cancelRutubeResume();return true;}
-          if(!rutubeAd&&Number.isFinite(time)&&Math.abs(time-target.pos)<=4){
-            cancelRutubeResume();observed={playing:true,pos:time};
-            void runTransportAction({seconds:target.pos,playing:true});return true;
+          if(!rutubeAd&&observed.playing&&Number.isFinite(time)&&Math.abs(time-rutubeResumeSeconds(target))<=4){
+            cancelRutubeResume();
+            observed.pos=time;
+            observe(true,time);
+            pending={op:'play',seconds:time,code:target.code,video:target.video,epoch:target.epoch};
+            void flushPlayback();
+            return true;
           }
           retryRutubeResume();return true;
         }
@@ -2383,10 +2396,8 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
           if(!resumePlayerReady||rutubeAd)return;
           resumeRestorePending=null;
           if(target.video.includes('rutube.ru/')){
-            cancelRutubeResume();rutubeResumeTarget=target;rutubeResumeLastSeek=performance.now();
-            // Retry after the ad transition and verify using Rutube's currentTime event.
-            void runTransportAction({seconds:target.pos,playing:true});
-            rutubeResumeTimer=setTimeout(retryRutubeResume,900);return;
+            cancelRutubeResume();rutubeResumeTarget=target;
+            retryRutubeResume();return;
           }
           void runTransportAction({seconds:target.pos,playing:true});
         }
@@ -2723,7 +2734,11 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
           if(m?.type==='player:volumeChange'){localMuted=!!m.data?.muted||Number(m.data?.volume)===0;updatePlaybackControls();}
           if(m?.type==='player:durationChange')mediaDuration=Number(m.data?.duration)||0;
           if(m?.type==='player:rollState'){
-            rutubeAd=m.data?.state==='play';updatePlaybackControls();
+            const state=m.data?.state;
+            if(state!=='play'&&state!=='complete')return;
+            rutubeAd=state==='play';
+            if(rutubeAd)observed.playing=false;
+            updatePlaybackControls();
             if(rutubeAd&&hostHere()&&sample){syncPlayback();}
             if(!rutubeAd){
               if(hostHere()){if(rutubeResumeTarget)retryRutubeResume();else tryApplyResume();}

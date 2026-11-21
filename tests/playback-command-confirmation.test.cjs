@@ -13,6 +13,61 @@ test('new sequence requires a fresh command and observation',async()=>{
  const {c,calls,tick,seq}=setup();await c.receiveGuestControl();tick(600);seq(2);c.sample={pos:120,playing:false,now:550,observed:true};await c.receiveGuestControl();assert.ok(!calls.includes('ack'));assert.equal(calls.filter(x=>x==='command').length,2);
 });
 
+test('RUTUBE resumes after the ad and publishes only the confirmed content position', () => {
+  const room = {code: 'ROOM', video: 'https://rutube.ru/play/embed/test/'};
+  const target = {...room, user: 'host', epoch: 1, pos: 104};
+  const commands = [];
+  const writes = [];
+  const state = {
+    roomState: room,
+    roomEpoch: 1,
+    currentUser: {id: 'host'},
+    hostHere: () => true,
+    roomIsSolo: () => true,
+    mediaDuration: 80,
+    resumePlayerReady: true,
+    resumeRestorePending: target,
+    rutubeAd: true,
+    rutubeResumeTarget: null,
+    rutubeResumeTimer: 0,
+    rutubeResumeAttempts: 0,
+    rutubeResumeLastSeek: 0,
+    observed: {playing: false, pos: 0},
+    performance: {now: () => 100},
+    clearTimeout() {},
+    setTimeout: () => 1,
+    sendRutube: (command, data) => commands.push([command, data?.time]),
+    runTransportAction: () => assert.fail('Must wait for player confirmation'),
+    observe() {},
+    flushPlayback: () => writes.push(state.pending.seconds),
+  };
+  const start = html.indexOf('    function rutubeResumeContextValid(');
+  const end = html.indexOf("        byId('resumeDismiss')", start);
+  vm.runInNewContext(html.slice(start, end), state);
+  state.tryApplyResume();
+  assert.deepEqual(commands, []);
+  state.rutubeAd = false;
+  state.tryApplyResume();
+  assert.deepEqual(commands, [['player:setCurrentTime', 79], ['player:play', undefined]]);
+  state.observeRutubeResumeTime(79);
+  assert.deepEqual(writes, []);
+  state.observed.playing = true;
+  state.observeRutubeResumeTime(79);
+  assert.deepEqual(writes, [79]);
+  assert.equal(state.rutubeResumeTarget, null);
+
+  state.resumeRestorePending = target;
+  state.tryApplyResume();
+  state.rutubeResumeAttempts = 30;
+  state.performance.now = () => 1000;
+  let offeredAgain = false;
+  state.showResumePromptIfReady = () => { offeredAgain = state.resumePrompt === target; };
+  state.showToast = () => {};
+  state.retryRutubeResume();
+  assert.equal(offeredAgain, true);
+  assert.deepEqual(writes, [79]);
+});
+
 test('guest transport buttons send the current room context and ignore stale replies', async () => {
   const guard = html.slice(html.indexOf('    function guestControlCurrent('), html.indexOf('    function queueGuestControl('));
   const listenerStart = html.indexOf("    playbackControls.addEventListener('click',async e=>");
