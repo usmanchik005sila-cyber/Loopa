@@ -11,9 +11,9 @@ const source = readFileSync(join(__dirname, '../supabase/functions/telegram-mini
 const syntheticBotToken = 'synthetic-test-token';
 const origin = 'https://loopacinema.ru';
 
-function signedLaunch(profile = {}) {
+function signedLaunch(profile = {}, authDate = Math.floor(Date.now() / 1000)) {
   const fields = {
-    auth_date: String(Math.floor(Date.now() / 1000)),
+    auth_date: String(authDate),
     query_id: 'synthetic-launch',
     user: JSON.stringify({ id: 1234, ...profile }),
   };
@@ -188,6 +188,20 @@ test('unlinked automatic login leaves the launch available for explicit registra
   assert.equal((await bridge.request('login', fields)).body.status, 'unlinked');
   assert.equal((await bridge.request('register', fields)).body.status, 'login_ready');
   assert.equal(bridge.mintCount(), 1);
+});
+
+test('an expired Telegram launch asks for a fresh launch before touching the account', async () => {
+  const bridge = mockBridge({linked: false});
+  const expired = signedLaunch({}, Math.floor(Date.now() / 1000) - 601);
+  for (const action of ['login', 'register']) {
+    const response = await bridge.request(action, expired);
+    assert.equal(response.code, 401);
+    assert.equal(response.body.error, 'reopen_miniapp');
+  }
+  assert.deepEqual(bridge.budgetCalls, []);
+  assert.deepEqual(bridge.authCalls, []);
+  assert.equal(bridge.createCount(), 0);
+  assert.equal(bridge.mintCount(), 0);
 });
 
 test('ambiguous issuance failure cannot mint again and unavailable claims block issuance', async () => {
