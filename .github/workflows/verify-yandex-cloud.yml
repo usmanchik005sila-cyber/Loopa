@@ -16,12 +16,13 @@ concurrency:
 jobs:
   verify:
     if: github.repository == 'usmanchik005sila-cyber/Loopa' && github.ref == 'refs/heads/main'
+    environment: yandex-production
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Verify service-account access (read-only)
         env:
-          YC_SA_JSON_CREDENTIALS: ${{ secrets.YC_SA_JSON_CREDENTIALS }}
+          YC_SA_JSON_CREDENTIALS: ${{ secrets.LOOPA_YANDEX_DEPLOY_KEY }}
           YC_AUDIT_CERTIFICATE: ${{ inputs.audit_certificate }}
         shell: bash
         run: |
@@ -172,7 +173,7 @@ jobs:
           def main():
               raw = os.environ.get('YC_SA_JSON_CREDENTIALS', '')
               if not raw:
-                  raise ProbeError('Repository secret YC_SA_JSON_CREDENTIALS is missing or empty')
+                  raise ProbeError('Environment secret LOOPA_YANDEX_DEPLOY_KEY is missing or empty')
               try:
                   key = json.loads(raw)
                   if key.get('service_account_id') != SA_ID:
