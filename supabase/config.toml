@@ -9,3 +9,8 @@ entrypoint = "./functions/telegram-miniapp-auth/index.js"
 [functions.loopa-bot]
 verify_jwt = false
 entrypoint = "./functions/loopa-bot/index.js"
+
+# Validate the signed-in user's access token with Supabase Auth in the handler.
+[functions.loopa-avatar]
+verify_jwt = false
+entrypoint = "./functions/loopa-avatar/index.js"
