@@ -1,6 +1,6 @@
 # Server abuse limits
 
-Per-account token buckets live in loopa_private.request_budgets (RLS, no application grants, auth.users FK with cascading removal). At most six rows per account. Counters are updated under a row lock, shared by all devices and Edge isolates. Values refill continuously.
+Per-account token buckets live in loopa_private.request_budgets (RLS, no application grants, auth.users FK with cascading removal). At most seven rows per account. Counters are updated under a row lock, shared by all devices and Edge isolates. Values refill continuously.
 
 | Action | Initial burst | Refill |
 | --- | --- | --- |
@@ -8,12 +8,15 @@ Per-account token buckets live in loopa_private.request_budgets (RLS, no applica
 | Create room | 5 rooms | 1 room/12 seconds |
 | Send friend request | 5 requests | 1 request/12 seconds |
 | Send or resend room invitation | 20 invitations | 1 invitation/3 seconds |
+| Search users | 10 requests | 1 request/3 seconds |
 | Full catalog search (all providers) | 10 requests | 1 request/3 seconds |
 | Autocomplete (all providers) | 30 requests | 10 requests/second |
 
 Database triggers enforce the limits on message and room creation, friend requests, and invitation sends. Resending an invitation consumes a token when the send time changes. The room RPC also keeps its existing room-invitation limits. Accepting a request or invitation and marking an invitation as notified do not consume a token. Failed transactions do not consume budget. Trusted maintenance without an end-user JWT bypasses insert limits. Room reads, playback synchronization, joining rooms, history and inbox paging do not consume these budgets.
 
 video-search checks an authenticated RPC budget before serving cached responses or calling an external API. Exhaustion returns HTTP 429, Retry-After and a Russian message; unavailable quota service returns 503 with no external search. The RPC takes no user id or adjustable quota. Authentication is still validated separately.
+
+User search accepts queries from 2 to 40 characters and returns up to 15 name matches plus an exact username match. Known profile IDs use a separate lookup capped at 150 per request. Room list and history recovery use the membership index keyed by member and room code.
 
 Validation: tests/abuse-rate-limits.sql runs with transactional fixtures in BEGIN/ROLLBACK. It covers burst rejection, shared messaging budget, refill, separate autocomplete budget, actor isolation and internal privileges. Node tests cover 429, failure closure and cached-call quotas. Actual parallel-connection load testing has not been performed.
 

@@ -2,7 +2,7 @@
   'use strict';
   // Owns conversation state, paging, rendering, and realtime subscriptions.
   function create({getClient,getCurrentUser,getPage,showPage,byId,document,
-    friendAvatar,avatarForUser,openFriendProfile,openSafetyReport,showToast}){
+    friendAvatar,avatarForUser,openFriendProfile,openSafetyReport,showToast,lookupPublicProfiles}){
     let dmPeer=null,dmChannel=null,dmHistory=[],dmBusy=false,dmPageReturn='friend-profile';
     let messagesInboxGeneration=0,messagesInboxChannel=null,messagesInboxOwner=null;
     let inboxRows=new Map(),inboxCursor=null,inboxHasMore=false,inboxPaging=false;
@@ -48,8 +48,7 @@
         }
         if(!latest.size){inboxState('Здесь появятся твои переписки. Открой профиль друга и нажми «Написать», чтобы начать общение.',true);return;}
         const ids=[...latest.keys()];
-        const {data:people,error:profileError}=await getClient().rpc('loopa_public_profiles')
-          .select('id,display_name,avatar_path,updated_at').in('id',ids);
+        const {data:people,error:profileError}=await lookupPublicProfiles(ids);
         if(revision!==messagesInboxGeneration||getCurrentUser()?.id!==owner)return;
         // If a profile isn't public or was removed, keep the conversation accessible.
         const names=new Map((!profileError&&people||[]).map(p=>[p.id,p]));
