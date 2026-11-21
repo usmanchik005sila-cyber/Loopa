@@ -3,17 +3,28 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['.github/workflows/deploy-rutube-bridge.yml']
-permissions: {}
+    paths: ['.github/workflows/deploy-rutube-bridge.yml', 'yandex/rutube-search/**']
+permissions:
+  contents: read
 concurrency:
   group: rutube-bridge-deployment
   cancel-in-progress: false
 jobs:
   deploy:
-    if: github.repository == 'usmanchik005sila-cyber/Loopa'
+    if: github.repository == 'usmanchik005sila-cyber/Loopa' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: yandex/rutube-search/go.mod
+          cache: false
+      - name: Test RUTUBE bridge
+        working-directory: yandex/rutube-search
+        run: go test ./...
       - name: Preserve rollback and deploy verified code
         env:
           YC_SA_JSON_CREDENTIALS: ${{ secrets.YC_SA_JSON_CREDENTIALS }}
@@ -21,6 +32,7 @@ jobs:
         run: |
           python3 - <<'PYCODE'
           import base64
+          import io
           import json
           import os
           import subprocess
@@ -28,6 +40,7 @@ jobs:
           import time
           import urllib.error
           import urllib.request
+          import zipfile
           
           SA_ID = 'ajejjebhmvkkfhjg5vo4'
           FUNCTION_ID = 'd4e8n1se4iuc8ql4rm82'
@@ -94,22 +107,32 @@ jobs:
               function = request_json(API_URL + '/functions/' + FUNCTION_ID, 'Read function', token=token)
               if function.get('id') != FUNCTION_ID:
                   raise ProbeError('Unexpected function response')
+              return token, read_latest(token)
+
+          def read_latest(token):
               versions = request_json(API_URL + '/versions?functionId=' + FUNCTION_ID + '&pageSize=1000',
                                       'Read function versions', token=token).get('versions', [])
               latest = next((v for v in versions if '$latest' in v.get('tags', [])), None)
               if latest is None:
                   raise ProbeError('No $latest version found; probe stopped without changing the function')
-              return token, latest
-              # Explicit allow-list only. Never print raw API JSON, environment, source or tokens.
-              print(json.dumps({'connection': 'ok', 'function_id': FUNCTION_ID,
-                                'folder_id': function.get('folderId'), 'version_id': latest.get('id'),
-                                'runtime': latest.get('runtime'), 'entrypoint': latest.get('entrypoint'),
-                                'execution_timeout': latest.get('executionTimeout'),
-                                'memory_bytes': latest.get('resources', {}).get('memory'),
-                                'runtime_service_account_id': latest.get('serviceAccountId'),
-                                'environment_variable_count': len(latest.get('environment', {}))}))
-          
-          
+              return request_json(API_URL + '/versions/' + latest['id'], 'Read runtime configuration', token=token)
+
+          def source_content():
+              archive = io.BytesIO()
+              with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as package:
+                  for name in ('index.go', 'go.mod'):
+                      package.write('yandex/rutube-search/' + name, name)
+              return base64.b64encode(archive.getvalue()).decode()
+
+          def smoke_status(body, headers):
+              req = urllib.request.Request('https://functions.yandexcloud.net/' + FUNCTION_ID,
+                                           data=body, headers={'Content-Type': 'application/json', **headers})
+              try:
+                  with urllib.request.urlopen(req, timeout=45) as response:
+                      return response.status
+              except urllib.error.HTTPError as error:
+                  return error.code
+
           def wait_operation(operation,token):
               for _ in range(120):
                   if operation.get('done'):
@@ -121,26 +144,30 @@ jobs:
           
           def deploy():
               token,old=main()
-              if old.get('id')!='d4e0shn1vd4don2tmjgd':raise ProbeError('Latest version changed; refusing to overwrite it')
-              # Tag preserves the exact old code even though source downloads are unavailable.
-              wait_operation(request_json(API_URL+'/versions/'+old['id']+':setTag','Preserve rollback',{'tag':'before-rutube-limits-20261119'},token),token)
+              if old.get('runtime') != 'golang123' or old.get('entrypoint') != 'index.Handler':
+                  raise ProbeError('Unexpected runtime or entrypoint; refusing to replace it')
               fields=['runtime','entrypoint','resources','executionTimeout','concurrency','logOptions','metadataOptions']
               config={k:old[k] for k in fields if k in old}
               # Do not silently lose configuration not supported by this deployment workflow.
               if any(old.get(k) for k in ['environment','serviceAccountId','secrets','connectivity','namedServiceAccounts','storageMounts','mounts','asyncInvocationConfig']):
                   raise ProbeError('Unexpected additional configuration; refusing to replace it')
-              config.update({'functionId':FUNCTION_ID,'description':'RUTUBE authenticated durable quota enforcement','content':'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','tag':['rutube-limits-20261119']})
+              tag = 'rollback-' + old['id']
+              wait_operation(request_json(API_URL+'/versions/'+old['id']+':setTag',
+                                          'Preserve rollback',{'tag':tag},token),token)
+              if read_latest(token)['id'] != old['id']:
+                  raise ProbeError('Latest version changed; refusing to overwrite it')
+              config.update({'functionId': FUNCTION_ID, 'description': 'LOOPA RUTUBE bridge',
+                             'content': source_content()})
               print('Rollback version retained: '+old['id'],flush=True)
               response=wait_operation(request_json(API_URL+'/versions','Create protected version',config,token),token)
               new_id=response.get('id')
               print('Created protected version: '+str(new_id),flush=True)
               try:
-                  req=urllib.request.Request('https://functions.yandexcloud.net/'+FUNCTION_ID,data=b'{"q":"nature","page":1}',headers={'Content-Type':'application/json'})
-                  try:
-                      with urllib.request.urlopen(req,timeout=45) as r:status=r.status
-                  except urllib.error.HTTPError as e:status=e.code
-                  if status!=401:raise ProbeError('Deployed authentication smoke check failed')
-                  print('DEPLOY_OK: protected version active; unauthenticated direct POST rejected with 401',flush=True)
+                  if smoke_status(b'{"q":"nature","page":1}', {}) != 401:
+                      raise ProbeError('Deployed authentication smoke check failed')
+                  if smoke_status(b'{', {'X-Loopa-Authorization': 'Bearer smoke-fixture'}) != 400:
+                      raise ProbeError('Deployed input validation smoke check failed')
+                  print('DEPLOY_OK: missing authorization returned 401 and invalid input returned 400',flush=True)
               except Exception:
                   rollback={k:old[k] for k in fields if k in old}
                   rollback.update({'functionId':FUNCTION_ID,'versionId':old['id'],'description':'Automatic rollback after RUTUBE smoke failure'})

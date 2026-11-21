@@ -73,3 +73,46 @@ func TestMissingAuth(t *testing.T) {
 		t.Fatal(w.Code, n)
 	}
 }
+
+func TestInvalidInputStopsBeforeNetwork(t *testing.T) {
+	old := client
+	t.Cleanup(func() { client = old })
+	client = &http.Client{Transport: transport(func(*http.Request) (*http.Response, error) {
+		t.Fatal("validation failure reached an external service")
+		return nil, nil
+	})}
+	for _, fixture := range []struct {
+		body string
+		want int
+	}{
+		{`{"q":"nature"} {}`, http.StatusBadRequest},
+		{`{"q":"nature"}` + strings.Repeat(" ", requestBodyLimit), http.StatusRequestEntityTooLarge},
+		{`{"q":"nature","page":101}`, http.StatusBadRequest},
+	} {
+		req := httptest.NewRequest("POST", "https://function.test", strings.NewReader(fixture.body))
+		req.Header.Set("X-Loopa-Authorization", "Bearer fixture")
+		w := httptest.NewRecorder()
+		Handler(w, req)
+		if w.Code != fixture.want {
+			t.Errorf("status %d, want %d", w.Code, fixture.want)
+		}
+	}
+}
+
+func TestAuthOutageStopsBeforeQuota(t *testing.T) {
+	old := client
+	t.Cleanup(func() { client = old })
+	client = &http.Client{Transport: transport(func(r *http.Request) (*http.Response, error) {
+		if r.URL.Path != "/auth/v1/user" {
+			t.Fatal("auth outage reached quota or RUTUBE")
+		}
+		return &http.Response{StatusCode: http.StatusServiceUnavailable, Body: http.NoBody, Header: make(http.Header)}, nil
+	})}
+	req := httptest.NewRequest("POST", "https://function.test", strings.NewReader(`{"q":"nature"}`))
+	req.Header.Set("X-Loopa-Authorization", "Bearer fixture")
+	w := httptest.NewRecorder()
+	Handler(w, req)
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status %d, want 503", w.Code)
+	}
+}
