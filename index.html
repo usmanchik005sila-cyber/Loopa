@@ -2284,11 +2284,13 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     resumeBanner.setAttribute('aria-label','Продолжить просмотр');
     resumeBanner.innerHTML='<span class="resumeCopy"><strong>Продолжить просмотр?</strong><small id="resumePosition"></small></span><button type="button" id="resumeApply">Продолжить</button><button type="button" id="resumeDismiss" aria-label="Скрыть предложение">×</button>';
     byId('chatLog').before(resumeBanner);
-    let resumePrompt=null,resumeRestorePending=null,resumePlayerReady=false;
+    let resumeLookup=null,resumePrompt=null,resumeRestorePending=null,resumePlayerReady=false;
     let rutubeResumeTarget=null,rutubeResumeAttempts=0,rutubeResumeTimer=0,rutubeResumeLastSeek=0;
     function saveResumeCheckpoint(forceCloud=false){
       const userId=currentUser?.id;
       if(!roomState?.video||!userId||rutubeAd||!sample)return;
+      // Keep the saved point while the room is waiting for a resume decision or seek.
+      if(resumeLookup||resumePrompt||resumeRestorePending||rutubeResumeTarget)return;
       const age=performance.now()-sample.now;
       if(age<0||age>5000||!Number.isFinite(sample.pos))return;
       const pos=Math.max(0,sample.pos+(sample.playing?Math.min(5,age/1000):0));
@@ -2305,6 +2307,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       }else void writeResumeCloud(record,userId,forceCloud);
     }
     function hideResumePrompt(){
+      resumeLookup=null;
       resumePrompt=null;
       resumeBanner.hidden=true;
     }
@@ -2319,11 +2322,15 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       hideResumePrompt();
       if(!currentUser||!data?.video||data.host!==currentUser.id||!roomIsSolo(data))return;
       const userId=currentUser.id,epoch=roomEpoch,local=readSavedResume(data.video,userId);
+      const lookup={};
+      resumeLookup=lookup;
       let remote=null;
       try{remote=await readResumeCloud(data.video,userId);}
       catch(error){
         reportResumeCloudError(userId,data.video,error);
       }
+      if(resumeLookup!==lookup)return;
+      resumeLookup=null;
       if(currentUser?.id!==userId||roomEpoch!==epoch||roomState?.code!==data.code
         ||roomState?.video!==data.video||!hostHere()||!roomIsSolo(roomState))return;
       const record=LOOPAAAccountContinuity.mergeResumeCheckpoints(

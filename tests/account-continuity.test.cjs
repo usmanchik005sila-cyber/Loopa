@@ -59,6 +59,47 @@ test('keeps the newest twenty distinct checkpoints', () => {
   assert.equal(merged.at(-1).video, 'video-19');
 });
 
+test('a reopened room preserves its checkpoint until the resume decision', async () => {
+  const now = Date.now();
+  const room = {code: 'test-room', video: 'test-video', host: 'owner', members: []};
+  let records = [{video: room.video, pos: 104, duration: 340, savedAt: now}];
+  let resolveCloud;
+  const state = {
+    Date, Math, Number,
+    currentUser: {id: 'owner'},
+    roomState: room,
+    roomEpoch: 1,
+    rutubeAd: false,
+    mediaDuration: 340,
+    sample: {pos: 182, playing: false, now: 50},
+    performance: {now: () => 100},
+    resumeBanner: {hidden: true},
+    readSavedResume: () => records[0],
+    readResumeCheckpoints: () => records,
+    writeResumeCheckpoints: (_, entries) => { records = entries; },
+    readResumeCloud: () => new Promise(resolve => { resolveCloud = resolve; }),
+    writeResumeCloud() {},
+    formatVideoTime: String,
+    byId: () => ({}),
+    hostHere: () => true,
+    LOOPAAAccountContinuity: continuity,
+  };
+  const source = html.slice(html.indexOf('    let resumeLookup='),
+    html.indexOf('    function rutubeResumeContextValid'));
+  vm.runInNewContext(source + '\nresumePlayerReady = true;', state);
+  const offer = state.offerSavedResume(room);
+  state.saveResumeCheckpoint(true);
+  assert.equal(records[0].pos, 104);
+  resolveCloud(null);
+  await offer;
+  assert.equal(state.resumeBanner.hidden, false);
+  state.saveResumeCheckpoint(true);
+  assert.equal(records[0].pos, 104);
+  state.hideResumePrompt();
+  state.saveResumeCheckpoint(true);
+  assert.equal(records[0].pos, 182);
+});
+
 test('explains identity conflicts and disabled linking without suggesting account merging', () => {
   assert.match(continuity.identityLinkError({code: 'identity_already_exists'}, 'Google'), /уже привязан к другому профилю/);
   assert.match(continuity.identityLinkError({message: 'Identity is already linked to another user'}, 'Google'), /уже привязан к другому профилю/);
