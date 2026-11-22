@@ -23,6 +23,36 @@ function ownerTelegramId(){
   const id=Number(value);
   return /^[1-9][0-9]{0,19}$/.test(value)&&Number.isSafeInteger(id)?id:null;
 }
+function trackingLink(id){
+  if(!REQUEST_ID_RE.test(id||""))throw Error("invalid_tracking_link");
+  return "https://t.me/"+BOT_NAME+"/loopa?startapp=ref_"+id;
+}
+async function handleTrackingCommand(token,chatId,command,args){
+  let text;
+  if(command==="link"){
+    const label=args.trim().replace(/\s+/gu," ");
+    if(!label||[...label].length>48||/\p{C}/u.test(label)){
+      text="Чтобы создать ссылку, отправь /link и название до 48 символов. Например: /link Анонс в канале";
+    }else{
+      const {data,error}=await adminClient().rpc("loopa_create_telegram_tracking_link",{p_label:label});
+      if(error)throw error;
+      text=label+"\n"+trackingLink(data)+"\n\nСтатистика: /links";
+    }
+  }else{
+    const page=args.trim()||"1";
+    if(!/^\d{1,5}$/.test(page)||Number(page)<1||Number(page)>10000){
+      text="Чтобы открыть другую страницу, отправь /links и номер страницы.";
+    }else{
+      const {data,error}=await adminClient().rpc("loopa_list_telegram_tracking_links",{p_page:Number(page)});
+      if(error||!Array.isArray(data))throw Error("tracking_links_unavailable");
+      const entries=data.slice(0,10).map(row=>row.label+" · "+row.visitors+" уник.\n"+trackingLink(row.id));
+      text=entries.length?["Уникальные открытия LOOPA · страница "+Number(page),...entries].join("\n\n")
+        :"На этой странице ссылок нет. Создай ссылку командой /link Название.";
+      if(data.length>10&&Number(page)<10000)text+="\n\nДальше: /links "+(Number(page)+1);
+    }
+  }
+  await botAPI(token,"sendMessage",{chat_id:chatId,text,link_preview_options:{is_disabled:true}});
+}
 function isMissingAuthUser(error){
   const message=String(error?.message||"").toLowerCase();
   return error?.status===404||error?.code==="user_not_found"||message.includes("user not found");
@@ -409,7 +439,8 @@ async function getStatus(token){
     issues:!!info.last_error_date,
     inlineMode:!!bot.supports_inline_queries,
     inlineWebhook:!info.allowed_updates?.length||info.allowed_updates.includes("inline_query"),
-    inlineProvider:!!Deno.env.get("YOUTUBE_API_KEY")};
+    inlineProvider:!!Deno.env.get("YOUTUBE_API_KEY"),
+    trackingOwnerConfigured:ownerTelegramId()!==null};
 }
 Deno.serve(async request=>{
   try{
@@ -457,13 +488,18 @@ Deno.serve(async request=>{
     }
     const message=update?.message;
     if(!message||message.chat?.type!=="private")return result({ok:true});
-    const command=String(message.text||"").trim().match(/^\/(start|help|stop|myid)(?:@([A-Za-z0-9_]+))?(?:\s|$)/i);
+    const command=String(message.text||"").trim().match(/^\/(start|help|stop|myid|links?)(?:@([A-Za-z0-9_]+))?(?:\s+([\s\S]*))?$/i);
     if(!command||(command[2]&&command[2].toLowerCase()!==BOT_NAME.toLowerCase()))
       return result({ok:true});
     const chatId=message.chat.id;
     if(!Number.isSafeInteger(chatId))return result({ok:true});
     if(message.from?.id!==chatId)return result({ok:true});
-    if(command[1].toLowerCase()==="myid"){
+    const name=command[1].toLowerCase();
+    if(name==="link"||name==="links"){
+      if(chatId===ownerTelegramId())await handleTrackingCommand(token,chatId,name,command[3]||"");
+      return result({ok:true});
+    }
+    if(name==="myid"){
       await botAPI(token,"sendMessage",{
         chat_id:chatId,
         text:"Твой Telegram ID: <code>"+escapeHtml(String(chatId))+"</code>\nУкажи его в секретах Supabase как LOOPA_OWNER_TELEGRAM_ID.",
@@ -485,7 +521,7 @@ Deno.serve(async request=>{
     }
     await botAPI(token,"sendMessage",{
       chat_id:chatId,
-      text:command[1].toLowerCase()==="start"?WELCOME:HELP,
+      text:name==="start"?WELCOME:HELP+(chatId===ownerTelegramId()?"\n\n/link Название — создать ссылку\n/links — статистика ссылок":""),
       parse_mode:"HTML",
       link_preview_options:{is_disabled:true},
       reply_markup:{
