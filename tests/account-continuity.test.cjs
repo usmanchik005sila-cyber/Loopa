@@ -151,6 +151,7 @@ test('Telegram welcome checks an existing link before offering explicit registra
     client: { auth: { verifyOtp: async () => ({ data: { user: account } }) } },
     showPage: page => { pages.push(page); context.lastPage = page; },
     displayAccount: async user => assert.equal(user, account),
+    pauseInlineVideoCard() {},
     acceptInvite: async () => { openedInvite = true; },
     showToast() {},
     telegramMiniErrorMessage: error => { throw error; },
