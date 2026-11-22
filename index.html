@@ -4548,9 +4548,47 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       }
     }
     const avatarRequests=new Map(),avatarRenders=new WeakMap();
+    const ownAvatarPreviewKey='loopa-own-avatar-preview-v1';
+    const ownAvatarPreviewLifetime=86400000;
+    function isOwnAvatarPath(path,viewer){
+      const prefix=viewer+'/';
+      return typeof path==='string'&&path.startsWith(prefix)
+        &&/^(?:avatar\.(?:jpg|png|webp)|telegram-avatar\.jpg)$/.test(path.slice(prefix.length));
+    }
+    function readOwnAvatarPreview(user){
+      if(!user?.id)return null;
+      try{
+        const preview=JSON.parse(localStorage.getItem(ownAvatarPreviewKey));
+        if(preview?.viewer===user.id&&preview.version===(user.user_metadata?.avatar_version??null)
+          &&isOwnAvatarPath(preview.path,user.id)&&preview.expiresAt>Date.now()
+          &&typeof preview.src==='string'&&preview.src.length<=48000&&preview.src.startsWith('data:image/jpeg;base64,'))return preview;
+      }catch{}
+      return null;
+    }
+    function clearOwnAvatarPreview(){
+      try{localStorage.removeItem(ownAvatarPreviewKey);}catch{}
+    }
+    function saveOwnAvatarPreview(user,path,img){
+      if(!isOwnAvatarPath(path,user.id))return;
+      try{
+        const side=Math.min(img.naturalWidth,img.naturalHeight);
+        if(!side)return;
+        const canvas=document.createElement('canvas');
+        canvas.width=canvas.height=Math.min(144,side);
+        const ctx=canvas.getContext('2d');
+        if(!ctx)return;
+        ctx.fillStyle='#181719';ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.drawImage(img,(img.naturalWidth-side)/2,(img.naturalHeight-side)/2,side,side,0,0,canvas.width,canvas.height);
+        const src=canvas.toDataURL('image/jpeg',.8);
+        if(src.length<=48000)localStorage.setItem(ownAvatarPreviewKey,JSON.stringify({
+          viewer:user.id,path,version:user.user_metadata?.avatar_version??null,expiresAt:Date.now()+ownAvatarPreviewLifetime,src
+        }));
+      }catch{}
+    }
     let avatarViewer=null;
     function resetAvatarViewer(viewer) {
       if(viewer===avatarViewer)return;
+      if(avatarViewer&&viewer!==avatarViewer)clearOwnAvatarPreview();
       avatarViewer=viewer;
       avatarRequests.clear();
       roomProfileCache.clear();
@@ -4561,8 +4599,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       if(session?.user.id!==viewer)return null;
       // An authenticated viewer can read their own folder in the private bucket.
       // Photos belonging to anyone else still require the privacy gateway.
-      const prefix=viewer+'/';
-      const ownAvatar=path.startsWith(prefix)&&/^(?:avatar\.(?:jpg|png|webp)|telegram-avatar\.jpg)$/.test(path.slice(prefix.length));
+      const ownAvatar=isOwnAvatarPath(path,viewer);
       const endpoint=ownAvatar
         ? '/storage/v1/object/authenticated/avatars/'+path
         : '/functions/v1/loopa-avatar?'+new URLSearchParams({path});
@@ -4571,7 +4608,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         cache:'no-store',
         signal:AbortSignal.timeout(10000)
       });
-      return response.ok?response.blob():null;
+      return response.ok?response.blob():response.status>=500?undefined:null;
     }
     async function showAvatar(node,path,name,imageClass='') {
       const viewer=currentUser?.id;
@@ -4592,16 +4629,30 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         node.replaceChildren(letter);
       };
       if(!path||!viewer||!client){showInitial();return;}
-      if(!sameImage||!node.querySelector('img'))showInitial();
+      const ownHeader=imageClass==='top-profile-avatar'&&isOwnAvatarPath(path,viewer);
+      const preview=ownHeader?readOwnAvatarPreview(currentUser):null;
+      if(!sameImage||!node.querySelector('img')){
+        if(preview?.path===path){
+          const img=document.createElement('img');
+          img.className=imageClass;
+          img.alt='';
+          img.src=preview.src;
+          node.replaceChildren(img);
+        }else showInitial();
+      }
       const key=viewer+':'+path;
       if(!avatarRequests.has(key)){
-        const request=requestAvatar(path,viewer).catch(()=>null);
+        const request=requestAvatar(path,viewer).catch(()=>undefined);
         avatarRequests.set(key,request);
         setTimeout(()=>{if(avatarRequests.get(key)===request)avatarRequests.delete(key);},15000);
       }
       const image=await avatarRequests.get(key);
       if(!isCurrent())return;
-      if(!image){render.image=null;showInitial();return;}
+      if(!image){
+        if(ownHeader&&image===undefined&&node.querySelector('img'))return;
+        if(ownHeader&&preview?.path===path)clearOwnAvatarPreview();
+        render.image=null;showInitial();return;
+      }
       if(render.image===image&&node.querySelector('img'))return;
       const img=document.createElement('img');
       const url=URL.createObjectURL(image);
@@ -4613,6 +4664,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         if(!isCurrent())return;
         render.image=image;
         node.replaceChildren(img);
+        if(ownHeader)saveOwnAvatarPreview(currentUser,path,img);
       };
       img.onerror=()=>URL.revokeObjectURL(url);
       img.src=url;
@@ -4643,7 +4695,10 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         return;
       }
       const nickname = byId('profile-name').value.trim() || currentUser.user_metadata?.display_name || '';
-      void showAvatar(button,profileAvatarPath(currentUser),nickname,'top-profile-avatar');
+      const knownPath=profileAvatarPath(currentUser);
+      const awaitingDirectory=loadedProfileAvatar?.userId!==currentUser.id;
+      const path=knownPath||(awaitingDirectory?readOwnAvatarPreview(currentUser)?.path:null);
+      void showAvatar(button,path,nickname,'top-profile-avatar');
     }
     function refreshSettingsIdentity() {
       const name = byId('profile-name').value.trim() || 'Профиль LOOPA';
@@ -4713,6 +4768,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     });
     const closeAccountDelete=()=>{if(accountDeleteDialog.open)accountDeleteDialog.close();};
     function clearLocalAccountData(userId){
+      clearOwnAvatarPreview();
       const keys=[
         resumeStorageKeyFor(userId),
         'loopa-watch-pairs-v1-'+userId,
@@ -5606,7 +5662,10 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         } else {
           byId('profile-username').value=data?.username||'';
           loadedProfileAvatar={userId:user.id,path:data?.avatar_path||null};
-          if(loadedProfileAvatar.path&&!user.user_metadata?.avatar_path)renderAvatar(currentUser);
+          if(!user.user_metadata?.avatar_path){
+            if(!loadedProfileAvatar.path&&readOwnAvatarPreview(currentUser))clearOwnAvatarPreview();
+            renderAvatar(currentUser);
+          }
           if (data?.display_name) {
             byId('profile-name').value = data.display_name;
             renderName(data.display_name);
@@ -6282,6 +6341,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       const {error} = await client.auth.signOut();
       byId('sign-out').disabled = false;
       if (error) return feedback('profile-feedback',errorText(error),true);
+      clearOwnAvatarPreview();
       currentUser = null;
       stopPresence();
       refreshTopProfileAvatar();
