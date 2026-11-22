@@ -1295,6 +1295,14 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
 <style id="chat-replies-styles">
     #chatReplyPreview{display:flex;align-items:center;gap:10px;min-height:48px;box-sizing:border-box;padding:7px 10px;border-top:1px solid #ffffff16;border-left:2px solid #c8c8cc;background:#ffffff06}
     #chatReplyPreview[hidden]{display:none!important}
+    body.roomViewing .roomChat{--reply-preview-height:48px}
+    body.roomViewing .roomComposerDock{position:relative;flex:none}
+    body.roomViewing .roomComposerDock #chatReplyPreview{
+      position:absolute;inset:auto 0 100%;z-index:2;height:var(--reply-preview-height);background:#171719
+    }
+    body.roomViewing .roomChat:has(#chatReplyPreview:not([hidden])) #chatLog{
+      padding-bottom:calc(12px + var(--reply-preview-height));scroll-padding-bottom:var(--reply-preview-height)
+    }
     .chatReplyPreviewCopy{display:grid;gap:2px;min-width:0;flex:1}
     .chatReplyPreviewCopy strong{font:550 11px/1.3 system-ui;color:#ededf0}
     .chatReplyPreviewCopy small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#aaaab1;font:11px/1.4 system-ui}
@@ -1631,7 +1639,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
 
       <section data-page="rooms" aria-label="Комната" hidden>
 <div id="room-active" class="panel glass" hidden><div class="setupHeader"><p class="panel-note">СОВМЕСТНЫЙ ПРОСМОТР</p><h2 id="setupTitle">Выбери видео</h2></div><div class="roomBar"><button class="text-link" data-room="exit">‹ Назад</button><small id="accessBadge"></small><button id="moreRoom" class="friend-small-action" aria-label="Меню комнаты">⋯</button></div><div class="playerCode"><span>Код</span><b id="room-code"></b><button type="button" data-room="copy" aria-label="Скопировать код комнаты"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M15 5V4a1 1 0 0 0-1-1H5a2 2 0 0 0-2 2v10a1 1 0 0 0 1 1h1"/></svg></button></div><iframe id="room-frame" hidden title="Видео комнаты"></iframe><button id="inviteRoom" type="button" class="roomInvite">＋ Пригласить</button><small id="room-status" hidden></small><div id="room-host"><details id="videoEdit"><summary><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="4"/><path d="m10 9 5 3-5 3z"/></svg>Сменить видео</summary><button id="catalogOpen" type="button" class="catalogLaunch" aria-haspopup="dialog" aria-expanded="false"><span class="launchIcon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg></span><span>Каталог видео<small>YouTube, VK Видео и RUTUBE</small></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button></details></div>
-<div id="chatResizeHandle" role="separator" aria-orientation="horizontal" aria-label="Разделитель видео и чата. Стрелки вверх и вниз меняют высоту." aria-controls="videoStage chatLog" tabindex="0"></div><section class="roomChat"><h2>Чат комнаты</h2><div id="chatLog"></div><div id="emojiTray" hidden aria-label="Выбор эмодзи"></div><div id="chatReplyPreview" class="chatReplyPreview" hidden><div class="chatReplyPreviewCopy"><strong id="chatReplyAuthor"></strong><small id="chatReplyText"></small></div><button type="button" id="chatReplyCancel" aria-label="Отменить ответ">×</button></div><form id="chatForm"><button type="button" id="emojiOpen" aria-label="Выбрать эмодзи" aria-controls="emojiTray" aria-expanded="false">☺</button><input class="friend-search-input" id="chatText" type="text" enterkeyhint="send" autocomplete="off" maxlength="1000" aria-label="Сообщение" placeholder="Сообщение…" required><button class="friend-small-action" id="roomChatSend" type="submit" aria-label="Отправить сообщение"><svg aria-hidden="true" viewBox="0 0 24 24" focusable="false"><path d="M12 20V4m0 0-6.25 6.25M12 4l6.25 6.25"/></svg></button></form></section></div>
+<div id="chatResizeHandle" role="separator" aria-orientation="horizontal" aria-label="Разделитель видео и чата. Стрелки вверх и вниз меняют высоту." aria-controls="videoStage chatLog" tabindex="0"></div><section class="roomChat"><h2>Чат комнаты</h2><div id="chatLog"></div><div class="roomComposerDock"><div id="emojiTray" hidden aria-label="Выбор эмодзи"></div><div id="chatReplyPreview" class="chatReplyPreview" hidden><div class="chatReplyPreviewCopy"><strong id="chatReplyAuthor"></strong><small id="chatReplyText"></small></div><button type="button" id="chatReplyCancel" aria-label="Отменить ответ">×</button></div><form id="chatForm"><button type="button" id="emojiOpen" aria-label="Выбрать эмодзи" aria-controls="emojiTray" aria-expanded="false">☺</button><input class="friend-search-input" id="chatText" type="text" enterkeyhint="send" autocomplete="off" maxlength="1000" aria-label="Сообщение" placeholder="Сообщение…" required><button class="friend-small-action" id="roomChatSend" type="submit" aria-label="Отправить сообщение"><svg aria-hidden="true" viewBox="0 0 24 24" focusable="false"><path d="M12 20V4m0 0-6.25 6.25M12 4l6.25 6.25"/></svg></button></form></div></section></div>
 <dialog id="inviteSheet"><header><h2>Пригласить друзей</h2><button type="button" id="closeInvites" aria-label="Закрыть">×</button></header><p id="inviteHint">Выбери друга — приглашение появится у него в LOOPA.</p><div id="inviteList"></div><button type="button" id="shareRoomLink" class="roomInvite">Отправить ссылку</button></dialog><dialog id="roomSheet"><div class="roomSheetHeading"><strong>Настройки комнаты</strong><button id="roomSheetClose" class="roomSheetClose" type="button" aria-label="Закрыть настройки">×</button></div><button type="button" id="sheetVideoChange" aria-label="Сменить видео" title="Сменить видео">Сменить видео</button><button type="button" id="cinemaModeToggle" class="cinemaModeToggle" aria-pressed="false"><span class="cinemaModeGlyph" aria-hidden="true">▣</span><span class="cinemaModeCopy"><strong>Режим кинотеатра</strong><small>Видео в центре внимания, чат остаётся открытым</small></span><span class="cinemaModeSwitch" aria-hidden="true"></span></button><h3>Участники</h3><div id="people" role="list" aria-label="Участники"></div><div id="sharedControlEdit" hidden><h3>Настройки комнаты</h3><div class="sharedControlLine"><div class="sharedControlCopy"><strong>Совместное управление</strong><small>Разрешить участникам ставить видео на паузу, включать и перематывать</small></div><label class="presence-switch" aria-label="Совместное управление"><input type="checkbox" id="roomSharedControl"><span class="presence-switch-track"></span></label></div><p id="sharedControlStatus" role="status">По умолчанию видео управляет создатель комнаты</p></div><div id="accessEdit"><h3>Доступ в комнату</h3><div class="roomAccessOptions" role="group" aria-label="Доступ в комнату"><button type="button" data-access="code" aria-pressed="true">Открытая</button><button type="button" data-access="private" aria-pressed="false">Закрытая</button><button type="button" data-access="friends" aria-pressed="false">Для друзей</button></div><select hidden id="accessMode" class="privacy-select"><option value="code">Любой</option><option value="friends">Только друзья</option><option value="private">Приватная</option></select><div id="pick"></div><small id="accessWarning"></small><button class="action" id="saveAccess">Сохранить доступ</button></div></dialog><p id="room-note" role="status"></p>
       </section>
 
@@ -2857,22 +2865,34 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       if(typeof raw==='number')return raw<1e12?raw*1000:raw;
       const stamp=Date.parse(raw);return Number.isFinite(stamp)?stamp:NaN;
     }
-    let chatReplyTarget=null,chatMessageById=new Map(),chatSwipe=null;
-        function clearChatReply(){
-          chatReplyTarget=null;byId('chatReplyPreview').hidden=true;
-          byId('chatReplyAuthor').textContent='';byId('chatReplyText').textContent='';
-        }
-        function setChatReply(message){
-          if(!message||message.id==null)return;
-          chatReplyTarget={id:String(message.id),author:message.author,name:message.name||'',body:String(message.body||'')};
-          const author=String(message.author)===String(currentUser?.id)?'Ты':message.name||roomProfileCache.get(message.author)?.name||'Участник';
-          byId('chatReplyAuthor').textContent='Ответ на '+author;
-          byId('chatReplyText').textContent=chatReplyTarget.body.slice(0,180);
-          byId('chatReplyPreview').hidden=false;
-      const input=byId('chatText');
-      try{input.focus({preventScroll:true});}catch(_){input.focus();}
-      scheduleWatchViewport();
-        }
+    let chatReplyTarget=null,chatMessageById=new Map(),chatSwipe=null,chatReplyScrollFrame=0;
+    function setChatReplyVisible(visible){
+      const preview=byId('chatReplyPreview');
+      if(preview.hidden===!visible)return;
+      const keepBottom=watchKeepBottom;
+      const previousPosition=keepBottom?watchLog.scrollTop:0;
+      preview.hidden=!visible;
+      if(!keepBottom||chatReplyScrollFrame)return;
+      chatReplyScrollFrame=requestAnimationFrame(()=>{
+        chatReplyScrollFrame=0;
+        if(document.body.classList.contains('roomViewing')&&watchLog.scrollTop>=previousPosition-2)watchLog.scrollTop=watchLog.scrollHeight;
+      });
+    }
+    function clearChatReply(){
+      chatReplyTarget=null;
+      setChatReplyVisible(false);
+      byId('chatReplyAuthor').textContent='';
+      byId('chatReplyText').textContent='';
+    }
+    function setChatReply(message){
+      if(!message||message.id==null)return;
+      chatReplyTarget={id:String(message.id),author:message.author,name:message.name||'',body:String(message.body||'')};
+      const author=String(message.author)===String(currentUser?.id)?'Ты':message.name||roomProfileCache.get(message.author)?.name||'Участник';
+      if(document.activeElement!==watchField)watchField.focus({preventScroll:true});
+      byId('chatReplyAuthor').textContent='Ответ на '+author;
+      byId('chatReplyText').textContent=chatReplyTarget.body.slice(0,180);
+      setChatReplyVisible(true);
+    }
         function jumpToChatMessage(id){
           const key=String(id),bubble=[...byId('chatLog').querySelectorAll('.bubble[data-chat-id]')].find(el=>el.dataset.chatId===key);
           if(!bubble){showToast('Исходное сообщение уже не отображается в чате');return;}
@@ -2883,8 +2903,9 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         chatLogGesture.addEventListener('pointerdown',event=>{
           if(event.pointerType!=='touch'||event.target.closest('button'))return;
           const bubble=event.target.closest('.chatLine .bubble[data-chat-id]');if(!bubble)return;
+          if(document.activeElement===watchField)event.preventDefault();
           chatSwipe={bubble,id:bubble.dataset.chatId,pointerId:event.pointerId,x:event.clientX,y:event.clientY,active:false};
-        },{passive:true});
+        });
         chatLogGesture.addEventListener('pointermove',event=>{
           const gesture=chatSwipe;if(!gesture||gesture.pointerId!==event.pointerId)return;
           const dx=event.clientX-gesture.x,dy=event.clientY-gesture.y;
@@ -2902,7 +2923,10 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
           if(chatSwipe?.pointerId!==event.pointerId)return;
           chatSwipe.bubble.style.transform='';chatSwipe.bubble.classList.remove('chatReplySwipe');chatSwipe=null;
         },{passive:true});
-        byId('chatReplyCancel').addEventListener('click',clearChatReply);
+        const chatReplyCancel=byId('chatReplyCancel');
+        chatReplyCancel.addEventListener('pointerdown',keepRoomChatFocus);
+        chatReplyCancel.addEventListener('mousedown',keepRoomChatFocus);
+        chatReplyCancel.addEventListener('click',clearChatReply);
             function normalizeChatMessage(message){
           if(!message||typeof message.body!=='string'||message.body[0]!=='{')return message;
           try{
@@ -3186,9 +3210,9 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       const compact=Math.min(preferred,Math.max(76,Math.min(128,fullHeight*.30)));
       const player=watchKeyboardOpen?compact:preferred;
       const playerWidth=watchKeyboardOpen?Math.min(fullWidth,player*16/9):fullWidth;
-      const oldHeight=root.style.getPropertyValue('--watch-height');
-      const oldPlayer=root.style.getPropertyValue('--watch-player-height');
-      const keepBottom=watchKeepBottom,position=watchLog.scrollTop;
+      const restoreScroll=typeof ResizeObserver==='undefined'
+        &&(root.style.getPropertyValue('--watch-height')!==height+'px'||root.style.getPropertyValue('--watch-player-height')!==player+'px');
+      const position=restoreScroll?watchLog.scrollTop:0;
       const dimensions={
         '--watch-height':height+'px',
         '--watch-player-height':player+'px',
@@ -3203,13 +3227,13 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       updateChatResizeAria(layoutHeight,width,player);
       const top=Math.max(0,telegram?0:window.scrollY||0)+'px';
       if(root.style.getPropertyValue('--watch-top')!==top)root.style.setProperty('--watch-top',top);
-      if(typeof ResizeObserver==='undefined'&&(oldHeight!==height+'px'||oldPlayer!==player+'px')){
-        watchLog.scrollTop=keepBottom?watchLog.scrollHeight:position;
-      }
+      if(restoreScroll)watchLog.scrollTop=watchKeepBottom?watchLog.scrollHeight:position;
     }
     function stopWatchViewport(){
       restoreWatchField();
       stopWatchPlayerMotion();
+      if(chatReplyScrollFrame)cancelAnimationFrame(chatReplyScrollFrame);
+      chatReplyScrollFrame=0;
       watchKeyboardOpen=false;
       watchNativeKeyboard=false;
       watchBaseHeight=0;
@@ -3229,7 +3253,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     // Keep the newest message beside the composer unless the reader scrolled back.
     if(typeof ResizeObserver!=='undefined')new ResizeObserver(()=>{
       if(document.body.classList.contains('roomViewing')&&watchKeepBottom)watchLog.scrollTop=watchLog.scrollHeight;
-    }).observe(watchLog);
+    }).observe(watchLog,{box:'border-box'});
     window.visualViewport?.addEventListener('resize',scheduleWatchViewport);
     window.visualViewport?.addEventListener('scroll',scheduleWatchViewport);
     window.addEventListener('resize',scheduleWatchViewport);
