@@ -116,3 +116,32 @@ func TestAuthOutageStopsBeforeQuota(t *testing.T) {
 		t.Fatalf("status %d, want 503", w.Code)
 	}
 }
+
+func TestInlineSearchRequiresVerifiedBody(t *testing.T) {
+	old := client
+	defer func() { client = old }()
+	const body = `{"q":"аниме","page":1,"ticket":"fixture","expires":1}`
+	proof := strings.Repeat("a", 64)
+	for _, verdict := range []int{http.StatusOK, http.StatusUnauthorized} {
+		calls := 0
+		client = &http.Client{Transport: transport(func(r *http.Request) (*http.Response, error) {
+			if r.URL.Host == "rutube.ru" {
+				calls++
+				return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"results":[]}`))}, nil
+			}
+			forwarded, err := io.ReadAll(r.Body)
+			if err != nil || string(forwarded) != body || r.Header.Get("X-Loopa-Inline-Proof") != proof ||
+				r.URL.String() != supabaseURL+"/functions/v1/loopa-bot?action=verify-inline-rutube" {
+				t.Fatal("signed request was not forwarded intact")
+			}
+			return &http.Response{StatusCode: verdict, Body: io.NopCloser(strings.NewReader(`{}`))}, nil
+		})}
+		req := httptest.NewRequest("POST", "https://function.test", strings.NewReader(body))
+		req.Header.Set("X-Loopa-Inline-Proof", proof)
+		response := httptest.NewRecorder()
+		Handler(response, req)
+		if response.Code != verdict || (calls == 1) != (verdict == http.StatusOK) {
+			t.Fatalf("verdict %d, response %d, upstream calls %d", verdict, response.Code, calls)
+		}
+	}
+}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io"
@@ -12,6 +13,8 @@ import (
 	"time"
 	"unicode"
 )
+
+var inlineProof = regexp.MustCompile(`^[a-f0-9]{64}$`)
 
 var videoID = regexp.MustCompile(`^[a-fA-F0-9]{32}$`)
 var client = &http.Client{
@@ -35,15 +38,37 @@ func fail(w http.ResponseWriter, status int, message string) {
 	respond(w, status, map[string]string{"message": message})
 }
 
-// Reconstructed from the owner's screenshots. Only public configuration is embedded.
+func verifyInline(r *http.Request, proof string, body []byte) int {
+	req, err := http.NewRequestWithContext(r.Context(), "POST", supabaseURL+"/functions/v1/loopa-bot?action=verify-inline-rutube", bytes.NewReader(body))
+	if err != nil {
+		return http.StatusServiceUnavailable
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Loopa-Inline-Proof", proof)
+	response, err := client.Do(req)
+	if err != nil {
+		return http.StatusServiceUnavailable
+	}
+	response.Body.Close()
+	switch response.StatusCode {
+	case http.StatusOK, http.StatusUnauthorized:
+		return response.StatusCode
+	default:
+		return http.StatusServiceUnavailable
+	}
+}
+
+// Browser requests require a LOOPA session. Inline requests carry a single-use bot ticket.
 func Handler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		fail(w, 405, "Используй поиск из LOOPA")
 		return
 	}
+	proof := r.Header.Get("X-Loopa-Inline-Proof")
+	inline := inlineProof.MatchString(proof)
 	token := r.Header.Get("X-Loopa-Authorization")
 	credential, ok := strings.CutPrefix(token, "Bearer ")
-	if !ok || credential == "" || len(token) > 8192 || strings.IndexFunc(credential, unicode.IsSpace) >= 0 {
+	if !inline && (!ok || credential == "" || len(token) > 8192 || strings.IndexFunc(credential, unicode.IsSpace) >= 0) {
 		fail(w, 401, "Войди в аккаунт LOOPA")
 		return
 	}
@@ -53,7 +78,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 	body := http.MaxBytesReader(w, r.Body, requestBodyLimit)
 	defer body.Close()
-	decoder := json.NewDecoder(body)
+	var raw bytes.Buffer
+	decoder := json.NewDecoder(io.TeeReader(body, &raw))
 	err := decoder.Decode(&input)
 	if err == nil {
 		var extra json.RawMessage
@@ -76,62 +102,73 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, "Проверь название и страницу поиска")
 		return
 	}
-	auth, err := http.NewRequestWithContext(r.Context(), "GET", supabaseURL+"/auth/v1/user", nil)
-	if err != nil {
-		fail(w, 502, "Ошибка проверки входа")
-		return
-	}
-	auth.Header.Set("Authorization", token)
-	auth.Header.Set("apikey", publishableKey)
-	user, err := client.Do(auth)
-	if err != nil {
-		fail(w, 503, "Не удалось проверить вход")
-		return
-	}
-	user.Body.Close()
-	switch user.StatusCode {
-	case http.StatusOK:
-	case http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden:
-		fail(w, 401, "Войди в аккаунт LOOPA")
-		return
-	default:
-		fail(w, 503, "Не удалось проверить вход")
-		return
-	}
-	// The same durable account quota applies even when this public URL is called directly.
-	quota, err := http.NewRequestWithContext(r.Context(), "POST", supabaseURL+"/rest/v1/rpc/loopa_search_budget", strings.NewReader(`{"p_mode":"search"}`))
-	if err != nil {
-		fail(w, 503, "Поиск временно недоступен")
-		return
-	}
-	quota.Header.Set("Authorization", token)
-	quota.Header.Set("apikey", publishableKey)
-	quota.Header.Set("Content-Type", "application/json")
-	budgetResponse, err := client.Do(quota)
-	if err != nil {
-		fail(w, 503, "Поиск временно недоступен")
-		return
-	}
-	var budget struct {
-		Allowed *bool `json:"allowed"`
-		Retry   int   `json:"retry_after"`
-	}
-	err = json.NewDecoder(io.LimitReader(budgetResponse.Body, 4096)).Decode(&budget)
-	budgetResponse.Body.Close()
-	if budgetResponse.StatusCode != 200 || err != nil || budget.Allowed == nil {
-		fail(w, 503, "Поиск временно недоступен")
-		return
-	}
-	if !*budget.Allowed {
-		if budget.Retry < 1 {
-			budget.Retry = 1
+	if inline {
+		if input.Page != 1 {
+			fail(w, 400, "Некорректная страница")
+			return
 		}
-		if budget.Retry > 60 {
-			budget.Retry = 60
+		if status := verifyInline(r, proof, raw.Bytes()); status != http.StatusOK {
+			fail(w, status, "Не удалось проверить запрос Telegram")
+			return
 		}
-		w.Header().Set("Retry-After", strconv.Itoa(budget.Retry))
-		fail(w, 429, "Слишком много запросов. Подожди немного и попробуй снова.")
-		return
+	} else {
+		auth, err := http.NewRequestWithContext(r.Context(), "GET", supabaseURL+"/auth/v1/user", nil)
+		if err != nil {
+			fail(w, 502, "Ошибка проверки входа")
+			return
+		}
+		auth.Header.Set("Authorization", token)
+		auth.Header.Set("apikey", publishableKey)
+		user, err := client.Do(auth)
+		if err != nil {
+			fail(w, 503, "Не удалось проверить вход")
+			return
+		}
+		user.Body.Close()
+		switch user.StatusCode {
+		case http.StatusOK:
+		case http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden:
+			fail(w, 401, "Войди в аккаунт LOOPA")
+			return
+		default:
+			fail(w, 503, "Не удалось проверить вход")
+			return
+		}
+		// The same durable account quota applies even when this public URL is called directly.
+		quota, err := http.NewRequestWithContext(r.Context(), "POST", supabaseURL+"/rest/v1/rpc/loopa_search_budget", strings.NewReader(`{"p_mode":"search"}`))
+		if err != nil {
+			fail(w, 503, "Поиск временно недоступен")
+			return
+		}
+		quota.Header.Set("Authorization", token)
+		quota.Header.Set("apikey", publishableKey)
+		quota.Header.Set("Content-Type", "application/json")
+		budgetResponse, err := client.Do(quota)
+		if err != nil {
+			fail(w, 503, "Поиск временно недоступен")
+			return
+		}
+		var budget struct {
+			Allowed *bool `json:"allowed"`
+			Retry   int   `json:"retry_after"`
+		}
+		err = json.NewDecoder(io.LimitReader(budgetResponse.Body, 4096)).Decode(&budget)
+		budgetResponse.Body.Close()
+		if budgetResponse.StatusCode != 200 || err != nil || budget.Allowed == nil {
+			fail(w, 503, "Поиск временно недоступен")
+			return
+		}
+		if !*budget.Allowed {
+			if budget.Retry < 1 {
+				budget.Retry = 1
+			}
+			if budget.Retry > 60 {
+				budget.Retry = 60
+			}
+			w.Header().Set("Retry-After", strconv.Itoa(budget.Retry))
+			fail(w, 429, "Слишком много запросов. Подожди немного и попробуй снова.")
+			return
+		}
 	}
 	params := url.Values{"query": {input.Q}, "client": {"web"}, "page": {strconv.Itoa(input.Page)}, "per_page": {"12"}}
 	req, err := http.NewRequestWithContext(r.Context(), "GET", "https://rutube.ru/api/search/video/?"+params.Encode(), nil)

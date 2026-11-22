@@ -299,6 +299,64 @@ async function youtubeInlineResults(query){
     }];
   });
 }
+const inlineRutubeUrl="https://functions.yandexcloud.net/d4e8n1se4iuc8ql4rm82";
+const inlineRutubeId=/^https:\/\/rutube\.ru\/video\/([a-f0-9]{32})\/$/i;
+async function rutubeInlineResults(token,query){
+  const body=JSON.stringify({q:query,page:1,ticket:crypto.randomUUID(),expires:Date.now()+12000});
+  const proof=await webhookSecret(token,"loopa.telegram.inline-rutube.v1:"+body);
+  const response=await fetch(inlineRutubeUrl,{
+    method:"POST",headers:{"Content-Type":"application/json","X-Loopa-Inline-Proof":proof},
+    body,redirect:"error",signal:AbortSignal.timeout(2400)
+  });
+  if(!response.ok)return null;
+  const {items}=await response.json();
+  if(!Array.isArray(items))return null;
+  const ids=new Set();
+  return items.slice(0,8).flatMap(item=>{
+    const id=inlineRutubeId.exec(item?.url||"")?.[1]?.toLowerCase();
+    const title=typeof item?.title==="string"?item.title.trim().slice(0,180):"";
+    if(!id||!title||ids.has(id))return [];
+    ids.add(id);
+    const author=typeof item.author==="string"?item.author.trim().slice(0,100):"";
+    const card={
+      type:"article",id:"rt_"+id,title,description:author?"RUTUBE · "+author:"RUTUBE",
+      input_message_content:{message_text:title,link_preview_options:{is_disabled:true}},
+      reply_markup:{inline_keyboard:[[{text:"Смотреть вместе",url:"https://t.me/"+BOT_NAME+"/loopa?startapp=rt_"+id}]]}
+    };
+    try{
+      const cover=new URL(item.image);
+      if(cover.protocol==="https:"&&/(^|\.)(rutube|rtbcdn)\.ru$/.test(cover.hostname)&&!cover.username&&!cover.password)
+        card.thumbnail_url=cover.href;
+    }catch{/* Cards can omit a cover. */}
+    return [card];
+  });
+}
+async function verifyInlineRutube(request,token){
+  const proof=request.headers.get("X-Loopa-Inline-Proof")||"";
+  if(!/^[a-f0-9]{64}$/.test(proof)||Number(request.headers.get("content-length")||0)>4096)
+    return result({ok:false},401);
+  const reader=request.body?.getReader();
+  if(!reader)return result({ok:false},401);
+  const bytes=new Uint8Array(4096);
+  let size=0;
+  while(true){
+    const {value,done}=await reader.read();
+    if(done)break;
+    if(size+value.length>bytes.length){await reader.cancel();return result({ok:false},413);}
+    bytes.set(value,size);
+    size+=value.length;
+  }
+  const body=new TextDecoder().decode(bytes.subarray(0,size));
+  if(!sameSecret(proof,await webhookSecret(token,"loopa.telegram.inline-rutube.v1:"+body)))
+    return result({ok:false},401);
+  const ticket=JSON.parse(body),now=Date.now();
+  if(!REQUEST_ID_RE.test(ticket?.ticket||"")||!Number.isSafeInteger(ticket.expires)
+    ||ticket.expires<=now||ticket.expires>now+12000)
+    return result({ok:false},401);
+  const {data,error}=await adminClient().rpc("loopa_consume_inline_rutube_ticket",{p_ticket:ticket.ticket})
+    .abortSignal(AbortSignal.timeout(1000));
+  return result({ok:!error&&data===true},error?503:data===true?200:401);
+}
 async function handleInlineVideo(token,query){
   const id=query?.id,userId=query?.from?.id;
   if(typeof id!=="string"||!id.length||id.length>128||!Number.isSafeInteger(userId)||userId<=0)return;
@@ -309,19 +367,26 @@ async function handleInlineVideo(token,query){
     const cached=inlineVideos.get(key);
     if(cached?.expires>Date.now()){
       results=cached.results;
-      cacheTime=60;
-    }else if(Deno.env.get("YOUTUBE_API_KEY")){
+      cacheTime=cached.cacheTime;
+    }else{
       try{
         const actor=await webhookSecret(token,"loopa.telegram.inline-budget.v1:"+userId);
         const {data,error}=await adminClient().rpc("loopa_take_inline_video_budget",{p_actor:actor})
           .abortSignal(AbortSignal.timeout(1500));
         if(!error&&data===true){
-          const found=await youtubeInlineResults(term);
-          if(found){
-            results=found;
-            cacheTime=60;
+          const [youtube,rutube]=await Promise.all([
+            youtubeInlineResults(term).catch(()=>null),
+            rutubeInlineResults(token,term).catch(()=>null)
+          ]);
+          const count=Math.max(youtube?.length||0,rutube?.length||0);
+          for(let index=0;index<count;index++){
+            if(youtube?.[index])results.push(youtube[index]);
+            if(rutube?.[index])results.push(rutube[index]);
+          }
+          if(youtube||rutube){
+            cacheTime=youtube&&rutube?60:10;
             if(inlineVideos.size>=100)inlineVideos.delete(inlineVideos.keys().next().value);
-            inlineVideos.set(key,{results,expires:Date.now()+300000});
+            inlineVideos.set(key,{results,cacheTime,expires:Date.now()+(youtube&&rutube?300000:10000)});
           }
         }
       }catch{/* Leave the query retryable if the provider or quota check is unavailable. */}
@@ -355,6 +420,8 @@ Deno.serve(async request=>{
       const info=await getStatus(token);
       return result(info,info.error?409:200);
     }
+    if(request.method==="POST"&&url.searchParams.get("action")==="verify-inline-rutube")
+      return await verifyInlineRutube(request,token);
     if(request.method==="OPTIONS")return request.headers.get("Origin")===SITE_ORIGIN?result({ok:true}):result({error:"invalid_origin"},403);
     if(request.method==="POST"&&request.headers.has("Authorization"))
       return await miniAppAction(request,token);
