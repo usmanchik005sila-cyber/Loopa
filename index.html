@@ -2896,8 +2896,9 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         function renderConversation(messages){
       messages=messages.map(normalizeChatMessage);
       const log=byId('chatLog'),near=log.scrollHeight-log.scrollTop-log.clientHeight<48,previousScroll=log.scrollTop;
+      const photos=new Map([...log.querySelectorAll('[data-chat-photo-key]')].map(photo=>[photo.dataset.chatPhotoKey,photo]));
+      const conversation=document.createDocumentFragment();
       chatMessageById=new Map(messages.filter(message=>message?.id!=null).map(message=>[String(message.id),message]));
-      log.replaceChildren();
       if(!messages.length){log.textContent='Пока тихо. Напиши первым.';return;}
       const groups=[];
       for(const msg of messages){
@@ -2923,7 +2924,13 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
             quote.onclick=event=>{event.stopPropagation();jumpToChatMessage(replied.id);};bubble.append(quote);
           }
           bubble.append(document.createTextNode(msg.body||''));
-          const photo=last?roomAvatar(group.author,own?'Ты':group.name||'Участник','chatUserPhoto'):document.createElement('span');
+          const firstId=group.items[0].id;
+          const photoKey=firstId==null?'':String(firstId);
+          const savedPhoto=photos.get(photoKey);
+          const photo=last
+            ? (savedPhoto&&savedPhoto.dataset.avatarUser===group.author ? savedPhoto : roomAvatar(group.author,own?'Ты':group.name||'Участник','chatUserPhoto'))
+            : document.createElement('span');
+          if(last&&photoKey)photo.dataset.chatPhotoKey=photoKey;
           if(!last)photo.className='chatAvatarSpace';
           if(last&&!own&&group.author&&group.author!==currentUser?.id){
             photo.tabIndex=0;photo.setAttribute('role','button');photo.setAttribute('aria-label','Профиль '+(group.name||'участника'));
@@ -2933,9 +2940,10 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
           if(own)line.append(bubble,photo);else line.append(photo,bubble);
           thread.append(line);
         });
-        log.append(thread);
+        conversation.append(thread);
       }
-      if(near||messages.at(-1)?.author===currentUser?.id)log.scrollTop=log.scrollHeight;
+      log.replaceChildren(conversation);
+      if(near)log.scrollTop=log.scrollHeight;
       else log.scrollTop=Math.min(previousScroll,Math.max(0,log.scrollHeight-log.clientHeight));
     }
 
@@ -2943,16 +2951,23 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     function renderSocial(data,prev){
       const messages=data.chat||[],members=data.members||[],online=members.filter(m=>m.online);
       byId('accessBadge').textContent=modeNames[data.access_mode];
-      const chips=members.map(m=>{
-        const isPeer=!!m.id&&m.id!==currentUser?.id;
-        const chip=document.createElement(isPeer?'button':'div');chip.className='roomMemberChip'+(m.online?'':' is-offline');chip.setAttribute('role','listitem');
-        if(isPeer){chip.type='button';chip.dataset.peerId=m.id;chip.title='Открыть профиль '+(m.name||'участника');chip.setAttribute('aria-label','Открыть профиль '+(m.name||'участника'));chip.onclick=()=>openRoomPeer(m.id,m.name);}
-        const name=document.createElement('span');name.className='roomMemberLabel';name.textContent=m.name||'Участник';
-        const state=document.createElement('small');state.textContent=m.online?'В комнате':'Переподключается';name.append(state);
-        chip.append(roomAvatar(m.id,m.name),name);return chip;
-      });
-      byId('people').replaceChildren(...chips);
       const sameRoom=prev?.code===data.code;
+      const previousMembers=prev?.members||[];
+      const membersChanged=!sameRoom||members.length!==previousMembers.length||members.some((member,index)=>{
+        const old=previousMembers[index];
+        return member.id!==old.id||member.name!==old.name||member.online!==old.online;
+      });
+      if(membersChanged){
+        const chips=members.map(m=>{
+          const isPeer=!!m.id&&m.id!==currentUser?.id;
+          const chip=document.createElement(isPeer?'button':'div');chip.className='roomMemberChip'+(m.online?'':' is-offline');chip.setAttribute('role','listitem');
+          if(isPeer){chip.type='button';chip.dataset.peerId=m.id;chip.title='Открыть профиль '+(m.name||'участника');chip.setAttribute('aria-label','Открыть профиль '+(m.name||'участника'));chip.onclick=()=>openRoomPeer(m.id,m.name);}
+          const name=document.createElement('span');name.className='roomMemberLabel';name.textContent=m.name||'Участник';
+          const state=document.createElement('small');state.textContent=m.online?'В комнате':'Переподключается';name.append(state);
+          chip.append(roomAvatar(m.id,m.name),name);return chip;
+        });
+        byId('people').replaceChildren(...chips);
+      }
       if(!sameRoom){if(online.length>1)showRoomPeople(members,'Вы смотрите вместе');}
       else{
         const arrivals=online.filter(m=>!prev.members?.some(old=>old.online&&old.id===m.id));
@@ -2994,8 +3009,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       applyCinemaMode(!cinemaModeEnabled);
       byId('roomSheet').close();
     });
-    let watchBaseHeight=0,watchWidth=0,watchKeyboardOpen=false,watchViewportTimer=0,watchViewportSettleTimer=0,watchLastHeight=0;
-    let watchDismissActive=false,watchDismissTimer=0;
+    let watchBaseHeight=0,watchWidth=0,watchKeyboardOpen=false,watchViewportTimer=0;
     const watchRoomWidth=()=>Math.min(document.documentElement.clientWidth||window.innerWidth,cinemaModeEnabled?1160:900);
     const watchLayoutHeight=height=>{
       if(!document.documentElement.classList.contains('telegram-fullscreen'))return height;
@@ -3061,29 +3075,6 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       if(event.key==='ArrowUp')next=current-step;else if(event.key==='ArrowDown')next=current+step;else if(event.key==='Home')next=min;else if(event.key==='End')next=max;
       if(next===null)return;event.preventDefault();adjustCinemaPlayer(next,height,width);
     });
-    function endWatchDismiss(){
-      watchDismissActive=false;
-      if(watchDismissTimer)clearTimeout(watchDismissTimer);
-      watchDismissTimer=0;
-    }
-    function beginWatchKeyboardDismiss(){
-      if(!watchBrowserIOS||!document.body.classList.contains('roomViewing')||watchDismissActive)return;
-      const viewport=window.visualViewport;
-      const currentHeight=viewport?.height||window.innerHeight;
-      const fullHeight=Math.max(watchBaseHeight||0,window.innerHeight||0,currentHeight);
-      const layoutHeight=watchLayoutHeight(fullHeight);
-      if(fullHeight-currentHeight<70&&!watchKeyboardOpen)return;
-      watchDismissActive=true;
-      watchKeyboardOpen=false;
-      document.body.classList.remove('chatTyping');
-      const root=document.documentElement,roomWidth=watchRoomWidth();
-      root.style.setProperty('--watch-height',fullHeight+'px');
-      root.style.setProperty('--watch-player-height',(cinemaModeEnabled?preferredCinemaPlayer(layoutHeight,roomWidth):watchNormalPlayer(layoutHeight,roomWidth))+'px');
-      root.style.setProperty('--watch-player-width',roomWidth+'px');
-      root.style.setProperty('--watch-top','0px');
-      if(watchKeepBottom)watchLog.scrollTop=watchLog.scrollHeight;
-      watchDismissTimer=setTimeout(()=>{endWatchDismiss();scheduleWatchViewport();},850);
-    }
     let watchKeepBottom=true;
     const watchLog=byId('chatLog'),watchField=byId('chatText');
     watchField.readOnly=false;watchField.inputMode='text';
@@ -3121,30 +3112,25 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       if(!document.body.classList.contains('roomViewing'))return;
       const viewport=window.visualViewport,root=document.documentElement;
       const width=Math.min(root.clientWidth||window.innerWidth,cinemaModeEnabled?1160:900);
-      const height=viewport?.height||window.innerHeight;
-      const layoutHeight=watchLayoutHeight(height);
-      if(viewport&&Math.abs(viewport.scale-1)>.02)return;
+      const telegram=entryRoot.dataset.loopaEntry==='telegram'?window.Telegram?.WebApp:null;
+      const heights=[viewport?.height,window.innerHeight,telegram?.viewportHeight].filter(value=>Number.isFinite(value)&&value>0);
+      if(!heights.length||viewport&&Math.abs(viewport.scale-1)>.02)return;
+      const height=Math.min(...heights);
       const focused=document.activeElement===watchField;
-      if(watchDismissActive){
-        if(focused){endWatchDismiss();}
-        else if(height>=Math.max(0,watchBaseHeight-55)){endWatchDismiss();}
-        else return;
+      const stableHeight=Number(telegram?.viewportStableHeight)||0;
+      if(width!==watchWidth||!watchBaseHeight){
+        watchWidth=width;
+        watchBaseHeight=Math.max(height,stableHeight||window.innerHeight);
       }
-      if(width!==watchWidth){watchWidth=width;watchBaseHeight=Math.max(height,window.innerHeight);}
-      if(!focused&&!watchKeyboardOpen)watchBaseHeight=height;
-      // Retain the open state through blur until the keyboard actually retreats.
-      const reduced=watchBaseHeight-height>120;
-      watchKeyboardOpen=reduced&&(focused||watchKeyboardOpen);
-      if(!watchKeyboardOpen&&!focused)watchBaseHeight=height;
+      watchKeyboardOpen=(focused||watchKeyboardOpen)&&watchBaseHeight-height>(watchKeyboardOpen?55:100);
+      if(!focused&&!watchKeyboardOpen)watchBaseHeight=Math.max(height,stableHeight);
       document.body.classList.toggle('chatTyping',watchKeyboardOpen);
+      const layoutHeight=watchLayoutHeight(height);
       const normal=watchNormalPlayer(layoutHeight,width);
-      // v80: no gradual player-height interpolation (it pushed the chat down
-      // slowly while the iOS keyboard was opening or closing).
-      const compact=Math.min(normal,Math.max(76,Math.min(128,layoutHeight*.30)));
+      const compact=Math.min(normal,Math.max(76,Math.min(128,watchLayoutHeight(watchBaseHeight)*.30)));
       const preferred=cinemaModeEnabled?preferredCinemaPlayer(layoutHeight,width):normal;
-      const player=(focused||watchKeyboardOpen)?compact:preferred;
-      // Keep the video at 16:9 while the cinema divider changes chat height.
-      const playerWidth=(focused||watchKeyboardOpen||cinemaModeEnabled)?Math.min(width,player*16/9):width;
+      const player=watchKeyboardOpen?compact:preferred;
+      const playerWidth=(watchKeyboardOpen||cinemaModeEnabled)?Math.min(width,player*16/9):width;
       const oldHeight=root.style.getPropertyValue('--watch-height');
       const oldPlayer=root.style.getPropertyValue('--watch-player-height');
       const oldPlayerWidth=root.style.getPropertyValue('--watch-player-width');
@@ -3153,47 +3139,27 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       if(oldPlayer!==player+'px')root.style.setProperty('--watch-player-height',player+'px');
       if(oldPlayerWidth!==playerWidth+'px')root.style.setProperty('--watch-player-width',playerWidth+'px');
       updateChatResizeAria(layoutHeight,width,player);
-      // Fixed elements follow Safari's layout-viewport pan without scrolling
-      // the document or combining offsetTop and scrollY twice.
-      const top=Math.max(0,window.scrollY||0)+'px';
+      const top=Math.max(0,telegram?0:window.scrollY||0)+'px';
       if(root.style.getPropertyValue('--watch-top')!==top)root.style.setProperty('--watch-top',top);
       if(oldHeight!==height+'px'||oldPlayer!==player+'px'){
         watchLog.scrollTop=keepBottom?watchLog.scrollHeight:position;
       }
-      watchLastHeight=height;
     }
     function stopWatchViewport(){
       restoreWatchField();
-      endWatchDismiss();
       watchKeyboardOpen=false;
+      watchBaseHeight=0;
       if(watchViewportTimer)cancelAnimationFrame(watchViewportTimer);
       watchViewportTimer=0;
-      if(watchViewportSettleTimer)clearTimeout(watchViewportSettleTimer);
-      watchViewportSettleTimer=0;
-      watchLastHeight=window.visualViewport?.height||window.innerHeight;
     }
     function scheduleWatchViewport(){
-          if(!document.body.classList.contains('roomViewing')||document.hidden)return;
-          const keyboardActive=watchKeyboardOpen||document.activeElement===watchField;
-          // iOS Safari can pan the visual viewport with scroll events while its height stays unchanged.
-          // Defer every viewport sync during keyboard transitions, then apply one final layout.
-          if(watchBrowserIOS&&keyboardActive){
-            if(watchViewportTimer){cancelAnimationFrame(watchViewportTimer);watchViewportTimer=0;}
-            if(watchViewportSettleTimer)clearTimeout(watchViewportSettleTimer);
-            watchViewportSettleTimer=setTimeout(()=>{
-              watchViewportSettleTimer=0;
-              syncWatchViewport();
-            },80);
-            return;
-          }
-          if(watchViewportSettleTimer){clearTimeout(watchViewportSettleTimer);watchViewportSettleTimer=0;}
-          if(watchViewportTimer)return;
-          watchViewportTimer=requestAnimationFrame(()=>{
-            watchViewportTimer=0;
-            syncWatchViewport();
-          });
-        }
-        document.addEventListener('visibilitychange',()=>{
+      if(!document.body.classList.contains('roomViewing')||document.hidden||watchViewportTimer)return;
+      watchViewportTimer=requestAnimationFrame(()=>{
+        watchViewportTimer=0;
+        syncWatchViewport();
+      });
+    }
+    document.addEventListener('visibilitychange',()=>{
       if(document.hidden)stopWatchViewport();else scheduleWatchViewport();
     });
     // Keep the newest message beside the composer unless the reader scrolled back.
@@ -3204,8 +3170,11 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     window.visualViewport?.addEventListener('scroll',scheduleWatchViewport);
     window.addEventListener('resize',scheduleWatchViewport);
     window.addEventListener('scroll',scheduleWatchViewport,{passive:true});
-    watchField.addEventListener('focus',()=>{endWatchDismiss();scheduleWatchViewport();});
-    watchField.addEventListener('blur',()=>{beginWatchKeyboardDismiss();scheduleWatchViewport();});
+    watchField.addEventListener('focus',scheduleWatchViewport);
+    watchField.addEventListener('blur',scheduleWatchViewport);
+    if(entryRoot.dataset.loopaEntry==='telegram'){
+      try{window.Telegram?.WebApp?.onEvent?.('viewportChanged',scheduleWatchViewport);}catch{}
+    }
     syncWatchViewport();
     const tray=byId('emojiTray'), emojiOpen=byId('emojiOpen');
     function closeEmoji(){tray.hidden=true;emojiOpen.setAttribute('aria-expanded','false');}
@@ -3217,16 +3186,20 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         closeEmoji();field.focus();};tray.append(choice);
     }
     let chatSending=false;
-    const chatSendButton=byId('chatForm').querySelector('button:last-child');
-    byId('chatForm').noValidate=true;
-    chatSendButton.addEventListener('pointerdown',e=>{if(document.activeElement===byId('chatText'))e.preventDefault();});
+    const chatForm=byId('chatForm'),chatSendButton=byId('roomChatSend');
+    chatForm.noValidate=true;
+    function keepRoomChatFocus(event){
+      if(event.button===0&&event.isPrimary!==false&&document.activeElement===watchField)event.preventDefault();
+    }
+    chatSendButton.addEventListener('pointerdown',keepRoomChatFocus);
+    chatSendButton.addEventListener('mousedown',keepRoomChatFocus);
     // Safari's blue keyboard Send/Return key submits this single-line input.
     watchField.addEventListener('keydown',event=>{
       if(event.key!=='Enter'||event.isComposing||event.keyCode===229||event.shiftKey||event.ctrlKey||event.metaKey||event.altKey)return;
       event.preventDefault();
-      byId('chatForm').requestSubmit();
+      chatForm.requestSubmit(chatSendButton);
     });
-    byId('chatForm').onsubmit=async e=>{
+    chatForm.onsubmit=async e=>{
       e.preventDefault();const input=byId('chatText'),raw=input.value,value=raw.trim();
       if(!value||chatSending||!roomState)return;
       const sendingRoom=roomState.code,epoch=roomEpoch;
@@ -3236,7 +3209,6 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       // causing the entire room composer to slide after *every* message.
       // The keyboard closes only when the user dismisses it intentionally.
       closeEmoji();
-      scheduleWatchViewport();
       const reply=chatReplyTarget;
           const media=reply?JSON.stringify({_loopa_reply_v1:'1',body:value,reply_to:reply.id}):value;
           try{await roomCall('chat',{media});if(roomEpoch===epoch&&roomState?.code===sendingRoom&&chatReplyTarget?.id===reply?.id)clearChatReply();}
@@ -4498,7 +4470,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         if(pane)animateContent(pane);
       }
     }
-    const avatarRequests = new Map();
+    const avatarRequests=new Map(),avatarRenders=new WeakMap();
     let avatarViewer=null;
     function resetAvatarViewer(viewer) {
       if(viewer===avatarViewer)return;
@@ -4519,6 +4491,11 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     }
     async function showAvatar(node,path,name,imageClass='') {
       const viewer=currentUser?.id;
+      const previous=avatarRenders.get(node);
+      const sameImage=previous&&previous.path===path&&previous.viewer===viewer;
+      const render={path,viewer,image:sameImage?previous.image:null};
+      avatarRenders.set(node,render);
+      const isCurrent=()=>avatarRenders.get(node)===render&&currentUser?.id===viewer;
       node.dataset.avatarPath=path||'';
       node.dataset.avatarName=name||'';
       node.dataset.avatarClass=imageClass;
@@ -4530,8 +4507,8 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         letter.textContent=fallback;
         node.replaceChildren(letter);
       };
-      if(!node.querySelector('img'))showInitial();
       if(!path||!viewer||!client){showInitial();return;}
+      if(!sameImage||!node.querySelector('img'))showInitial();
       const key=viewer+':'+path;
       if(!avatarRequests.has(key)){
         const request=requestAvatar(path,viewer).catch(()=>null);
@@ -4539,17 +4516,22 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         setTimeout(()=>{if(avatarRequests.get(key)===request)avatarRequests.delete(key);},15000);
       }
       const image=await avatarRequests.get(key);
-      if(node.dataset.avatarPath!==path||currentUser?.id!==viewer)return;
-      if(!image){showInitial();return;}
+      if(!isCurrent())return;
+      if(!image){render.image=null;showInitial();return;}
+      if(render.image===image&&node.querySelector('img'))return;
       const img=document.createElement('img');
       const url=URL.createObjectURL(image);
       img.className=imageClass;
       img.alt='';
       img.decoding='async';
-      img.onload=()=>URL.revokeObjectURL(url);
-      img.onerror=()=>{URL.revokeObjectURL(url);if(node.firstChild===img)showInitial();};
+      img.onload=()=>{
+        URL.revokeObjectURL(url);
+        if(!isCurrent())return;
+        render.image=image;
+        node.replaceChildren(img);
+      };
+      img.onerror=()=>URL.revokeObjectURL(url);
       img.src=url;
-      node.replaceChildren(img);
     }
     setInterval(()=>{
       if(document.hidden||!currentUser)return;
