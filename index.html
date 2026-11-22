@@ -1346,6 +1346,12 @@ html.telegram-miniapp.telegram-fullscreen body.roomViewing #room-active {
   top:calc(var(--watch-top, 0px) + var(--loopa-tg-safe-top, 0px)) !important;
   height:calc(var(--watch-height, 100dvh) - var(--loopa-tg-safe-top, 0px)) !important;
 }
+/* Telegram for iOS resizes its WebView with the keyboard. Let CSS follow
+   the WebView's bottom edge without waiting for Telegram's JS metrics. */
+html.telegram-miniapp.tg-native-room body.roomViewing #room-active {
+  bottom:max(0px, calc(100% - var(--watch-overlay-height, 100%))) !important;
+  height:auto !important;
+}
 html.telegram-miniapp.telegram-fullscreen body.roomViewing:not(.chatTyping) .roomChat #chatForm {
   padding-bottom:max(10px, var(--loopa-tg-safe-bottom, 0px)) !important;
 }
@@ -3086,6 +3092,8 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       (navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
     const watchStandalone=navigator.standalone===true||window.matchMedia?.('(display-mode: standalone)').matches===true;
     const watchBrowserIOS=watchIOS&&!watchStandalone;
+    const watchUsesNativeRoom=watchIOS&&entryRoot.dataset.loopaEntry==='telegram';
+    if(watchUsesNativeRoom)entryRoot.classList.add('tg-native-room');
     let watchFocusTimer=0,watchSavedOpacity=null;
     function restoreWatchField(){
       if(watchFocusTimer)clearTimeout(watchFocusTimer);
@@ -3108,7 +3116,6 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     watchField.addEventListener('blur',restoreWatchField);
 
     watchLog.addEventListener('scroll',()=>{watchKeepBottom=watchLog.scrollHeight-watchLog.scrollTop-watchLog.clientHeight<48;},{passive:true});
-    let watchDismissal=null;
     function syncWatchViewport(){
       if(!document.body.classList.contains('roomViewing'))return;
       const viewport=window.visualViewport,root=document.documentElement;
@@ -3124,45 +3131,34 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         watchBaseHeight=stableHeight||Math.max(nativeHeight,window.innerHeight);
         watchNativeBase=nativeHeight;
         watchNativeKeyboard=false;
-        watchDismissal=null;
       }
       // Telegram's keyboard-sized height can linger after the native viewport expands.
       // Once the native viewport reports this keyboard, follow it through dismissal.
       if((focused||watchKeyboardOpen)&&(!focused||watchNativeBase-nativeHeight>100))watchNativeKeyboard=true;
-      let height=watchNativeKeyboard
+      const height=watchNativeKeyboard
         ? nativeHeight
         : Math.min(nativeHeight,window.innerHeight||nativeHeight,telegramHeight);
       const baseline=watchNativeKeyboard?watchNativeBase:watchBaseHeight;
-      let keyboardShare;
-      if(watchDismissal){
-        const {start,from,to,initialNative,duration}=watchDismissal;
-        const elapsed=duration?Math.min(1,(performance.now()-start)/duration):1;
-        const eased=1-(1-elapsed)**2;
-        // iOS can animate the keyboard before reporting any viewport change.
-        const measured=nativeHeight>initialNative
-          ? Math.max(0,Math.min(1,(nativeHeight-from)/(to-from)))
-          : 0;
-        const progress=Math.max(eased,measured);
-        height=Math.round(from+(to-from)*progress);
-        keyboardShare=1-progress;
-        watchKeyboardOpen=progress<1;
-        if(watchKeyboardOpen)scheduleWatchViewport();
-        else if(nativeHeight>=to-2)watchDismissal=null;
-      }else{
-        watchKeyboardOpen=(focused||watchKeyboardOpen)&&baseline-height>(watchKeyboardOpen?55:100);
-        keyboardShare=watchKeyboardOpen?1:0;
-      }
-      if(!focused&&!watchKeyboardOpen&&!watchDismissal){
+      watchKeyboardOpen=(focused||watchKeyboardOpen)&&baseline-height>(watchKeyboardOpen?55:100);
+      if(!focused&&!watchKeyboardOpen){
         watchBaseHeight=Math.max(height,stableHeight);
         watchNativeBase=nativeHeight;
+      }
+      if(watchUsesNativeRoom){
+        // Before Telegram resizes the WebView, WebKit may report an overlay
+        // keyboard. Reserve only the part that is outside the layout viewport.
+        const overlayHeight=focused&&watchKeyboardOpen&&height<root.clientHeight?height+'px':'';
+        if(root.style.getPropertyValue('--watch-overlay-height')!==overlayHeight){
+          root.style.setProperty('--watch-overlay-height',overlayHeight);
+        }
       }
       document.body.classList.toggle('chatTyping',watchKeyboardOpen);
       const layoutHeight=watchLayoutHeight(height);
       const normal=watchNormalPlayer(layoutHeight,width);
       const compact=Math.min(normal,Math.max(76,Math.min(128,watchLayoutHeight(watchBaseHeight)*.30)));
       const preferred=cinemaModeEnabled?preferredCinemaPlayer(layoutHeight,width):normal;
-      const player=preferred+(compact-preferred)*keyboardShare;
-      const playerWidth=cinemaModeEnabled?Math.min(width,player*16/9):width+(Math.min(width,compact*16/9)-width)*keyboardShare;
+      const player=watchKeyboardOpen?compact:preferred;
+      const playerWidth=(watchKeyboardOpen||cinemaModeEnabled)?Math.min(width,player*16/9):width;
       const oldHeight=root.style.getPropertyValue('--watch-height');
       const oldPlayer=root.style.getPropertyValue('--watch-player-height');
       const oldPlayerWidth=root.style.getPropertyValue('--watch-player-width');
@@ -3179,7 +3175,6 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     }
     function stopWatchViewport(){
       restoreWatchField();
-      watchDismissal=null;
       watchKeyboardOpen=false;
       watchNativeKeyboard=false;
       watchBaseHeight=0;
@@ -3205,22 +3200,11 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     window.addEventListener('resize',scheduleWatchViewport);
     window.addEventListener('scroll',scheduleWatchViewport,{passive:true});
     watchField.addEventListener('focus',()=>{
-      watchDismissal=null;
       watchNativeKeyboard=false;
       scheduleWatchViewport();
     });
     watchField.addEventListener('blur',()=>{
-      if(watchIOS&&watchKeyboardOpen&&document.body.classList.contains('roomViewing')){
-        const from=parseFloat(document.documentElement.style.getPropertyValue('--watch-height'));
-        const to=watchNativeBase;
-        if(to-from>55){
-          watchDismissal={
-            start:performance.now(),from,to,
-            initialNative:window.visualViewport?.height||window.innerHeight,
-            duration:window.matchMedia('(prefers-reduced-motion: reduce)').matches?0:240
-          };
-        }
-      }
+      if(watchUsesNativeRoom)entryRoot.style.removeProperty('--watch-overlay-height');
       scheduleWatchViewport();
     });
     if(entryRoot.dataset.loopaEntry==='telegram'){
