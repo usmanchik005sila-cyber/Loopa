@@ -113,7 +113,7 @@ test('tracking commands work only for the bot owner in a private Telegram chat',
   vm.runInNewContext(source,{
     Deno:{env:{get:key=>env[key]},serve:handler=>{receive=handler;}},
     crypto:webcrypto,TextEncoder,URL,Response,AbortSignal,
-    createClient:()=>({rpc:async(name,args)=>{
+    createClient:()=>({from:()=>({upsert:async()=>({error:null})}),rpc:async(name,args)=>{
       rpc.push([name,JSON.parse(JSON.stringify(args))]);
       return {data:name.startsWith('loopa_create')?linkId:[{id:linkId,label:'Космос',visitors:2}]};
     }}),
@@ -139,6 +139,17 @@ test('tracking commands work only for the bot owner in a private Telegram chat',
     ['loopa_create_telegram_tracking_link',{p_label:'Космос'}],
     ['loopa_list_telegram_tracking_links',{p_page:2}]
   ]);
-  assert.match(messages[0].text,new RegExp('startapp=ref_'+linkId));
+  assert.match(messages[0].text,new RegExp('/LOOPAvideo_bot\\?start=ref_'+linkId));
   assert.match(messages[1].text,/Космос · 2 уник/);
+  await command('/start',43);
+  await command('/start ref_'+linkId,42);
+  await command('/start ref_'+linkId,43,'group');
+  assert.equal(rpc.length,2);
+  await command('/start ref_'+linkId,43);
+  await command('/start ref_'+linkId,43);
+  const hash=createHmac('sha256',token).update('loopa.tracking.open.v1:'+linkId+':43').digest('hex');
+  assert.deepEqual(rpc.slice(2),Array(2).fill([
+    'loopa_record_telegram_tracking_open',{p_link_id:linkId,p_visitor_hash:hash}
+  ]));
+  assert.equal(messages.at(-1).reply_markup.inline_keyboard[0][0].text,'🎬 Открыть LOOPA');
 });

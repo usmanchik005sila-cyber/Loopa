@@ -25,7 +25,7 @@ function ownerTelegramId(){
 }
 function trackingLink(id){
   if(!REQUEST_ID_RE.test(id||""))throw Error("invalid_tracking_link");
-  return "https://t.me/"+BOT_NAME+"/loopa?startapp=ref_"+id;
+  return "https://t.me/"+BOT_NAME+"?start=ref_"+id;
 }
 async function handleTrackingCommand(token,chatId,command,args){
   let text;
@@ -46,7 +46,7 @@ async function handleTrackingCommand(token,chatId,command,args){
       const {data,error}=await adminClient().rpc("loopa_list_telegram_tracking_links",{p_page:Number(page)});
       if(error||!Array.isArray(data))throw Error("tracking_links_unavailable");
       const entries=data.slice(0,10).map(row=>row.label+" · "+row.visitors+" уник.\n"+trackingLink(row.id));
-      text=entries.length?["Уникальные открытия LOOPA · страница "+Number(page),...entries].join("\n\n")
+      text=entries.length?["Уникальные запуски бота · страница "+Number(page),...entries].join("\n\n")
         :"На этой странице ссылок нет. Создай ссылку командой /link Название.";
       if(data.length>10&&Number(page)<10000)text+="\n\nДальше: /links "+(Number(page)+1);
     }
@@ -506,6 +506,14 @@ Deno.serve(async request=>{
         parse_mode:"HTML"
       });
       return result({ok:true});
+    }
+    if(name==="start"&&chatId!==ownerTelegramId()){
+      const id=/^ref_([a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12})$/.exec(command[3]||"")?.[1];
+      if(id){
+        const hash=await webhookSecret(token,"loopa.tracking.open.v1:"+id+":"+chatId);
+        const {error}=await adminClient().rpc("loopa_record_telegram_tracking_open",{p_link_id:id,p_visitor_hash:hash});
+        if(error)throw error;
+      }
     }
     if(command[1].toLowerCase()==="start"||command[1].toLowerCase()==="stop"){
       const {error}=await adminClient().from("loopa_bot_subscriptions").upsert({
