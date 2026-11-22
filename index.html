@@ -3490,6 +3490,8 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       if(directRoom)pendingInvite=directRoom[1];
       const inlineVideo=/^yt_([A-Za-z0-9_-]{11})$/.exec(startParam);
       if(inlineVideo)pendingInlineVideo='https://youtu.be/'+inlineVideo[1];
+      const rutubeVideo=/^rt_([a-f0-9]{32})$/i.exec(startParam);
+      if(rutubeVideo)pendingInlineVideo='https://rutube.ru/video/'+rutubeVideo[1].toLowerCase()+'/';
     }
     if(!/^[a-f0-9]{12}$/i.test(pendingInvite||''))pendingInvite=null;
     async function acceptInvite(){
