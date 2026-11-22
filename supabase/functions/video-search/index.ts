@@ -8,6 +8,29 @@ function quotaReply(retryAfter:unknown){
  const retry=Math.max(1,Math.min(60,Math.ceil(Number(retryAfter)||1)));
  return searchReply({message:'Слишком много запросов. Подожди немного и попробуй снова.',retry_after:retry},429,{'Retry-After':String(retry)});
 }
+async function videoMetadata(provider:string,id:string,auth:string){
+ if(provider==='rutube'){
+  const response=await fetch('https://functions.yandexcloud.net/d4e8n1se4iuc8ql4rm82',{
+   method:'POST',headers:{'Content-Type':'application/json','X-Loopa-Authorization':auth},
+   body:JSON.stringify({id}),signal:AbortSignal.timeout(8000),redirect:'error'
+  });
+  if(response.status===429){const quota=quotaReply(response.headers.get('Retry-After'));return reply(quota.data,quota.status,quota.extra);}
+  if(!response.ok)return reply({item:null},response.status===404?404:502);
+  const {item}=await response.json();
+  return item?.title?reply({item}):reply({item:null},404);
+ }
+ const key=Deno.env.get('YOUTUBE_API_KEY');
+ if(!key)return reply({item:null},503);
+ const params=new URLSearchParams({key,id,part:'snippet,status'});
+ const response=await fetch('https://www.googleapis.com/youtube/v3/videos?'+params,{
+  redirect:'error',signal:AbortSignal.timeout(4000)
+ });
+ if(!response.ok)return reply({item:null},502);
+ const {items}=await response.json();
+ const video=items?.find((item:any)=>item.id===id&&item.status?.embeddable&&item.status?.privacyStatus!=='private');
+ if(!video?.snippet?.title)return reply({item:null},404);
+ return reply({item:{title:video.snippet.title,image:'https://i.ytimg.com/vi/'+id+'/hqdefault.jpg'}});
+}
 async function rutubePage(term:string,pageNumber:number,auth:string,timeout=25000){
  const key=JSON.stringify([term.toLocaleLowerCase('ru'),pageNumber]);
  const cached=rutubeCache.get(key);
@@ -33,8 +56,14 @@ Deno.serve(async req=>{
  const user=await fetch(Deno.env.get('SUPABASE_URL')+'/auth/v1/user',{headers:{Authorization:auth,apikey:Deno.env.get('SUPABASE_ANON_KEY')!},redirect:'error',signal:AbortSignal.timeout(2500)}).catch(()=>null);
  if(!user||user.status>=500||user.status===429)return reply({message:'Не удалось проверить вход. Попробуй ещё раз.'},503);
  if(!user.ok)return reply({message:'Войди в аккаунт'},401);
- const {provider,q,page,mode}=await req.json();
- if(typeof q!=='string'||q.trim().length<2||q.length>100)return reply({message:'Введи название видео'},400);
+ const {provider,q,page,mode,id}=await req.json();
+ if(mode==='metadata'){
+  if(typeof id!=='string'||!(provider==='youtube'&&/^[A-Za-z0-9_-]{11}$/.test(id)||provider==='rutube'&&/^[a-f0-9]{32}$/.test(id)))
+   return reply({message:'Некорректный идентификатор видео'},400);
+  // The RUTUBE bridge already checks the session and enforces its durable quota.
+  if(provider==='rutube')return await videoMetadata(provider,id,auth);
+ }
+ if(mode!=='metadata'&&(typeof q!=='string'||q.trim().length<2||q.length>100))return reply({message:'Введи название видео'},400);
  if(!['youtube','rutube','vk'].includes(provider))return reply({message:'Неизвестный источник'},400);
  if(mode==='suggest'&&provider==='vk')return reply({suggestions:[]});
  // Durable per-account quota; never trust a client-provided user id or an
@@ -50,6 +79,7 @@ Deno.serve(async req=>{
   return reply(rejection.data,rejection.status,rejection.extra);
  }
  }catch{return reply({message:'Поиск временно недоступен. Попробуй ещё раз.'},503);}
+ if(mode==='metadata')return await videoMetadata(provider,id,auth);
  if(mode==='suggest'){
  if(provider!=='youtube'&&provider!=='rutube')return reply({suggestions:[]});
  // RUTUBE uses general query completions; a catalog search is only needed on submit.

@@ -3439,7 +3439,15 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       byId('inviteRoom').hidden=data.host!==u;if(data.host!==u&&catalogDialog.open)closeCatalog();
       byId('room-active').hidden=false;byId('room-code').textContent=data.code;byId('room-host').hidden=data.host!==u;
       byId('room-status').textContent=!data.video?'Ведущий выбирает видео':data.playing?'Идёт просмотр':'На паузе';
-      if(data.video&&(!prev||prev.video!==data.video||op==='join'))historyCall('record',{room_code:data.code});
+      if(data.video&&(!prev||prev.video!==data.video||op==='join')){
+        historyCall('record',{room_code:data.code});
+        if(op==='video'&&inlineVideoDraft&&data.host===u){
+          void resolveHistoryMetadata(data.video).then(metadata=>{
+            if(metadata?.title&&currentUser?.id===u)
+              return historyCall('meta',{room_code:data.code,media:data.video,caption:metadata.title,picture:metadata.image});
+          }).catch(()=>{});
+        }
+      }
       // An explicit join (including a history card) must rebuild the player:
       // an old iframe may remain connected with a src while being black/stale on iOS.
       // Also recover an iframe removed or emptied by a mobile browser.
@@ -3953,46 +3961,46 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     function rutubeVideoId(value){
       return String(value||'').match(/\/(?:video|play\/embed)\/([a-f\d]{32})(?:[/?#]|$)/i)?.[1]?.toLowerCase()||'';
     }
-    const rutubeCoverRequests=new Map(),rutubeCoverPersisted=new Set();
+    const historyMetadataRequests=new Map();
     function videoCover(item){
       const saved=safeInviteImage(item?.image||item?.picture||item?.thumbnail_url);
       if(saved)return saved;
-      const id=item?.video?.match(/youtube\.com\/embed\/([\w-]{11})/);
-      return id?'https://i.ytimg.com/vi/'+id[1]+'/hqdefault.jpg':'';
+      const id=item?.video?.match(/^https:\/\/www\.youtube\.com\/embed\/([\w-]{11})(?:[/?#]|$)/)?.[1];
+      return id?'https://i.ytimg.com/vi/'+id+'/hqdefault.jpg':'';
     }
-    function resolveRutubeCover(item){
-      const id=rutubeVideoId(item.video),owner=currentUser?.id;
-      if(!id||!owner||!client)return Promise.resolve('');
-      if(rutubeCoverRequests.has(id))return rutubeCoverRequests.get(id);
-      const request=(async()=>{
+    function resolveHistoryMetadata(video){
+      const owner=currentUser?.id;
+      if(!owner||!client||typeof video!=='string')return Promise.resolve(null);
+      const youtube=/^https:\/\/www\.youtube\.com\/embed\/([\w-]{11})(?:[/?#]|$)/.exec(video)?.[1];
+      const rutube=video.startsWith('https://rutube.ru/')?rutubeVideoId(video):'';
+      if(!youtube&&!rutube)return Promise.resolve(null);
+      const provider=youtube?'youtube':'rutube',id=youtube||rutube,key=owner+'|'+provider+'|'+id;
+      const cached=historyMetadataRequests.get(key);
+      if(cached?.expires>Date.now())return cached.promise;
+      const entry={expires:Date.now()+60000};
+      entry.promise=(async()=>{
         try{
-          const query=String(item.title||'').trim().slice(0,100);if(query.length<2)return '';
-          const {data,error}=await client.functions.invoke('video-search',{body:{provider:'rutube',q:query,page:null}});
-          if(error||currentUser?.id!==owner||!Array.isArray(data?.items))return '';
-          const match=data.items.find(hit=>rutubeVideoId(hit.url||hit.video||hit.media)===id);
-          return safeInviteImage(match?.image||match?.thumbnail_url||match?.picture);
-        }catch{return '';}
+          const {data,error}=await client.functions.invoke('video-search',{body:{provider,mode:'metadata',id}});
+          if(error||currentUser?.id!==owner||typeof data?.item?.title!=='string')return null;
+          const title=data.item.title.trim().slice(0,200);
+          if(!title)return null;
+          entry.expires=Date.now()+1800000;
+          return {title,image:safeInviteImage(data.item.image)};
+        }catch{return null;}
       })();
-      rutubeCoverRequests.set(id,request);
-      request.then(image=>{if(!image&&rutubeCoverRequests.get(id)===request)rutubeCoverRequests.delete(id);});
-      return request;
+      if(historyMetadataRequests.size>=40)historyMetadataRequests.delete(historyMetadataRequests.keys().next().value);
+      historyMetadataRequests.set(key,entry);
+      return entry.promise;
     }
-    function persistRutubeCover(item,id,image){
-      if(!client||!currentUser?.id||!item.code)return;
-      const key=String(item.code)+'|'+id;if(rutubeCoverPersisted.has(key))return;
-      rutubeCoverPersisted.add(key);const owner=currentUser.id;
-      client.rpc('loopa_history27',{op:'meta',room_code:item.code,media:item.video,caption:String(item.title||'Видео').slice(0,200),picture:image})
-        .then(({error})=>{if(error||currentUser?.id!==owner)rutubeCoverPersisted.delete(key);})
-        .catch(()=>rutubeCoverPersisted.delete(key));
-    }
-    function attachRutubeHistoryCover(item,button,text){
-      const id=rutubeVideoId(item.video);if(!id||button.querySelector('img'))return;
-      resolveRutubeCover(item).then(image=>{
-        if(!image||!button.isConnected||button.querySelector('img'))return;
+    function attachHistoryMetadata(item,button,text,title){
+      const owner=currentUser?.id, missingTitle=!item.title||item.title==='Видео';
+      if(!missingTitle&&button.querySelector('img'))return;
+      void resolveHistoryMetadata(item.video).then(metadata=>{
+        if(!metadata||currentUser?.id!==owner||!button.isConnected)return;
+        if(missingTitle)title.textContent=metadata.title;
+        if(!metadata.image||button.querySelector('img'))return;
         const img=document.createElement('img');img.alt='';img.loading='lazy';
-        img.onerror=()=>img.remove();
-        img.onload=()=>{item.image=image;persistRutubeCover(item,id,image);};
-        button.insertBefore(img,text);img.src=image;
+        img.onerror=()=>img.remove();img.src=metadata.image;button.insertBefore(img,text);
       });
     }
     function renderHistory(items){
@@ -4003,11 +4011,11 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         const image=videoCover(item);
         small.textContent='Вы смотрели';title.textContent=item.title||'Видео';
         const saved=readSavedResume(item.video);hint.textContent=saved?'Сохранено: '+formatVideoTime(saved.pos)+(saved.cloud?' · профиль':' · это устройство')+' · Открыть комнату':'Вернуться в комнату →';text.append(small,title,hint);
-        if(image){const img=document.createElement('img');img.src=image;img.alt='';img.loading='lazy';img.onerror=()=>{img.remove();if(rutubeVideoId(item.video))attachRutubeHistoryCover(item,button,text);};button.append(img);}
+        if(image){const img=document.createElement('img');img.src=image;img.alt='';img.loading='lazy';img.onerror=()=>{img.remove();if(rutubeVideoId(item.video))attachHistoryMetadata(item,button,text,title);};button.append(img);}
         button.append(text);
         button.onclick=async()=>{button.disabled=true;try{await roomCall('join',{room:item.code});}catch(e){showToast('Не удалось войти: комната закрыта или доступ изменился');}finally{button.disabled=false;}};
         parent.append(button);
-        if(!image&&rutubeVideoId(item.video))attachRutubeHistoryCover(item,button,text);
+        attachHistoryMetadata(item,button,text,title);
       }
     }
     async function historyCall(op,extra={}){
