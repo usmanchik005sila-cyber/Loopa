@@ -16,6 +16,31 @@ import (
 
 var inlineProof = regexp.MustCompile(`^[a-f0-9]{64}$`)
 
+type catalogVideo struct {
+	ID     string `json:"id"`
+	Title  string `json:"title"`
+	Image  string `json:"thumbnail_url"`
+	Author struct {
+		Name string `json:"name"`
+	} `json:"author"`
+	Deleted bool `json:"is_deleted"`
+	Hidden  bool `json:"is_hidden"`
+	Paid    bool `json:"is_paid"`
+	Locked  bool `json:"is_locked"`
+	Private bool `json:"is_private"`
+}
+
+func (v catalogVideo) item() map[string]string {
+	if !videoID.MatchString(v.ID) || v.Title == "" || v.Deleted || v.Hidden || v.Paid || v.Locked || v.Private {
+		return nil
+	}
+	image := ""
+	if u, err := url.Parse(v.Image); err == nil && u.Scheme == "https" && u.Host != "" && u.User == nil {
+		image = v.Image
+	}
+	return map[string]string{"title": v.Title, "author": v.Author.Name, "image": image, "url": "https://rutube.ru/video/" + v.ID + "/"}
+}
+
 var videoID = regexp.MustCompile(`^[a-fA-F0-9]{32}$`)
 var client = &http.Client{
 	Timeout: 10 * time.Second,
@@ -74,6 +99,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 	var input struct {
 		Q    string `json:"q"`
+		ID   string `json:"id"`
 		Page int    `json:"page"`
 	}
 	body := http.MaxBytesReader(w, r.Body, requestBodyLimit)
@@ -98,7 +124,12 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	if input.Page == 0 {
 		input.Page = 1
 	}
-	if len([]rune(input.Q)) < 2 || len([]rune(input.Q)) > 100 || input.Page < 1 || input.Page > 100 {
+	if input.ID != "" {
+		if inline || !videoID.MatchString(input.ID) {
+			fail(w, 400, "Некорректный идентификатор видео")
+			return
+		}
+	} else if len([]rune(input.Q)) < 2 || len([]rune(input.Q)) > 100 || input.Page < 1 || input.Page > 100 {
 		fail(w, 400, "Проверь название и страницу поиска")
 		return
 	}
@@ -171,7 +202,11 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	params := url.Values{"query": {input.Q}, "client": {"web"}, "page": {strconv.Itoa(input.Page)}, "per_page": {"12"}}
-	req, err := http.NewRequestWithContext(r.Context(), "GET", "https://rutube.ru/api/search/video/?"+params.Encode(), nil)
+	endpoint := "https://rutube.ru/api/search/video/?" + params.Encode()
+	if input.ID != "" {
+		endpoint = "https://rutube.ru/api/video/" + input.ID + "/"
+	}
+	req, err := http.NewRequestWithContext(r.Context(), "GET", endpoint, nil)
 	if err != nil {
 		fail(w, 502, "Ошибка запроса RUTUBE")
 		return
@@ -183,39 +218,42 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer res.Body.Close()
+	if input.ID != "" && res.StatusCode == http.StatusNotFound {
+		respond(w, 404, map[string]string{"message": "Видео недоступно"})
+		return
+	}
 	if res.StatusCode != http.StatusOK {
 		fail(w, 502, "RUTUBE временно не принимает поиск")
 		return
 	}
-	var data struct {
-		Results *[]struct {
-			ID     string `json:"id"`
-			Title  string `json:"title"`
-			Image  string `json:"thumbnail_url"`
-			Author struct {
-				Name string `json:"name"`
-			} `json:"author"`
-			Deleted bool `json:"is_deleted"`
-			Hidden  bool `json:"is_hidden"`
-			Paid    bool `json:"is_paid"`
-			Locked  bool `json:"is_locked"`
-		} `json:"results"`
-		HasNext bool `json:"has_next"`
+	decoder = json.NewDecoder(io.LimitReader(res.Body, 4<<20))
+	if input.ID != "" {
+		var video catalogVideo
+		if decoder.Decode(&video) != nil {
+			fail(w, 502, "Не удалось прочитать данные видео")
+			return
+		}
+		item := video.item()
+		if item == nil || !strings.EqualFold(video.ID, input.ID) {
+			fail(w, 404, "Видео недоступно")
+			return
+		}
+		respond(w, 200, map[string]interface{}{"item": item})
+		return
 	}
-	if json.NewDecoder(io.LimitReader(res.Body, 4<<20)).Decode(&data) != nil || data.Results == nil {
+	var data struct {
+		Results *[]catalogVideo `json:"results"`
+		HasNext bool            `json:"has_next"`
+	}
+	if decoder.Decode(&data) != nil || data.Results == nil {
 		fail(w, 502, "Не удалось прочитать каталог RUTUBE")
 		return
 	}
 	items := []map[string]string{}
-	for _, v := range *data.Results {
-		if !videoID.MatchString(v.ID) || v.Title == "" || v.Deleted || v.Hidden || v.Paid || v.Locked {
-			continue
+	for _, video := range *data.Results {
+		if item := video.item(); item != nil {
+			items = append(items, item)
 		}
-		image := ""
-		if u, e := url.Parse(v.Image); e == nil && u.Scheme == "https" && u.Host != "" {
-			image = v.Image
-		}
-		items = append(items, map[string]string{"title": v.Title, "author": v.Author.Name, "image": image, "url": "https://rutube.ru/video/" + v.ID + "/"})
 	}
 	var next interface{}
 	if data.HasNext && input.Page < 100 {

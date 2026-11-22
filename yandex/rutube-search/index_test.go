@@ -145,3 +145,41 @@ func TestInlineSearchRequiresVerifiedBody(t *testing.T) {
 		}
 	}
 }
+
+func TestVideoMetadataUsesExactIDAndExistingQuota(t *testing.T) {
+	const id = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	old := client
+	defer func() { client = old }()
+	for _, allowed := range []bool{true, false} {
+		upstream := 0
+		client = &http.Client{Transport: transport(func(r *http.Request) (*http.Response, error) {
+			payload := `{}`
+			switch {
+			case r.URL.Host == "rutube.ru":
+				upstream++
+				if r.URL.Path != "/api/video/"+id+"/" || r.URL.RawQuery != "" {
+					t.Fatal("metadata used the wrong RUTUBE URL")
+				}
+				payload = `{"id":"` + id + `","title":"Космос","thumbnail_url":"https://pic.rtbcdn.ru/cover.jpg"}`
+			case strings.HasSuffix(r.URL.Path, "/loopa_search_budget"):
+				payload = `{"allowed":false}`
+				if allowed {
+					payload = `{"allowed":true}`
+				}
+			case r.URL.Path != "/auth/v1/user":
+				t.Fatal("unexpected request", r.URL)
+			}
+			return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(payload)), Header: make(http.Header)}, nil
+		})}
+		request := httptest.NewRequest("POST", "https://function.test", strings.NewReader(`{"id":"`+id+`"}`))
+		request.Header.Set("X-Loopa-Authorization", "Bearer fixture")
+		response := httptest.NewRecorder()
+		Handler(response, request)
+		if allowed && (response.Code != 200 || upstream != 1 || !strings.Contains(response.Body.String(), "Космос")) {
+			t.Fatal(response.Code, upstream, response.Body.String())
+		}
+		if !allowed && (response.Code != 429 || upstream != 0) {
+			t.Fatal(response.Code, upstream)
+		}
+	}
+}
