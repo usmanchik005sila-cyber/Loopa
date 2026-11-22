@@ -23,6 +23,12 @@
     const entryRoot=document.documentElement;
     const entryQuery=new URLSearchParams(location.search);
     const entryFragment=new URLSearchParams(location.hash.slice(1));
+    const telegramStartParam=window.Telegram?.WebApp?.initDataUnsafe?.start_param
+      ||entryQuery.get('tgWebAppStartParam')||'';
+    if(entryRoot.classList.contains('telegram-miniapp')&&/^rt_[a-f0-9]{32}$/i.test(telegramStartParam)){
+      const connection=document.createElement('link');
+      connection.rel='preconnect';connection.href='https://rutube.ru';document.head.append(connection);
+    }
     const entryAuthCallback=entryQuery.has('code')||entryQuery.has('error_code')
       ||entryFragment.has('access_token')||entryFragment.has('error_code');
     entryRoot.dataset.loopaEntry=entryRoot.classList.contains('telegram-miniapp')?'telegram'
@@ -584,6 +590,7 @@ body.roomViewing #chatText{font-size:16px;min-height:44px;line-height:22px}
 body.roomViewing #room-active{transition:none}
 @media(prefers-reduced-motion:reduce){body.roomViewing #room-frame{transition:none}}
 
+#rutubeLoading:not([hidden]){position:absolute;inset:auto 12px 12px;z-index:1;width:max-content;max-width:calc(100% - 24px);margin:auto;padding:7px 12px;border-radius:12px;background:#121216dd;color:#eee;font:13px/1.4 system-ui;pointer-events:none}
 #videoStage{position:relative;background:#000;flex:none;width:100%;overflow:hidden}
 #guestPlaybackLock[hidden]{display:none!important}
 #guestPlaybackLock{position:absolute;inset:0;z-index:5;background:transparent;display:flex;align-items:flex-end;justify-content:center;padding:12px;box-sizing:border-box;cursor:not-allowed;touch-action:manipulation}
@@ -2227,6 +2234,9 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       }}finally{writing=false;}
     }
     const videoStage=document.createElement('div');videoStage.id='videoStage';
+    const rutubeLoading=document.createElement('p');rutubeLoading.id='rutubeLoading';
+    rutubeLoading.setAttribute('role','status');rutubeLoading.textContent='Загружаем плеер RUTUBE…';
+    rutubeLoading.hidden=true;videoStage.append(rutubeLoading);
     roomBox().before(videoStage);videoStage.append(roomBox());
     // Prevent unauthorized local pause/seek from native iframes. This shield is
     // shown only to guests while no current-video host grant exists.
@@ -2692,6 +2702,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       clearTimeout(playerReadyTimer);playerReadyTimer=0;playerIssue=null;playerBindingFailed=false;
       clearTimeout(guestControlTimer);guestControlQueued=null;guestManualUntil=0;
       rutubeIframeLoaded=false;rutubeIframeFailed=false;rutubeSignalObserved=false;rutubeRecovery.hidden=true;
+      rutubeLoading.hidden=!url.startsWith('https://rutube.ru/');
       sample=null;observed={playing:false,pos:0};pending=null;ytPlayer=null;
       try{vkPlayer?.destroy?.();}catch{}vkPlayer=null;syncSnapshot=null;guestManualUntil=0;nativeNeedsStart=true;nativeAccess=true;localMuted=false;syncProblem='';
       applyingUntil=0;lastPlaybackPublish=0;lastGuestCorrection=0;rutubeAd=false;mediaDuration=0;clearTimeout(overlayTimer);videoStage.classList.remove('controlsVisible');
@@ -2705,12 +2716,15 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       frame.onerror=()=>{
         if(frame!==roomBox()||!frame.src.startsWith('https://rutube.ru/'))return;
         rutubeIframeFailed=true;
+        rutubeLoading.hidden=true;
         setPlayerIssue(LOOPAWatchReliability.playerReadyTimeout('rutube',hostHere()));
       };
       if(url.includes('youtube.com/embed/')){const u=new URL(url);u.searchParams.set('controls','1');u.searchParams.set('fs','1');url=u.toString();}
       frame.src=url;
       playerReadyTimer=setTimeout(()=>{
-        if(frame===roomBox()&&!resumePlayerReady&&!playerBindingFailed)
+        if(frame!==roomBox())return;
+        rutubeLoading.hidden=true;
+        if(!resumePlayerReady&&!playerBindingFailed)
           setPlayerIssue(LOOPAWatchReliability.playerReadyTimeout(LOOPAWatchReliability.providerFor(frame.src),hostHere()));
       },15000);
       updatePlaybackControls();
@@ -2769,6 +2783,8 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
           let m;try{m=typeof e.data==='string'?JSON.parse(e.data):e.data;}catch{return;}
           if(typeof m?.type!=='string'||!m.type.startsWith('player:'))return;
           rutubeSignalObserved=true;
+          if(['player:ready','player:currentTime','player:stateChange','player:error'].includes(m.type))
+            rutubeLoading.hidden=true;
           if(m.type==='player:ready')readyPlayer();
           if(m?.type==='player:error'){setPlayerIssue(LOOPAWatchReliability.playerError('rutube',m.data?.code));return;}
           if(m?.type==='player:volumeChange'){localMuted=!!m.data?.muted||Number(m.data?.volume)===0;updatePlaybackControls();}
@@ -3456,6 +3472,8 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       if(op==='video'){
         if(b.disabled)return;
         b.disabled=true;
+        const label=b.textContent;
+        b.textContent='Открываем видео…';
         try{
           const raw=byId('room-link').value,media=roomMedia(raw);
           if(inlineVideoDraft&&!hostHere()){
@@ -3470,7 +3488,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
             closeCatalog();byId('videoEdit').open=false;
           }else showToast('Не удалось открыть видео. Проверь ссылку');
         }catch(e){showToast(e.message);}
-        finally{b.disabled=false;}
+        finally{b.disabled=false;b.textContent=label;}
       }
     });
     setInterval(async()=>{if(roomPoll||lastPage!=='rooms'||!roomState||document.hidden)return;roomPoll=true;try{await roomRun('read');}finally{roomPoll=false;}},1500);
@@ -3484,8 +3502,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     // BotFather Main Mini App direct links can carry startapp=room_<12-hex-code>.
     // The room join RPC still enforces permissions; this is not authentication.
     if(!pendingInvite&&isTelegramMiniApp){
-      const startParam=telegramWebApp.initDataUnsafe?.start_param
-        ||new URL(location.href).searchParams.get('tgWebAppStartParam')||'';
+      const startParam=telegramStartParam;
       const directRoom=/^room_([a-f0-9]{12})$/i.exec(startParam);
       if(directRoom)pendingInvite=directRoom[1];
       const inlineVideo=/^yt_([A-Za-z0-9_-]{11})$/.exec(startParam);
@@ -5884,7 +5901,13 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         telegramMiniLinked=!!session;
       }
       currentUser = session?.user || null;
-      if (currentUser) {await displayAccount(currentUser);acceptInvite();}
+      if (currentUser) {
+        const profile=displayAccount(currentUser);
+        const openVideo=pendingInlineVideo&&!pendingInvite;
+        if(openVideo)void acceptInvite();
+        await profile;
+        if(!openVideo)void acceptInvite();
+      }
       else displayGuest();
     }
     document.addEventListener('click', function(event) {
@@ -5983,9 +6006,12 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         if(error||!data?.user)throw new Error('reopen_miniapp');
         currentUser=data.user;
         telegramMiniLinked=true;
-        await displayAccount(data.user);
+        const profile=displayAccount(data.user);
         if(!pendingInvite&&lastPage==='profile')showPage('home');
-        await acceptInvite();
+        const openVideo=pendingInlineVideo&&!pendingInvite;
+        if(openVideo)void acceptInvite();
+        await profile;
+        if(!openVideo)await acceptInvite();
         showToast(register?'LOOPA готова — добро пожаловать!':'Вход через Telegram выполнен');
       }catch(error){
         if(currentUser)return;
