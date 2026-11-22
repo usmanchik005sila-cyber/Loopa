@@ -1319,6 +1319,21 @@ body.roomViewing.cinemaMode #resumeBanner{background:#0b0b0d}
       animation:none!important;
       scroll-behavior:auto!important;
     }
+    /* Keep the embedded player laid out at its full size while the chat changes. */
+    body.roomViewing #videoStage #room-frame {
+      width:var(--watch-frame-width, 100%)!important;
+      height:var(--watch-frame-height, 100%)!important;
+      transform-origin:top center;
+      transform:translateX(-50%) scale(var(--watch-frame-scale-x, 1), var(--watch-frame-scale-y, 1));
+    }
+    @media(prefers-reduced-motion:no-preference){
+      body.roomViewing.watch-player-moving #videoStage {
+        transition:height 160ms ease-out!important;
+      }
+      body.roomViewing.watch-player-moving #videoStage #room-frame {
+        transition:transform 160ms ease-out!important;
+      }
+    }
     /* Telegram insets are separate: the system safe area plus Telegram controls. */
 html.telegram-miniapp {
   --loopa-tg-safe-bottom:calc(max(env(safe-area-inset-bottom, 0px), var(--tg-safe-area-inset-bottom, 0px)) + var(--tg-content-safe-area-inset-bottom, 0px));
@@ -3115,6 +3130,11 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     watchField.addEventListener('blur',restoreWatchField);
 
     watchLog.addEventListener('scroll',()=>{watchKeepBottom=watchLog.scrollHeight-watchLog.scrollTop-watchLog.clientHeight<48;},{passive:true});
+    let watchPlayerMoveTimer=0;
+    function stopWatchPlayerMotion(){
+      clearTimeout(watchPlayerMoveTimer);
+      document.body.classList.remove('watch-player-moving');
+    }
     function syncWatchViewport(){
       if(!document.body.classList.contains('roomViewing'))return;
       const viewport=window.visualViewport,root=document.documentElement;
@@ -3138,7 +3158,13 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         ? nativeHeight
         : Math.min(nativeHeight,window.innerHeight||nativeHeight,telegramHeight);
       const baseline=watchNativeKeyboard?watchNativeBase:watchBaseHeight;
+      const wasKeyboardOpen=watchKeyboardOpen;
       watchKeyboardOpen=(focused||watchKeyboardOpen)&&baseline-height>(watchKeyboardOpen?55:100);
+      if(wasKeyboardOpen!==watchKeyboardOpen){
+        document.body.classList.add('watch-player-moving');
+        clearTimeout(watchPlayerMoveTimer);
+        watchPlayerMoveTimer=setTimeout(stopWatchPlayerMotion,180);
+      }
       if(!focused&&!watchKeyboardOpen){
         watchBaseHeight=Math.max(height,stableHeight);
         watchNativeBase=nativeHeight;
@@ -3153,27 +3179,37 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       }
       document.body.classList.toggle('chatTyping',watchKeyboardOpen);
       const layoutHeight=watchLayoutHeight(height);
-      const normal=watchNormalPlayer(layoutHeight,width);
-      const compact=Math.min(normal,Math.max(76,Math.min(128,watchLayoutHeight(watchBaseHeight)*.30)));
-      const preferred=cinemaModeEnabled?preferredCinemaPlayer(layoutHeight,width):normal;
+      const fullHeight=watchLayoutHeight(watchKeyboardOpen?watchBaseHeight:height);
+      const normal=watchNormalPlayer(fullHeight,width);
+      const preferred=cinemaModeEnabled?preferredCinemaPlayer(fullHeight,width):normal;
+      const fullWidth=cinemaModeEnabled?Math.min(width,preferred*16/9):width;
+      const compact=Math.min(preferred,Math.max(76,Math.min(128,fullHeight*.30)));
       const player=watchKeyboardOpen?compact:preferred;
-      const playerWidth=(watchKeyboardOpen||cinemaModeEnabled)?Math.min(width,player*16/9):width;
+      const playerWidth=watchKeyboardOpen?Math.min(fullWidth,player*16/9):fullWidth;
       const oldHeight=root.style.getPropertyValue('--watch-height');
       const oldPlayer=root.style.getPropertyValue('--watch-player-height');
-      const oldPlayerWidth=root.style.getPropertyValue('--watch-player-width');
       const keepBottom=watchKeepBottom,position=watchLog.scrollTop;
-      if(oldHeight!==height+'px')root.style.setProperty('--watch-height',height+'px');
-      if(oldPlayer!==player+'px')root.style.setProperty('--watch-player-height',player+'px');
-      if(oldPlayerWidth!==playerWidth+'px')root.style.setProperty('--watch-player-width',playerWidth+'px');
+      const dimensions={
+        '--watch-height':height+'px',
+        '--watch-player-height':player+'px',
+        '--watch-frame-width':fullWidth+'px',
+        '--watch-frame-height':preferred+'px',
+        '--watch-frame-scale-x':String(fullWidth?playerWidth/fullWidth:1),
+        '--watch-frame-scale-y':String(preferred?player/preferred:1)
+      };
+      for(const [property,value] of Object.entries(dimensions)){
+        if(root.style.getPropertyValue(property)!==value)root.style.setProperty(property,value);
+      }
       updateChatResizeAria(layoutHeight,width,player);
       const top=Math.max(0,telegram?0:window.scrollY||0)+'px';
       if(root.style.getPropertyValue('--watch-top')!==top)root.style.setProperty('--watch-top',top);
-      if(oldHeight!==height+'px'||oldPlayer!==player+'px'){
+      if(typeof ResizeObserver==='undefined'&&(oldHeight!==height+'px'||oldPlayer!==player+'px')){
         watchLog.scrollTop=keepBottom?watchLog.scrollHeight:position;
       }
     }
     function stopWatchViewport(){
       restoreWatchField();
+      stopWatchPlayerMotion();
       watchKeyboardOpen=false;
       watchNativeKeyboard=false;
       watchBaseHeight=0;
