@@ -251,12 +251,12 @@ function sameSecret(a,b) {
   for(let i=0;i<a.length;i++)diff|=a.charCodeAt(i)^b.charCodeAt(i);
   return diff===0;
 }
-async function webhookSecret(token) {
+async function webhookSecret(token,context="loopa.telegram.webhook.v1") {
   const key=await crypto.subtle.importKey(
     "raw",utf8.encode(token),{name:"HMAC",hash:"SHA-256"},false,["sign"]
   );
   const signature=new Uint8Array(await crypto.subtle.sign(
-    "HMAC",key,utf8.encode("loopa.telegram.webhook.v1")
+    "HMAC",key,utf8.encode(context)
   ));
   return [...signature].map(x=>x.toString(16).padStart(2,"0")).join("");
 }
@@ -268,6 +268,66 @@ async function botAPI(token,method,payload={}) {
   const data=await response.json().catch(()=>null);
   if(!response.ok||!data?.ok)throw Error("telegram_request_failed");
   return data.result;
+}
+const inlineVideos=new Map();
+const inlineVideoId=/^[A-Za-z0-9_-]{11}$/;
+async function youtubeInlineResults(query){
+  const key=Deno.env.get("YOUTUBE_API_KEY");
+  if(!key)return null;
+  const params=new URLSearchParams({
+    key,q:query,part:"snippet",type:"video",videoEmbeddable:"true",safeSearch:"moderate",maxResults:"8"
+  });
+  const response=await fetch("https://www.googleapis.com/youtube/v3/search?"+params,{
+    redirect:"error",signal:AbortSignal.timeout(2500)
+  });
+  if(!response.ok)return null;
+  const {items}=await response.json();
+  if(!Array.isArray(items))return null;
+  const ids=new Set();
+  return items.flatMap(item=>{
+    const id=item?.id?.videoId;
+    const title=typeof item?.snippet?.title==="string"?item.snippet.title.trim().slice(0,180):"";
+    if(!inlineVideoId.test(id||"")||ids.has(id)||!title)return [];
+    ids.add(id);
+    const author=typeof item.snippet.channelTitle==="string"?item.snippet.channelTitle.trim().slice(0,100):"";
+    const buttonUrl="https://t.me/"+BOT_NAME+"/loopa?startapp=yt_"+id;
+    return [{
+      type:"article",id:"yt_"+id,title,description:author?"YouTube · "+author:"YouTube",
+      thumbnail_url:"https://i.ytimg.com/vi/"+id+"/hqdefault.jpg",
+      input_message_content:{message_text:title,link_preview_options:{is_disabled:true}},
+      reply_markup:{inline_keyboard:[[{text:"Смотреть вместе",url:buttonUrl}]]}
+    }];
+  });
+}
+async function handleInlineVideo(token,query){
+  const id=query?.id,userId=query?.from?.id;
+  if(typeof id!=="string"||!id.length||id.length>128||!Number.isSafeInteger(userId)||userId<=0)return;
+  const term=typeof query.query==="string"?query.query.trim().replace(/\s+/g," "):"";
+  let results=[],cacheTime=0;
+  if(term.length>=3&&term.length<=100){
+    const key=term.toLocaleLowerCase("ru");
+    const cached=inlineVideos.get(key);
+    if(cached?.expires>Date.now()){
+      results=cached.results;
+      cacheTime=60;
+    }else if(Deno.env.get("YOUTUBE_API_KEY")){
+      try{
+        const actor=await webhookSecret(token,"loopa.telegram.inline-budget.v1:"+userId);
+        const {data,error}=await adminClient().rpc("loopa_take_inline_video_budget",{p_actor:actor})
+          .abortSignal(AbortSignal.timeout(1500));
+        if(!error&&data===true){
+          const found=await youtubeInlineResults(term);
+          if(found){
+            results=found;
+            cacheTime=60;
+            if(inlineVideos.size>=100)inlineVideos.delete(inlineVideos.keys().next().value);
+            inlineVideos.set(key,{results,expires:Date.now()+300000});
+          }
+        }
+      }catch{/* Leave the query retryable if the provider or quota check is unavailable. */}
+    }
+  }
+  await botAPI(token,"answerInlineQuery",{inline_query_id:id,results,cache_time:cacheTime});
 }
 function webhookState(url){
   return !url?"empty":url===WEBHOOK_URL?"loopa":"external";
@@ -281,7 +341,10 @@ async function getStatus(token){
   }
   return {bot:BOT_NAME,webhook:webhookState(info.url||""),
     pending:Number(info.pending_update_count||0),
-    issues:!!info.last_error_date};
+    issues:!!info.last_error_date,
+    inlineMode:!!bot.supports_inline_queries,
+    inlineWebhook:!info.allowed_updates?.length||info.allowed_updates.includes("inline_query"),
+    inlineProvider:!!Deno.env.get("YOUTUBE_API_KEY")};
 }
 Deno.serve(async request=>{
   try{
@@ -305,6 +368,10 @@ Deno.serve(async request=>{
     const raw=await request.text();
     if(raw.length>65536)return result({error:"payload_too_large"},413);
     const update=JSON.parse(raw);
+    if(update?.inline_query){
+      await handleInlineVideo(token,update.inline_query);
+      return result({ok:true});
+    }
     const retryMessage=update?.message;
     const retryText=String(retryMessage?.text||"").trim();
     const retryMatch=retryText.match(/^\/retrydelete(?:@([A-Za-z0-9_]+))?\s+([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);

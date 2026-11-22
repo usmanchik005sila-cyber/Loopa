@@ -3453,7 +3453,25 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       if(op==='exit'){leaveRoomForHome();return;}
       if(op==='copy'){try{await navigator.clipboard.writeText(roomState.code);showToast('Код скопирован');}catch{showToast(roomState.code);}return;}
 
-      if(op==='video'){b.disabled=true;try{const raw=byId('room-link').value;await changeRoomVideo(raw);if(roomState?.video===roomMedia(raw)){closeCatalog();byId('videoEdit').open=false;}else showToast('Не удалось открыть видео. Проверь ссылку');}catch(e){showToast(e.message);}finally{b.disabled=false;}return;}
+      if(op==='video'){
+        if(b.disabled)return;
+        b.disabled=true;
+        try{
+          const raw=byId('room-link').value,media=roomMedia(raw);
+          if(inlineVideoDraft&&!hostHere()){
+            roomCreating=true;
+            try{await roomCall('create',{}, {openWhenReady:false});}
+            finally{roomCreating=false;}
+            if(!catalogDialog.open)return;
+            if(!hostHere())throw Error('Не удалось создать комнату');
+          }
+          await changeRoomVideo(raw);
+          if(roomState?.video===media){
+            closeCatalog();byId('videoEdit').open=false;
+          }else showToast('Не удалось открыть видео. Проверь ссылку');
+        }catch(e){showToast(e.message);}
+        finally{b.disabled=false;}
+      }
     });
     setInterval(async()=>{if(roomPoll||lastPage!=='rooms'||!roomState||document.hidden)return;roomPoll=true;try{await roomRun('read');}finally{roomPoll=false;}},1500);
 
@@ -3461,7 +3479,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     // A temporal-dead-zone error here used to abort the rest of the app startup.
     const telegramWebApp = window.Telegram?.WebApp || null;
     const isTelegramMiniApp = !!telegramWebApp?.initData;
-    let invitationBusy=false;
+    let invitationBusy=false,pendingInlineVideo=null;
     let pendingInvite=entryRoot.dataset.loopaEntry==='recovery'?null:new URL(location.href).searchParams.get('room');
     // BotFather Main Mini App direct links can carry startapp=room_<12-hex-code>.
     // The room join RPC still enforces permissions; this is not authentication.
@@ -3470,10 +3488,23 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         ||new URL(location.href).searchParams.get('tgWebAppStartParam')||'';
       const directRoom=/^room_([a-f0-9]{12})$/i.exec(startParam);
       if(directRoom)pendingInvite=directRoom[1];
+      const inlineVideo=/^yt_([A-Za-z0-9_-]{11})$/.exec(startParam);
+      if(inlineVideo)pendingInlineVideo='https://youtu.be/'+inlineVideo[1];
     }
     if(!/^[a-f0-9]{12}$/i.test(pendingInvite||''))pendingInvite=null;
     async function acceptInvite(){
-      if(!pendingInvite||!currentUser||invitationBusy)return;
+      if(!currentUser||invitationBusy)return;
+      if(!pendingInvite){
+        if(!pendingInlineVideo)return;
+        const video=pendingInlineVideo;
+        pendingInlineVideo=null;
+        openCatalog();
+        catalogLinkStage(false);
+        byId('catalogBack').hidden=true;
+        byId('room-link').value=video;
+        inlineVideoDraft=true;
+        return;
+      }
       invitationBusy=true;
       const code=pendingInvite.toUpperCase();
       try{
@@ -3549,8 +3580,9 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     };
     if(pendingInvite)setTimeout(()=>{if(currentUser)acceptInvite();else{showPage('profile',()=>showToast('Войди, чтобы присоединиться к комнате'));}},1200);
     const catalogDialog=byId('catalog');
-    let roomCreating=false;
+    let roomCreating=false,inlineVideoDraft=false;
     function closeCatalog(keepRoom=false){
+      inlineVideoDraft=false;
       catalogDialog.close();byId('catalogOpen').setAttribute('aria-expanded','false');clearCatalog();
       if(!keepRoom&&(roomCreating||(hostHere()&&!roomState.video))){
         if(lastPage==='rooms')leaveRoomForHome();
@@ -3582,7 +3614,8 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       byId('providerStage').hidden=true;byId('linkStage').hidden=true;byId('searchStage').hidden=false;byId('catalogBack').hidden=false;byId('catalogWordmark').hidden=true;
       byId('searchStatus').textContent='Найди то, что хочется посмотреть вместе';catalogDialog.scrollTop=0;byId('queryVideo').focus();
     });
-    byId('catalogLink').onclick=()=>{if(roomCreating)return;clearCatalog();byId('providerStage').hidden=true;byId('searchStage').hidden=true;byId('linkStage').hidden=false;byId('catalogBack').hidden=false;byId('catalogWordmark').hidden=true;byId('room-link').focus();};
+    function catalogLinkStage(focus=true){if(roomCreating)return;clearCatalog();byId('providerStage').hidden=true;byId('searchStage').hidden=true;byId('linkStage').hidden=false;byId('catalogBack').hidden=false;byId('catalogWordmark').hidden=true;if(focus)byId('room-link').focus();}
+    byId('catalogLink').onclick=()=>catalogLinkStage();
     let friendNoticeCount=0,noticeTab='all',friendActivity={},publishedTitle='';
     let inviteBusy=false,inviteOwner=null,inviteInbox=[],inviteSeen=new Set(),activeBannerInvite=null,inviteBannerTimer=null;
     // Preserve delivered notifications across video/player reloads and page restarts.
