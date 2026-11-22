@@ -87,7 +87,7 @@ async function verifyTelegramInitData(initData, botToken) {
   if (!user || !Number.isSafeInteger(user.id) || user.id <= 0) {
     throw new Error("invalid_user");
   }
-  return { telegramId: String(user.id), authDate, signature: calculatedHash, user, startParam: params.get("start_param") };
+  return { telegramId: String(user.id), authDate, signature: calculatedHash, user };
 }
 
 function adminClient() {
@@ -101,20 +101,6 @@ function adminClient() {
   return createClient(url, key, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
-}
-
-async function recordTrackingOpen(admin, token, telegram) {
-  const id = /^ref_([a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12})$/.exec(telegram.startParam || "")?.[1];
-  if (!id || telegram.telegramId === Deno.env.get("LOOPA_OWNER_TELEGRAM_ID")?.trim()) return;
-  const key = await crypto.subtle.importKey(
-    "raw", encoder.encode(token), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
-  );
-  const hashed = new Uint8Array(await crypto.subtle.sign(
-    "HMAC", key, encoder.encode("loopa.tracking.open.v1:" + id + ":" + telegram.telegramId)
-  ));
-  const visitorHash = Array.from(hashed, byte => byte.toString(16).padStart(2, "0")).join("");
-  await admin.rpc("loopa_record_telegram_tracking_open", { p_link_id: id, p_visitor_hash: visitorHash })
-    .abortSignal(AbortSignal.timeout(2000));
 }
 
 async function lookup(admin, telegramId) {
@@ -274,11 +260,6 @@ Deno.serve(async (request) => {
       return reply({ error: "service_unavailable" }, 503);
     }
     if (retryAfter > 0) return reply({ error: "telegram_rate_limited" }, 429, retryAfter);
-    if (telegram.startParam?.startsWith("ref_") && action !== "link") {
-      const tracking = recordTrackingOpen(admin, token, telegram).catch(() => {});
-      if (globalThis.EdgeRuntime?.waitUntil) globalThis.EdgeRuntime.waitUntil(tracking);
-      else await tracking;
-    }
 
     if (!needsSession) {
       let link = await lookup(admin, telegramId);

@@ -11,13 +11,12 @@ const source = readFileSync(join(__dirname, '../supabase/functions/telegram-mini
 const syntheticBotToken = 'synthetic-test-token';
 const origin = 'https://loopacinema.ru';
 
-function signedLaunch(profile = {}, authDate = Math.floor(Date.now() / 1000), startParam) {
+function signedLaunch(profile = {}, authDate = Math.floor(Date.now() / 1000)) {
   const fields = {
     auth_date: String(authDate),
     query_id: 'synthetic-launch',
     user: JSON.stringify({ id: 1234, ...profile }),
   };
-  if (startParam) fields.start_param = startParam;
   const canonical = Object.keys(fields).sort().map(key => key + '=' + fields[key]).join('\n');
   const key = createHmac('sha256', 'WebAppData').update(syntheticBotToken).digest();
   return new URLSearchParams({
@@ -137,11 +136,6 @@ function mockBridge({ linked = true, issueError = false, claimError = false, act
       },
     } },
   };
-  const trackedOpens = [];
-  const authRpc = admin.rpc;
-  admin.rpc = (name, args) => name === 'loopa_record_telegram_tracking_open'
-    ? { abortSignal: async () => { trackedOpens.push(args); return { error: null }; } }
-    : authRpc(name, args);
   runInNewContext(source.replace(/^import .*;$/m, ''), {
     createClient: () => admin,
     crypto: webcrypto,
@@ -167,7 +161,6 @@ function mockBridge({ linked = true, issueError = false, claimError = false, act
       }));
       return { code: response.status, headers: response.headers, body: await response.json() };
     },
-    trackedOpens,
     mintCount: () => mintCount,
     createCount: () => createCount,
     createdOptions: () => createdOptions,
@@ -380,27 +373,4 @@ test('an existing placeholder imports once through the verified session, includi
   assert.equal(bridge.repairCalls[1].p_display_name,'Алексей');
   assert.equal(bridge.repairCalls[1].p_username,'alex_test');
   assert.equal(bridge.uploads[0].path,'synthetic-profile/telegram-avatar.jpg');
-});
-
-test('tracking uses the signed launch code and hashes the visitor per link', async () => {
-  const bridge = mockBridge({linked:false});
-  const a = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-  const b = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
-  const now = Math.floor(Date.now() / 1000);
-  const launch = id => signedLaunch({}, now, 'ref_' + id);
-  const forged = launch(a);
-  forged.set('start_param','ref_' + b);
-  assert.equal((await bridge.request('login', forged)).code,401);
-  await bridge.request('login', signedLaunch({}, now, 'room_abcdef123456'));
-  assert.equal(bridge.trackedOpens.length,0);
-  await bridge.request('login', launch(a));
-  await bridge.request('login', launch(a));
-  await bridge.request('login', launch(b));
-  assert.equal(bridge.trackedOpens.length,3);
-  const [first, repeated, second] = bridge.trackedOpens;
-  assert.equal(first.p_link_id,a);
-  assert.equal(second.p_link_id,b);
-  assert.match(first.p_visitor_hash,/^[a-f0-9]{64}$/);
-  assert.equal(first.p_visitor_hash,repeated.p_visitor_hash);
-  assert.notEqual(first.p_visitor_hash,second.p_visitor_hash);
 });
