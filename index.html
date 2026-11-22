@@ -2047,7 +2047,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
   <script src="./assets/room-watch-reliability.js"></script>
   <script src="./assets/account-continuity.js"></script>
   <script src="./assets/resume-storage.js"></script>
-  <script src="./assets/direct-messages.js?v=message-actions"></script>
+  <script src="./assets/direct-messages.js?v=stable-inbox"></script>
   <script defer>
     'use strict';
     const SUPABASE_URL = 'https://wnubqzwsvclvcvozibtc.supabase.co';
@@ -4399,10 +4399,10 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       if(element._loopaAnimation){element._loopaAnimation.cancel();element._loopaAnimation=null;}
       if (typeof element.animate === 'function') {
         const keyframes=preserveGeometry
-          ? [{opacity:0},{opacity:1}]
-          : [{opacity:.6,transform:'translate3d(0,4px,0)'},{opacity:1,transform:'translate3d(0,0,0)'}];
+          ? [{opacity:.8},{opacity:1}]
+          : [{opacity:.8,transform:'translate3d(0,3px,0)'},{opacity:1,transform:'translate3d(0,0,0)'}];
         const animation=element.animate(keyframes,{
-          duration:180,easing:'cubic-bezier(.2,.8,.2,1)',fill:'none'
+          duration:145,easing:'cubic-bezier(.2,.75,.25,1)',fill:'none'
         });
         element._loopaAnimation=animation;
         animation.onfinish=()=>{if(element._loopaAnimation===animation)element._loopaAnimation=null;};
@@ -4678,7 +4678,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         if(pane)animateContent(pane);
       }
     }
-    const avatarRequests=new Map(),avatarRenders=new WeakMap();
+    const avatarRequests=new Map(),peerAvatars=new Map(),avatarRenders=new WeakMap();
     const ownAvatarPreviewKey='loopa-own-avatar-preview-v1';
     const ownAvatarPreviewLifetime=86400000;
     function isOwnAvatarPath(path,viewer){
@@ -4722,10 +4722,12 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       if(avatarViewer&&viewer!==avatarViewer)clearOwnAvatarPreview();
       avatarViewer=viewer;
       avatarRequests.clear();
+      for(const entry of peerAvatars.values())if(entry.src)URL.revokeObjectURL(entry.src);
+      peerAvatars.clear();
       roomProfileCache.clear();
       roomProfilePending.clear();
     }
-    async function requestAvatar(path,viewer) {
+    async function requestAvatar(path,viewer,permissionOnly=false) {
       const {data:{session}} = await client.auth.getSession();
       if(session?.user.id!==viewer)return null;
       // An authenticated viewer can read their own folder in the private bucket.
@@ -4735,11 +4737,53 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         ? '/storage/v1/object/authenticated/avatars/'+path
         : '/functions/v1/loopa-avatar?'+new URLSearchParams({path});
       const response=await fetch(SUPABASE_URL+endpoint,{
+        method:permissionOnly?'HEAD':'GET',
         headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+session.access_token},
         cache:'no-store',
         signal:AbortSignal.timeout(10000)
       });
+      if(permissionOnly)return response.ok?true:[401,403,404].includes(response.status)?null:undefined;
       return response.ok?response.blob():response.status>=500?undefined:null;
+    }
+    function forgetPeerAvatar(key){
+      const entry=peerAvatars.get(key);
+      if(entry?.src)URL.revokeObjectURL(entry.src);
+      peerAvatars.delete(key);
+    }
+    function loadPeerAvatar(path,viewer){
+      const key=viewer+':'+path,cached=peerAvatars.get(key);
+      if(cached)return cached;
+      if(peerAvatars.size>=300)forgetPeerAvatar(peerAvatars.keys().next().value);
+      const entry={src:null,check:null,checkedAt:Date.now()};
+      peerAvatars.set(key,entry);
+      entry.request=(async()=>{
+        const image=await requestAvatar(path,viewer);
+        if(!image||peerAvatars.get(key)!==entry)return null;
+        const src=URL.createObjectURL(image);
+        try{
+          await new Promise((resolve,reject)=>{
+            const probe=document.createElement('img');
+            probe.onload=resolve;probe.onerror=reject;probe.src=src;
+          });
+        }catch{URL.revokeObjectURL(src);return null;}
+        if(peerAvatars.get(key)!==entry){URL.revokeObjectURL(src);return null;}
+        entry.src=src;
+        return src;
+      })().catch(()=>null);
+      return entry;
+    }
+    function recheckPeerAvatar(path,viewer){
+      const key=viewer+':'+path,entry=peerAvatars.get(key);
+      if(!entry||entry.check||Date.now()-entry.checkedAt<15000)return;
+      if(!entry.src){forgetPeerAvatar(key);return;}
+      entry.checkedAt=Date.now();
+      entry.check=requestAvatar(path,viewer,true).then(allowed=>{
+        if(allowed!==null||peerAvatars.get(key)!==entry||currentUser?.id!==viewer)return;
+        forgetPeerAvatar(key);
+        for(const node of document.querySelectorAll('[data-avatar-path]')){
+          if(node.dataset.avatarPath===path)void showAvatar(node,null,node.dataset.avatarName,node.dataset.avatarClass);
+        }
+      }).catch(()=>{}).finally(()=>{entry.check=null;});
     }
     async function showAvatar(node,path,name,imageClass='') {
       const viewer=currentUser?.id;
@@ -4760,7 +4804,17 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         node.replaceChildren(letter);
       };
       if(!path||!viewer||!client){showInitial();return;}
-      const ownHeader=imageClass==='top-profile-avatar'&&isOwnAvatarPath(path,viewer);
+      if(!isOwnAvatarPath(path,viewer)){
+        if(sameImage&&node.querySelector('img'))return;
+        const entry=loadPeerAvatar(path,viewer);
+        if(!entry.src)showInitial();
+        const src=entry.src||await entry.request;
+        if(!src||!isCurrent()||peerAvatars.get(viewer+':'+path)!==entry)return;
+        const img=document.createElement('img');
+        img.className=imageClass;img.alt='';img.src=src;node.replaceChildren(img);
+        return;
+      }
+      const ownHeader=imageClass==='top-profile-avatar';
       const preview=ownHeader?readOwnAvatarPreview(currentUser):null;
       if(!sameImage||!node.querySelector('img')){
         if(preview?.path===path){
@@ -4803,7 +4857,13 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     setInterval(()=>{
       if(document.hidden||!currentUser)return;
       for(const node of document.querySelectorAll('[data-avatar-path]')){
-        if(node.dataset.avatarPath)showAvatar(node,node.dataset.avatarPath,node.dataset.avatarName,node.dataset.avatarClass);
+        const path=node.dataset.avatarPath,viewer=currentUser.id;
+        if(!path)continue;
+        if(isOwnAvatarPath(path,viewer))void showAvatar(node,path,node.dataset.avatarName,node.dataset.avatarClass);
+        else {
+          recheckPeerAvatar(path,viewer);
+          if(!node.querySelector('img'))void showAvatar(node,path,node.dataset.avatarName,node.dataset.avatarClass);
+        }
       }
     },15000);
     let loadedProfileAvatar=null;
@@ -5352,7 +5412,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       }
     });
     const {openDirectMessage,refreshMessagesInbox,subscribeMessagesInbox,
-      stopMessagesInbox,clearDirectMessageChannel}=messages;
+      stopMessagesInbox,clearDirectMessageChannel,primeMessagesInbox}=messages;
     // v88 uses loopa_history27 as the single active-time counter.
     // Avoid running v87's separate timer: it would double-count active seconds.
 
@@ -5539,6 +5599,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       if (error) throw error;
       return Object.fromEntries((data||[]).map(row=>[row.user_id,friendPresenceLabel(row)]));
     }
+    const renderedFriendRelations=new WeakMap();
     async function refreshFriendLists() {
       if (!client || !currentUser || friendRefreshBusy) return;
       syncFriendsSession();
@@ -5579,17 +5640,29 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         lastIncomingCount=received.length;
         function showRelations(target,list,kind) {
           const parent=byId(target);
-          parent.replaceChildren();
           if (!list.length && kind==='accepted') {friendEmpty(parent,'Друзей пока нет. Найди человека и отправь заявку.');return;}
           if (!list.length && kind==='outgoing') {friendEmpty(parent,'Отправленных заявок пока нет.');return;}
+          const previous=new Map(Array.from(parent.children).map(row=>[row.dataset.relationId,row]));
+          const rows=[];
           for (const relation of list) {
             const peer=relation.sender_id===owner?relation.receiver_id:relation.sender_id;
             const profile=directory[peer] || {id:peer,display_name:'Пользователь LOOPA'};
             const actions = kind==='accepted'?[{menu:true,items:[{label:'Удалить из друзей',action:'remove',requestId:relation.id},{label:'Заблокировать',action:'block'},{label:'Чёрный список',action:'blacklist'}]}]
               :kind==='incoming'?[{label:'Принять',action:'accept',requestId:relation.id,primary:true},{label:'×',action:'decline',requestId:relation.id}]
               :[{label:'Отменить',action:'cancel',requestId:relation.id}];
-            parent.appendChild(friendRow(profile,presence[peer],actions));
+            const signature=JSON.stringify([owner,kind,profile.display_name,profile.username,profile.avatar_path,
+              presence[peer],kind==='accepted'?friendActivity[peer]:null]);
+            const existing=previous.get(relation.id);
+            if(existing&&renderedFriendRelations.get(existing)===signature&&
+              (!profile.avatar_path||existing.firstElementChild?.dataset.avatarPath===profile.avatar_path)){
+              rows.push(existing);continue;
+            }
+            const row=friendRow(profile,presence[peer],actions);
+            row.dataset.relationId=relation.id;
+            renderedFriendRelations.set(row,signature);
+            rows.push(row);
           }
+          if(rows.length!==parent.children.length||rows.some((row,index)=>row!==parent.children[index]))parent.replaceChildren(...rows);
         }
         showRelations('friend-list',accepted,'accepted');
         if (received.length) showRelations('friend-incoming',received,'incoming');
@@ -5652,7 +5725,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       if(error)throw error;
       if(currentUser?.id!==viewer)return false;
       const prefix=userId+'/';
-      for(const key of avatarRequests.keys())if(key.startsWith(viewer+':'+prefix))avatarRequests.delete(key);
+      for(const key of peerAvatars.keys())if(key.startsWith(viewer+':'+prefix))forgetPeerAvatar(key);
       const cached=roomProfileCache.get(userId);
       if(cached)cached.path=null;
       for(const node of document.querySelectorAll('[data-avatar-path]')){
@@ -5762,7 +5835,9 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       byId('auth-guest').hidden=true;
       setDmPolicyView('everyone',false);
       if(roomUser && roomUser!==user.id)roomExit();
+      resetAvatarViewer(user.id);
       startPresence(user);
+      void primeMessagesInbox();
       syncFriendsSession();
       refreshFriendLists();
       pollInvites();

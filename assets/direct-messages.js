@@ -7,7 +7,13 @@
     let dmCanSend=true,dmBlockedHere=false;
     const blockDialog=byId('dm-block-dialog');
     let messagesInboxGeneration=0,messagesInboxChannel=null,messagesInboxOwner=null;
-    let inboxRows=new Map(),inboxCursor=null,inboxHasMore=false,inboxPaging=false;
+    let inboxRows=new Map(),inboxCursor=null,inboxPaging=false;
+    let inboxViewer=null,inboxLoaded=false;
+    const renderedConversations=new WeakMap();
+    function primeMessagesInbox(){
+      const owner=getCurrentUser()?.id;
+      if(owner&&(inboxViewer!==owner||!inboxLoaded&&!inboxPaging))return refreshMessagesInbox();
+    }
     function stopMessagesInbox(){
       if(messagesInboxChannel&&getClient())getClient().removeChannel(messagesInboxChannel).catch(()=>{});
       messagesInboxChannel=null;messagesInboxOwner=null;
@@ -29,35 +35,53 @@
       root.append(box);
     }
     async function refreshMessagesInbox(older=false){
-      if(older&&inboxPaging)return;
-      if(!older){inboxRows=new Map();inboxCursor=null;}
+      const owner=getCurrentUser()?.id;
+      const viewerChanged=inboxViewer!==owner;
+      if(viewerChanged){
+        inboxViewer=owner;inboxLoaded=false;inboxRows=new Map();inboxCursor=null;
+      }
+      if(older?(inboxPaging||viewerChanged):(inboxPaging&&!inboxLoaded&&!viewerChanged))return;
       inboxPaging=true;
-      const previousCursor=inboxCursor;
-      const revision=++messagesInboxGeneration,owner=getCurrentUser()?.id;
+      const revision=++messagesInboxGeneration;
       if(!owner||!getClient()){inboxPaging=false;inboxState('Войди в LOOPA, чтобы видеть свои переписки.');return;}
-      if(!older)inboxState('Загружаем переписки…');
+      if(!older&&!inboxLoaded)inboxState('Загружаем переписки…');
       try{
         const {data,error}=await getClient().rpc('loopa_dm_inbox',{before_id:older?inboxCursor:null,page_size:51});
         if(error)throw error;
         if(revision!==messagesInboxGeneration||getCurrentUser()?.id!==owner)return;
-        inboxHasMore=(data||[]).length>50;
+        const hasMore=(data||[]).length>50;
         const page=(data||[]).slice(0,50);
-        inboxCursor=page.at(-1)?.id||null;
-        const latest=inboxRows;
+        const cursor=page.at(-1)?.id||null;
+        const latest=older?new Map(inboxRows):new Map();
         for(const msg of page){
           const peerId=msg.sender_id===owner?msg.recipient_id:msg.sender_id;
           if(peerId&&!latest.has(peerId))latest.set(peerId,msg);
         }
-        if(!latest.size){inboxState('Здесь появятся твои переписки. Открой профиль друга и нажми «Написать», чтобы начать общение.',true);return;}
+        if(!latest.size){
+          inboxRows=latest;inboxCursor=cursor;
+          if(!inboxLoaded||byId('messagesList').querySelector('.message-conversation'))
+            inboxState('Здесь появятся твои переписки. Открой профиль друга и нажми «Написать», чтобы начать общение.',true);
+          inboxLoaded=true;
+          return;
+        }
         const ids=[...latest.keys()];
         const {data:people,error:profileError}=await lookupPublicProfiles(ids);
         if(revision!==messagesInboxGeneration||getCurrentUser()?.id!==owner)return;
         // If a profile isn't public or was removed, keep the conversation accessible.
         const names=new Map((!profileError&&people||[]).map(p=>[p.id,p]));
-        const root=byId('messagesList');root.replaceChildren();
+        const root=byId('messagesList');
+        const previous=new Map(Array.from(root.children).map(row=>[row.dataset.inboxPeer,row]));
+        const rows=[];
         for(const [peerId,msg] of latest){
           const profile=names.get(peerId)||{id:peerId,display_name:'Пользователь LOOPA'};
-          const row=document.createElement('div');row.className='message-conversation';
+          const signature=JSON.stringify([owner,profile,msg.id,msg.sender_id,msg.created_at,msg.body]);
+          const existing=previous.get(peerId);
+          if(existing&&renderedConversations.get(existing)===signature&&
+            (!profile.avatar_path||existing.querySelector('.friend-avatar')?.dataset.avatarPath===profile.avatar_path)){
+            rows.push(existing);continue;
+          }
+          const row=document.createElement('div');row.className='message-conversation';row.dataset.inboxPeer=peerId;
+          renderedConversations.set(row,signature);
           const avatar=document.createElement('button');avatar.type='button';avatar.className='message-avatar-open';
           avatar.setAttribute('aria-label','Открыть профиль '+(profile.display_name||'пользователя'));
           avatar.append(friendAvatar(profile));avatar.onclick=()=>openFriendProfile?.(profile);
@@ -75,13 +99,22 @@
           preview.textContent=(msg.sender_id===owner?'Ты: ':'')+(msg.body||'');
           copy.append(heading,preview);btn.append(copy);
           btn.onclick=()=>openDirectMessage(profile);
-          row.append(avatar,btn);root.append(row);
+          row.append(avatar,btn);rows.push(row);
         }
-        if(inboxHasMore){const more=document.createElement('button');more.type='button';more.className='action';more.textContent='Ещё переписки';more.onclick=()=>refreshMessagesInbox(true);root.append(more);}
+        if(hasMore){
+          let more=root.querySelector('[data-inbox-more]');
+          if(!more){
+            more=document.createElement('button');more.type='button';more.className='action';more.textContent='Ещё переписки';
+            more.dataset.inboxMore='';more.onclick=()=>refreshMessagesInbox(true);
+          }
+          rows.push(more);
+        }
+        if(rows.length!==root.children.length||rows.some((row,index)=>row!==root.children[index]))root.replaceChildren(...rows);
+        inboxRows=latest;inboxCursor=cursor;inboxLoaded=true;
       }catch(error){
         if(revision!==messagesInboxGeneration)return;
-        if(older){inboxCursor=previousCursor;showToast('Не удалось загрузить старые переписки. Попробуй ещё раз.');}
-        else inboxState('Не удалось загрузить переписки. Проверь подключение и попробуй ещё раз.');
+        if(older)showToast('Не удалось загрузить старые переписки. Попробуй ещё раз.');
+        else if(!inboxLoaded)inboxState('Не удалось загрузить переписки. Проверь подключение и попробуй ещё раз.');
       }finally{if(revision===messagesInboxGeneration)inboxPaging=false;}
 
     }
@@ -287,9 +320,10 @@
       dmHistoryEpoch++;dmPeer=null;dmHistory=[];dmOlderBusy=false;dmHasOlder=false;
       dmBusy=false;dmBlockedHere=false;setDmCanSend(true);setDmActions(false);
       if(blockDialog.open)blockDialog.close();
-      inboxRows=new Map();inboxCursor=null;inboxHasMore=false;inboxPaging=false;
+      inboxRows=new Map();inboxCursor=null;inboxPaging=false;
+      inboxViewer=null;inboxLoaded=false;byId('messagesList').replaceChildren();
     }
-    return Object.freeze({resumeDirectMessage:()=>{const draft=byId('dmInput').value;const pending=openDirectMessage(dmPeer,true);byId('dmInput').value=draft;return pending;},openDirectMessage,refreshMessagesInbox,subscribeMessagesInbox,
+    return Object.freeze({resumeDirectMessage:()=>{const draft=byId('dmInput').value;const pending=openDirectMessage(dmPeer,true);byId('dmInput').value=draft;return pending;},openDirectMessage,refreshMessagesInbox,primeMessagesInbox,subscribeMessagesInbox,
       stopMessagesInbox,clearDirectMessageChannel,reset,get returnPage(){return dmPageReturn;}});
   }
   root.LOOPADirectMessages=Object.freeze({create});
