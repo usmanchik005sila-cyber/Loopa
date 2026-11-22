@@ -561,7 +561,10 @@ body.roomViewing #chatText{scroll-margin:0;overflow-anchor:none}
 html:has(body.roomViewing){overflow:hidden;overscroll-behavior:none}
 body.roomViewing{position:fixed;inset:0;width:100%;height:100%;overflow:hidden;overscroll-behavior:none}
 body.roomViewing #room-active{backdrop-filter:none;-webkit-backdrop-filter:none}
-body.roomViewing .roomChat #chatLog{overflow-anchor:none}
+/* The chat's scroll origin stays at the newest message during a resize.
+   Keep the actual message order chronological inside the single flex item. */
+body.roomViewing .roomChat #chatLog{overflow-anchor:none;flex-direction:column-reverse}
+#chatMessages{flex:none;display:flex;flex-direction:column;gap:8px;min-width:0}
 
 body.roomViewing #room-active .roomBar{display:flex;min-height:48px;height:48px;padding:4px 12px;gap:7px;flex:none}
 body.roomViewing #sheetVideoChange{flex:none;min-height:36px;height:36px;margin:0 0 0 auto;padding:7px 10px;width:auto;font-size:12px;white-space:nowrap}
@@ -1639,7 +1642,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
 
       <section data-page="rooms" aria-label="Комната" hidden>
 <div id="room-active" class="panel glass" hidden><div class="setupHeader"><p class="panel-note">СОВМЕСТНЫЙ ПРОСМОТР</p><h2 id="setupTitle">Выбери видео</h2></div><div class="roomBar"><button class="text-link" data-room="exit">‹ Назад</button><small id="accessBadge"></small><button id="moreRoom" class="friend-small-action" aria-label="Меню комнаты">⋯</button></div><div class="playerCode"><span>Код</span><b id="room-code"></b><button type="button" data-room="copy" aria-label="Скопировать код комнаты"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M15 5V4a1 1 0 0 0-1-1H5a2 2 0 0 0-2 2v10a1 1 0 0 0 1 1h1"/></svg></button></div><iframe id="room-frame" hidden title="Видео комнаты"></iframe><button id="inviteRoom" type="button" class="roomInvite">＋ Пригласить</button><small id="room-status" hidden></small><div id="room-host"><details id="videoEdit"><summary><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="4"/><path d="m10 9 5 3-5 3z"/></svg>Сменить видео</summary><button id="catalogOpen" type="button" class="catalogLaunch" aria-haspopup="dialog" aria-expanded="false"><span class="launchIcon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg></span><span>Каталог видео<small>YouTube, VK Видео и RUTUBE</small></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button></details></div>
-<div id="chatResizeHandle" role="separator" aria-orientation="horizontal" aria-label="Разделитель видео и чата. Стрелки вверх и вниз меняют высоту." aria-controls="videoStage chatLog" tabindex="0"></div><section class="roomChat"><h2>Чат комнаты</h2><div id="chatLog"></div><div class="roomComposerDock"><div id="emojiTray" hidden aria-label="Выбор эмодзи"></div><div id="chatReplyPreview" class="chatReplyPreview" hidden><div class="chatReplyPreviewCopy"><strong id="chatReplyAuthor"></strong><small id="chatReplyText"></small></div><button type="button" id="chatReplyCancel" aria-label="Отменить ответ">×</button></div><form id="chatForm"><button type="button" id="emojiOpen" aria-label="Выбрать эмодзи" aria-controls="emojiTray" aria-expanded="false">☺</button><input class="friend-search-input" id="chatText" type="text" enterkeyhint="send" autocomplete="off" maxlength="1000" aria-label="Сообщение" placeholder="Сообщение…" required><button class="friend-small-action" id="roomChatSend" type="submit" aria-label="Отправить сообщение"><svg aria-hidden="true" viewBox="0 0 24 24" focusable="false"><path d="M12 20V4m0 0-6.25 6.25M12 4l6.25 6.25"/></svg></button></form></div></section></div>
+<div id="chatResizeHandle" role="separator" aria-orientation="horizontal" aria-label="Разделитель видео и чата. Стрелки вверх и вниз меняют высоту." aria-controls="videoStage chatLog" tabindex="0"></div><section class="roomChat"><h2>Чат комнаты</h2><div id="chatLog"><div id="chatMessages"></div></div><div class="roomComposerDock"><div id="emojiTray" hidden aria-label="Выбор эмодзи"></div><div id="chatReplyPreview" class="chatReplyPreview" hidden><div class="chatReplyPreviewCopy"><strong id="chatReplyAuthor"></strong><small id="chatReplyText"></small></div><button type="button" id="chatReplyCancel" aria-label="Отменить ответ">×</button></div><form id="chatForm"><button type="button" id="emojiOpen" aria-label="Выбрать эмодзи" aria-controls="emojiTray" aria-expanded="false">☺</button><input class="friend-search-input" id="chatText" type="text" enterkeyhint="send" autocomplete="off" maxlength="1000" aria-label="Сообщение" placeholder="Сообщение…" required><button class="friend-small-action" id="roomChatSend" type="submit" aria-label="Отправить сообщение"><svg aria-hidden="true" viewBox="0 0 24 24" focusable="false"><path d="M12 20V4m0 0-6.25 6.25M12 4l6.25 6.25"/></svg></button></form></div></section></div>
 <dialog id="inviteSheet"><header><h2>Пригласить друзей</h2><button type="button" id="closeInvites" aria-label="Закрыть">×</button></header><p id="inviteHint">Выбери друга — приглашение появится у него в LOOPA.</p><div id="inviteList"></div><button type="button" id="shareRoomLink" class="roomInvite">Отправить ссылку</button></dialog><dialog id="roomSheet"><div class="roomSheetHeading"><strong>Настройки комнаты</strong><button id="roomSheetClose" class="roomSheetClose" type="button" aria-label="Закрыть настройки">×</button></div><button type="button" id="sheetVideoChange" aria-label="Сменить видео" title="Сменить видео">Сменить видео</button><button type="button" id="cinemaModeToggle" class="cinemaModeToggle" aria-pressed="false"><span class="cinemaModeGlyph" aria-hidden="true">▣</span><span class="cinemaModeCopy"><strong>Режим кинотеатра</strong><small>Видео в центре внимания, чат остаётся открытым</small></span><span class="cinemaModeSwitch" aria-hidden="true"></span></button><h3>Участники</h3><div id="people" role="list" aria-label="Участники"></div><div id="sharedControlEdit" hidden><h3>Настройки комнаты</h3><div class="sharedControlLine"><div class="sharedControlCopy"><strong>Совместное управление</strong><small>Разрешить участникам ставить видео на паузу, включать и перематывать</small></div><label class="presence-switch" aria-label="Совместное управление"><input type="checkbox" id="roomSharedControl"><span class="presence-switch-track"></span></label></div><p id="sharedControlStatus" role="status">По умолчанию видео управляет создатель комнаты</p></div><div id="accessEdit"><h3>Доступ в комнату</h3><div class="roomAccessOptions" role="group" aria-label="Доступ в комнату"><button type="button" data-access="code" aria-pressed="true">Открытая</button><button type="button" data-access="private" aria-pressed="false">Закрытая</button><button type="button" data-access="friends" aria-pressed="false">Для друзей</button></div><select hidden id="accessMode" class="privacy-select"><option value="code">Любой</option><option value="friends">Только друзья</option><option value="private">Приватная</option></select><div id="pick"></div><small id="accessWarning"></small><button class="action" id="saveAccess">Сохранить доступ</button></div></dialog><p id="room-note" role="status"></p>
       </section>
 
@@ -2865,22 +2868,10 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       if(typeof raw==='number')return raw<1e12?raw*1000:raw;
       const stamp=Date.parse(raw);return Number.isFinite(stamp)?stamp:NaN;
     }
-    let chatReplyTarget=null,chatMessageById=new Map(),chatSwipe=null,chatReplyScrollFrame=0;
-    function setChatReplyVisible(visible){
-      const preview=byId('chatReplyPreview');
-      if(preview.hidden===!visible)return;
-      const keepBottom=watchKeepBottom;
-      const previousPosition=keepBottom?watchLog.scrollTop:0;
-      preview.hidden=!visible;
-      if(!keepBottom||chatReplyScrollFrame)return;
-      chatReplyScrollFrame=requestAnimationFrame(()=>{
-        chatReplyScrollFrame=0;
-        if(document.body.classList.contains('roomViewing')&&watchLog.scrollTop>=previousPosition-2)watchLog.scrollTop=watchLog.scrollHeight;
-      });
-    }
+    let chatReplyTarget=null,chatMessageById=new Map(),chatSwipe=null;
     function clearChatReply(){
       chatReplyTarget=null;
-      setChatReplyVisible(false);
+      byId('chatReplyPreview').hidden=true;
       byId('chatReplyAuthor').textContent='';
       byId('chatReplyText').textContent='';
     }
@@ -2891,7 +2882,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       if(document.activeElement!==watchField)watchField.focus({preventScroll:true});
       byId('chatReplyAuthor').textContent='Ответ на '+author;
       byId('chatReplyText').textContent=chatReplyTarget.body.slice(0,180);
-      setChatReplyVisible(true);
+      byId('chatReplyPreview').hidden=false;
     }
         function jumpToChatMessage(id){
           const key=String(id),bubble=[...byId('chatLog').querySelectorAll('.bubble[data-chat-id]')].find(el=>el.dataset.chatId===key);
@@ -2939,11 +2930,17 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         }
         function renderConversation(messages){
       messages=messages.map(normalizeChatMessage);
-      const log=byId('chatLog'),near=log.scrollHeight-log.scrollTop-log.clientHeight<48,previousScroll=log.scrollTop;
-      const photos=new Map([...log.querySelectorAll('[data-chat-photo-key]')].map(photo=>[photo.dataset.chatPhotoKey,photo]));
+      const log=byId('chatLog'),content=byId('chatMessages');
+      const nearBottom=Math.abs(log.scrollTop)<48;
+      const logTop=nearBottom?0:log.getBoundingClientRect().top;
+      const visible=nearBottom?null:[...content.querySelectorAll('.bubble[data-chat-id]')]
+        .find(bubble=>bubble.dataset.chatId&&bubble.getBoundingClientRect().bottom>logTop);
+      const anchorTop=visible?.getBoundingClientRect().top;
+      const previousScroll=log.scrollTop;
+      const photos=new Map([...content.querySelectorAll('[data-chat-photo-key]')].map(photo=>[photo.dataset.chatPhotoKey,photo]));
       const conversation=document.createDocumentFragment();
       chatMessageById=new Map(messages.filter(message=>message?.id!=null).map(message=>[String(message.id),message]));
-      if(!messages.length){log.textContent='Пока тихо. Напиши первым.';return;}
+      if(!messages.length){content.textContent='Пока тихо. Напиши первым.';return;}
       const groups=[];
       for(const msg of messages){
         const previous=groups.at(-1)?.items.at(-1);
@@ -2986,9 +2983,13 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         });
         conversation.append(thread);
       }
-      log.replaceChildren(conversation);
-      if(near)log.scrollTop=log.scrollHeight;
-      else log.scrollTop=Math.min(previousScroll,Math.max(0,log.scrollHeight-log.clientHeight));
+      content.replaceChildren(conversation);
+      if(nearBottom)log.scrollTop=0;
+      else{
+        const matching=visible&&[...content.querySelectorAll('.bubble[data-chat-id]')]
+          .find(bubble=>bubble.dataset.chatId===visible.dataset.chatId);
+        log.scrollTop=matching?log.scrollTop+matching.getBoundingClientRect().top-anchorTop:previousScroll;
+      }
     }
 
     const modeNames={code:'Любой',friends:'Только друзья',private:'Приватная'};
@@ -3021,6 +3022,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         const departures=(prev.members||[]).filter(m=>m.online&&m.id!==currentUser.id&&!online.some(now=>now.id===m.id));
         if(departures.length)showToast(departures.length===1?'Друг переподключается':'Некоторые участники переподключаются');
       }
+      if(!sameRoom)byId('chatLog').scrollTop=0;
       if(!sameRoom||prev.chat?.at(-1)?.id!==messages.at(-1)?.id||prev.chat?.length!==messages.length)renderConversation(messages);
       loadRoomProfiles([...members.map(m=>m.id),...messages.map(m=>m.author)]);
       countSharedWatching(data);
@@ -3119,8 +3121,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       if(event.key==='ArrowUp')next=current-step;else if(event.key==='ArrowDown')next=current+step;else if(event.key==='Home')next=min;else if(event.key==='End')next=max;
       if(next===null)return;event.preventDefault();adjustCinemaPlayer(next,height,width);
     });
-    let watchKeepBottom=true;
-    const watchLog=byId('chatLog'),watchField=byId('chatText');
+    const watchField=byId('chatText');
     watchField.readOnly=false;watchField.inputMode='text';
     watchField.setAttribute('autocorrect','on');watchField.setAttribute('autocapitalize','sentences');
     watchField.setAttribute('spellcheck','true');watchField.setAttribute('enterkeyhint','send');
@@ -3153,7 +3154,6 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     },true);
     watchField.addEventListener('blur',restoreWatchField);
 
-    watchLog.addEventListener('scroll',()=>{watchKeepBottom=watchLog.scrollHeight-watchLog.scrollTop-watchLog.clientHeight<48;},{passive:true});
     let watchPlayerMoveTimer=0;
     function stopWatchPlayerMotion(){
       clearTimeout(watchPlayerMoveTimer);
@@ -3210,9 +3210,6 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       const compact=Math.min(preferred,Math.max(76,Math.min(128,fullHeight*.30)));
       const player=watchKeyboardOpen?compact:preferred;
       const playerWidth=watchKeyboardOpen?Math.min(fullWidth,player*16/9):fullWidth;
-      const restoreScroll=typeof ResizeObserver==='undefined'
-        &&(root.style.getPropertyValue('--watch-height')!==height+'px'||root.style.getPropertyValue('--watch-player-height')!==player+'px');
-      const position=restoreScroll?watchLog.scrollTop:0;
       const dimensions={
         '--watch-height':height+'px',
         '--watch-player-height':player+'px',
@@ -3227,13 +3224,10 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       updateChatResizeAria(layoutHeight,width,player);
       const top=Math.max(0,telegram?0:window.scrollY||0)+'px';
       if(root.style.getPropertyValue('--watch-top')!==top)root.style.setProperty('--watch-top',top);
-      if(restoreScroll)watchLog.scrollTop=watchKeepBottom?watchLog.scrollHeight:position;
     }
     function stopWatchViewport(){
       restoreWatchField();
       stopWatchPlayerMotion();
-      if(chatReplyScrollFrame)cancelAnimationFrame(chatReplyScrollFrame);
-      chatReplyScrollFrame=0;
       watchKeyboardOpen=false;
       watchNativeKeyboard=false;
       watchBaseHeight=0;
@@ -3250,10 +3244,6 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     document.addEventListener('visibilitychange',()=>{
       if(document.hidden)stopWatchViewport();else scheduleWatchViewport();
     });
-    // Keep the newest message beside the composer unless the reader scrolled back.
-    if(typeof ResizeObserver!=='undefined')new ResizeObserver(()=>{
-      if(document.body.classList.contains('roomViewing')&&watchKeepBottom)watchLog.scrollTop=watchLog.scrollHeight;
-    }).observe(watchLog,{box:'border-box'});
     window.visualViewport?.addEventListener('resize',scheduleWatchViewport);
     window.visualViewport?.addEventListener('scroll',scheduleWatchViewport);
     window.addEventListener('resize',scheduleWatchViewport);
@@ -3349,7 +3339,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       if(hostHere()&&roomState?.shared_control&&client){
         void client.rpc('loopa_collab27',{action:'mode',room_code:roomState.code,enabled:false});
       }
-      saveResumeCheckpoint(true);resumeRestorePending=null;clearChatReply();hideResumePrompt();applyCinemaMode(false);cinemaPlayerRatio=1;finishCinemaResize();clearRoomSignals();clearTimeout(roomPeopleTimer);peopleFlash.classList.remove('is-visible');watchPeerSession='';watchPeerSeen.clear();stopWatchViewport();document.body.classList.remove('roomViewing','chatTyping');closeCatalog(true);closeEmoji();byId("room-link").value="";byId('roomSheet').close();byId('chatText').value='';byId('chatLog').replaceChildren();roomEpoch++;syncSnapshot=null;roomState=null;roomUser=null;mountRoomPlayer('');byId('room-active').hidden=true;byId('room-note').textContent='';}
+      saveResumeCheckpoint(true);resumeRestorePending=null;clearChatReply();hideResumePrompt();applyCinemaMode(false);cinemaPlayerRatio=1;finishCinemaResize();clearRoomSignals();clearTimeout(roomPeopleTimer);peopleFlash.classList.remove('is-visible');watchPeerSession='';watchPeerSeen.clear();stopWatchViewport();document.body.classList.remove('roomViewing','chatTyping');closeCatalog(true);closeEmoji();byId("room-link").value="";byId('roomSheet').close();byId('chatText').value='';byId('chatMessages').replaceChildren();byId('chatLog').scrollTop=0;roomEpoch++;syncSnapshot=null;roomState=null;roomUser=null;mountRoomPlayer('');byId('room-active').hidden=true;byId('room-note').textContent='';}
     async function roomCall(op,args={}, {openWhenReady=true}={}){
       if(!currentUser||!client){showPage('profile',()=>showToast('Войди в аккаунт'));return;}
       const u=currentUser.id, epoch=roomEpoch;
