@@ -3517,11 +3517,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         if(!pendingInlineVideo)return;
         const video=pendingInlineVideo;
         pendingInlineVideo=null;
-        openCatalog();
-        catalogLinkStage(false);
-        byId('catalogBack').hidden=true;
-        byId('room-link').value=video;
-        inlineVideoDraft=true;
+        showInlineVideoCard(video);
         return;
       }
       invitationBusy=true;
@@ -3600,8 +3596,31 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     if(pendingInvite)setTimeout(()=>{if(currentUser)acceptInvite();else{showPage('profile',()=>showToast('Войди, чтобы присоединиться к комнате'));}},1200);
     const catalogDialog=byId('catalog');
     let roomCreating=false,inlineVideoDraft=false;
+    const inlineVideoSubmit=catalogDialog.querySelector('[data-room="video"]');
+    function inlineVideoWaiting(waiting){
+      inlineVideoSubmit.disabled=waiting;
+      inlineVideoSubmit.textContent=waiting?'Проверяем вход в LOOPA…':'Открыть видео';
+    }
+    function showInlineVideoCard(video,waiting=false){
+      if(!catalogDialog.open||!inlineVideoDraft){
+        openCatalog();
+        catalogLinkStage(false);
+        byId('catalogBack').hidden=true;
+        byId('room-link').value=video;
+      }
+      inlineVideoDraft=true;
+      inlineVideoWaiting(waiting);
+    }
+    function pauseInlineVideoCard(){
+      if(pendingInlineVideo&&inlineVideoDraft)closeCatalog(true);
+    }
+
     function closeCatalog(keepRoom=false){
-      inlineVideoDraft=false;
+      if(inlineVideoDraft){
+        if(!keepRoom)pendingInlineVideo=null;
+        if(pendingInlineVideo)inlineVideoWaiting(false);
+        inlineVideoDraft=false;
+      }
       catalogDialog.close();byId('catalogOpen').setAttribute('aria-expanded','false');clearCatalog();
       if(!keepRoom&&(roomCreating||(hostHere()&&!roomState.video))){
         if(lastPage==='rooms')leaveRoomForHome();
@@ -5734,7 +5753,8 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       if(dmPolicyDialog.open)dmPolicyDialog.close();setDmPolicyView('everyone',false);
       historyOwner=null;byId('homeRecent').replaceChildren();byId('usageTime').textContent='—';
       byId('roomInboxButton').hidden=true;hideInviteBanner();byId('inviteSheet').close();inviteInbox=[];inviteSeen.clear();updateUnifiedBadge();
-      if(lastPage==='rooms')showPage('home');else roomExit();
+      if(lastPage==='rooms')showPage('home');
+      else if(!inlineVideoDraft||!pendingInlineVideo||roomState||roomUser)roomExit();
       byId('settings-home').hidden=true;
       byId('settings-detail').hidden=true;
       byId('auth-loading').hidden = true;
@@ -5994,6 +6014,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         const response=await telegramMiniRequest(register?'register':'login');
         if(currentUser)return;
         if(response.status==='unlinked'){
+          pauseInlineVideoCard();
           note.textContent='Имя, ник и доступное фото из Telegram появятся в профиле LOOPA. Их можно изменить.';
           continueButton.hidden=false;
           showPage('profile');
@@ -6015,6 +6036,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         showToast(register?'LOOPA готова — добро пожаловать!':'Вход через Telegram выполнен');
       }catch(error){
         if(currentUser)return;
+        pauseInlineVideoCard();
         note.textContent=telegramMiniErrorMessage(error);
         retry.hidden=false;
         showPage('profile');
@@ -6493,6 +6515,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     });
     async function init() {
       if (!window.supabase?.createClient) {
+        pauseInlineVideoCard();
         byId('auth-loading').hidden = true;
         displayGuest();
         feedback('auth-feedback','Не удалось загрузить библиотеку Supabase. Проверь подключение к интернету и обнови страницу.',true);
@@ -6539,6 +6562,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
           byId('auth-guest').hidden=true;
           feedback('profile-feedback','Не удалось загрузить часть данных профиля: '+errorText(err),true);
         } else {
+          pauseInlineVideoCard();
           displayGuest();
           feedback('auth-feedback',errorText(err),true);
         }
@@ -6552,6 +6576,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         showPageNow('profile');
         byId('auth-icloud-details').open=true;
       }
+      if(pendingInlineVideo&&!pendingInvite)showInlineVideoCard(pendingInlineVideo,true);
       init();
     }
 
