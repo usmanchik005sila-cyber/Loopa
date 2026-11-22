@@ -3154,7 +3154,13 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     },true);
     watchField.addEventListener('blur',restoreWatchField);
 
-    let watchPlayerMoveTimer=0;
+    let watchPlayerMoveTimer=0,watchKeyboardSettleTimer=0,watchCompactHeight=0,watchExpansionConfirmed=false;
+    function resetWatchKeyboardOpening(){
+      clearTimeout(watchKeyboardSettleTimer);
+      watchKeyboardSettleTimer=0;
+      watchCompactHeight=0;
+      watchExpansionConfirmed=false;
+    }
     function stopWatchPlayerMotion(){
       clearTimeout(watchPlayerMoveTimer);
       document.body.classList.remove('watch-player-moving');
@@ -3174,16 +3180,36 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         watchBaseHeight=stableHeight||Math.max(nativeHeight,window.innerHeight);
         watchNativeBase=nativeHeight;
         watchNativeKeyboard=false;
+        resetWatchKeyboardOpening();
       }
       // Telegram's keyboard-sized height can linger after the native viewport expands.
       // Once the native viewport reports this keyboard, follow it through dismissal.
       if((focused||watchKeyboardOpen)&&(!focused||watchNativeBase-nativeHeight>100))watchNativeKeyboard=true;
-      const height=watchNativeKeyboard
+      let height=watchNativeKeyboard
         ? nativeHeight
         : Math.min(nativeHeight,window.innerHeight||nativeHeight,telegramHeight);
       const baseline=watchNativeKeyboard?watchNativeBase:watchBaseHeight;
       const wasKeyboardOpen=watchKeyboardOpen;
+      // A large expansion during typing may be one stale viewport callback.
+      // Keep the measured keyboard limit until the larger height persists.
+      const unexpectedExpansion=watchUsesNativeRoom&&focused&&wasKeyboardOpen
+        &&watchCompactHeight>0&&height-watchCompactHeight>55;
+      if(unexpectedExpansion&&!watchExpansionConfirmed){
+        height=watchCompactHeight;
+        if(!watchKeyboardSettleTimer){
+          watchKeyboardSettleTimer=setTimeout(()=>{
+            watchKeyboardSettleTimer=0;
+            watchExpansionConfirmed=true;
+            scheduleWatchViewport();
+          },280);
+        }
+      }else{
+        clearTimeout(watchKeyboardSettleTimer);
+        watchKeyboardSettleTimer=0;
+        watchExpansionConfirmed=false;
+      }
       watchKeyboardOpen=(focused||watchKeyboardOpen)&&baseline-height>(watchKeyboardOpen?55:100);
+      watchCompactHeight=focused&&watchKeyboardOpen?height:0;
       if(wasKeyboardOpen!==watchKeyboardOpen){
         document.body.classList.add('watch-player-moving');
         clearTimeout(watchPlayerMoveTimer);
@@ -3194,9 +3220,9 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         watchNativeBase=nativeHeight;
       }
       if(watchUsesNativeRoom){
-        // Before Telegram resizes the WebView, WebKit may report an overlay
-        // keyboard. Reserve only the part that is outside the layout viewport.
-        const overlayHeight=focused&&watchKeyboardOpen&&height<root.clientHeight?height+'px':'';
+        // Keep the limit set while typing. CSS reserves zero space if the
+        // host already resized, without losing the limit if it expands again.
+        const overlayHeight=focused&&watchKeyboardOpen?height+'px':'';
         if(root.style.getPropertyValue('--watch-overlay-height')!==overlayHeight){
           root.style.setProperty('--watch-overlay-height',overlayHeight);
         }
@@ -3228,6 +3254,8 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     function stopWatchViewport(){
       restoreWatchField();
       stopWatchPlayerMotion();
+      resetWatchKeyboardOpening();
+      entryRoot.style.removeProperty('--watch-overlay-height');
       watchKeyboardOpen=false;
       watchNativeKeyboard=false;
       watchBaseHeight=0;
@@ -3249,10 +3277,12 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     window.addEventListener('resize',scheduleWatchViewport);
     window.addEventListener('scroll',scheduleWatchViewport,{passive:true});
     watchField.addEventListener('focus',()=>{
+      resetWatchKeyboardOpening();
       watchNativeKeyboard=false;
       scheduleWatchViewport();
     });
     watchField.addEventListener('blur',()=>{
+      resetWatchKeyboardOpening();
       if(watchUsesNativeRoom)entryRoot.style.removeProperty('--watch-overlay-height');
       scheduleWatchViewport();
     });
