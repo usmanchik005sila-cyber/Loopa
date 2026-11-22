@@ -9,7 +9,7 @@ test('avatar gateway checks session and permission before fetching a private pho
   let handler;
   let block = false;
   let photoExists = true;
-  let downloads = 0;
+  let downloads = 0, lookups = 0;
   vm.runInNewContext(source, {
     URL, Response,
     Deno: { serve: fn => { handler = fn; }, env: { get: name => name } },
@@ -19,11 +19,14 @@ test('avatar gateway checks session and permission before fetching a private pho
     } : { storage: { from: () => ({ download: async () => {
       downloads++;
       return photoExists ? { data: new Blob(['test image']) } : { error: true };
+    }, info: async () => {
+      lookups++;
+      return photoExists ? { data: { size: 4 } } : { error: { statusCode: '404' } };
     } }) } },
   });
-  const request = (token, path = account + '/telegram-avatar.jpg') => handler(new Request(
+  const request = (token, path = account + '/telegram-avatar.jpg', method = 'GET') => handler(new Request(
     'https://fixture.example/avatar?' + new URLSearchParams({path}), {
-      headers: { Origin: 'https://loopacinema.ru', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
+      method, headers: { Origin: 'https://loopacinema.ru', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
     }));
   assert.equal((await request()).status, 401);
   assert.equal((await request('invalid-fixture')).status, 401);
@@ -35,12 +38,19 @@ test('avatar gateway checks session and permission before fetching a private pho
   assert.equal(response.status, 200);
   assert.equal(response.headers.get('Cache-Control'), 'private, no-store');
   assert.equal(response.headers.get('Content-Type'), 'image/jpeg');
+  assert.equal((await request('local-fixture', undefined, 'HEAD')).status, 204);
+  assert.equal(lookups, 1);
+  assert.equal(downloads, 1);
   block = true;
+  assert.equal((await request('local-fixture', undefined, 'HEAD')).status, 404);
+  assert.equal(lookups, 1);
   response = await request('local-fixture');
   assert.equal(response.status, 404);
   assert.equal(downloads, 1);
   block = false;
   photoExists = false;
+  assert.equal((await request('local-fixture', undefined, 'HEAD')).status, 404);
+  assert.equal(lookups, 2);
   assert.equal((await request('local-fixture')).status, 404);
   assert.equal(downloads, 2);
 });
