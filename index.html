@@ -3009,7 +3009,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       applyCinemaMode(!cinemaModeEnabled);
       byId('roomSheet').close();
     });
-    let watchBaseHeight=0,watchWidth=0,watchKeyboardOpen=false,watchViewportTimer=0;
+    let watchBaseHeight=0,watchNativeBase=0,watchWidth=0,watchKeyboardOpen=false,watchNativeKeyboard=false,watchViewportTimer=0;
     const watchRoomWidth=()=>Math.min(document.documentElement.clientWidth||window.innerWidth,cinemaModeEnabled?1160:900);
     const watchLayoutHeight=height=>{
       if(!document.documentElement.classList.contains('telegram-fullscreen'))return height;
@@ -3113,17 +3113,29 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       const viewport=window.visualViewport,root=document.documentElement;
       const width=Math.min(root.clientWidth||window.innerWidth,cinemaModeEnabled?1160:900);
       const telegram=entryRoot.dataset.loopaEntry==='telegram'?window.Telegram?.WebApp:null;
-      const heights=[viewport?.height,window.innerHeight,telegram?.viewportHeight].filter(value=>Number.isFinite(value)&&value>0);
-      if(!heights.length||viewport&&Math.abs(viewport.scale-1)>.02)return;
-      const height=Math.min(...heights);
+      const nativeHeight=viewport?.height||window.innerHeight;
+      if(!nativeHeight||viewport&&Math.abs(viewport.scale-1)>.02)return;
+      const telegramHeight=Number(telegram?.viewportHeight)||nativeHeight;
       const focused=document.activeElement===watchField;
       const stableHeight=Number(telegram?.viewportStableHeight)||0;
       if(width!==watchWidth||!watchBaseHeight){
         watchWidth=width;
-        watchBaseHeight=Math.max(height,stableHeight||window.innerHeight);
+        watchBaseHeight=stableHeight||Math.max(nativeHeight,window.innerHeight);
+        watchNativeBase=nativeHeight;
+        watchNativeKeyboard=false;
       }
-      watchKeyboardOpen=(focused||watchKeyboardOpen)&&watchBaseHeight-height>(watchKeyboardOpen?55:100);
-      if(!focused&&!watchKeyboardOpen)watchBaseHeight=Math.max(height,stableHeight);
+      // Telegram's keyboard-sized height can linger after the native viewport expands.
+      // Once the native viewport reports this keyboard, follow it through dismissal.
+      if((focused||watchKeyboardOpen)&&(!focused||watchNativeBase-nativeHeight>100))watchNativeKeyboard=true;
+      const height=watchNativeKeyboard
+        ? nativeHeight
+        : Math.min(nativeHeight,window.innerHeight||nativeHeight,telegramHeight);
+      const baseline=watchNativeKeyboard?watchNativeBase:watchBaseHeight;
+      watchKeyboardOpen=(focused||watchKeyboardOpen)&&baseline-height>(watchKeyboardOpen?55:100);
+      if(!focused&&!watchKeyboardOpen){
+        watchBaseHeight=Math.max(height,stableHeight);
+        watchNativeBase=nativeHeight;
+      }
       document.body.classList.toggle('chatTyping',watchKeyboardOpen);
       const layoutHeight=watchLayoutHeight(height);
       const normal=watchNormalPlayer(layoutHeight,width);
@@ -3148,6 +3160,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     function stopWatchViewport(){
       restoreWatchField();
       watchKeyboardOpen=false;
+      watchNativeKeyboard=false;
       watchBaseHeight=0;
       if(watchViewportTimer)cancelAnimationFrame(watchViewportTimer);
       watchViewportTimer=0;
@@ -3170,7 +3183,10 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     window.visualViewport?.addEventListener('scroll',scheduleWatchViewport);
     window.addEventListener('resize',scheduleWatchViewport);
     window.addEventListener('scroll',scheduleWatchViewport,{passive:true});
-    watchField.addEventListener('focus',scheduleWatchViewport);
+    watchField.addEventListener('focus',()=>{
+      watchNativeKeyboard=false;
+      scheduleWatchViewport();
+    });
     watchField.addEventListener('blur',scheduleWatchViewport);
     if(entryRoot.dataset.loopaEntry==='telegram'){
       try{window.Telegram?.WebApp?.onEvent?.('viewportChanged',scheduleWatchViewport);}catch{}
