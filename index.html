@@ -3108,6 +3108,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     watchField.addEventListener('blur',restoreWatchField);
 
     watchLog.addEventListener('scroll',()=>{watchKeepBottom=watchLog.scrollHeight-watchLog.scrollTop-watchLog.clientHeight<48;},{passive:true});
+    let watchDismissal=null;
     function syncWatchViewport(){
       if(!document.body.classList.contains('roomViewing'))return;
       const viewport=window.visualViewport,root=document.documentElement;
@@ -3123,16 +3124,35 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         watchBaseHeight=stableHeight||Math.max(nativeHeight,window.innerHeight);
         watchNativeBase=nativeHeight;
         watchNativeKeyboard=false;
+        watchDismissal=null;
       }
       // Telegram's keyboard-sized height can linger after the native viewport expands.
       // Once the native viewport reports this keyboard, follow it through dismissal.
       if((focused||watchKeyboardOpen)&&(!focused||watchNativeBase-nativeHeight>100))watchNativeKeyboard=true;
-      const height=watchNativeKeyboard
+      let height=watchNativeKeyboard
         ? nativeHeight
         : Math.min(nativeHeight,window.innerHeight||nativeHeight,telegramHeight);
       const baseline=watchNativeKeyboard?watchNativeBase:watchBaseHeight;
-      watchKeyboardOpen=(focused||watchKeyboardOpen)&&baseline-height>(watchKeyboardOpen?55:100);
-      if(!focused&&!watchKeyboardOpen){
+      let keyboardShare;
+      if(watchDismissal){
+        const {start,from,to,initialNative,duration}=watchDismissal;
+        const elapsed=duration?Math.min(1,(performance.now()-start)/duration):1;
+        const eased=1-(1-elapsed)**2;
+        // iOS can animate the keyboard before reporting any viewport change.
+        const measured=nativeHeight>initialNative
+          ? Math.max(0,Math.min(1,(nativeHeight-from)/(to-from)))
+          : 0;
+        const progress=Math.max(eased,measured);
+        height=Math.round(from+(to-from)*progress);
+        keyboardShare=1-progress;
+        watchKeyboardOpen=progress<1;
+        if(watchKeyboardOpen)scheduleWatchViewport();
+        else if(nativeHeight>=to-2)watchDismissal=null;
+      }else{
+        watchKeyboardOpen=(focused||watchKeyboardOpen)&&baseline-height>(watchKeyboardOpen?55:100);
+        keyboardShare=watchKeyboardOpen?1:0;
+      }
+      if(!focused&&!watchKeyboardOpen&&!watchDismissal){
         watchBaseHeight=Math.max(height,stableHeight);
         watchNativeBase=nativeHeight;
       }
@@ -3141,8 +3161,8 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       const normal=watchNormalPlayer(layoutHeight,width);
       const compact=Math.min(normal,Math.max(76,Math.min(128,watchLayoutHeight(watchBaseHeight)*.30)));
       const preferred=cinemaModeEnabled?preferredCinemaPlayer(layoutHeight,width):normal;
-      const player=watchKeyboardOpen?compact:preferred;
-      const playerWidth=(watchKeyboardOpen||cinemaModeEnabled)?Math.min(width,player*16/9):width;
+      const player=preferred+(compact-preferred)*keyboardShare;
+      const playerWidth=cinemaModeEnabled?Math.min(width,player*16/9):width+(Math.min(width,compact*16/9)-width)*keyboardShare;
       const oldHeight=root.style.getPropertyValue('--watch-height');
       const oldPlayer=root.style.getPropertyValue('--watch-player-height');
       const oldPlayerWidth=root.style.getPropertyValue('--watch-player-width');
@@ -3159,6 +3179,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     }
     function stopWatchViewport(){
       restoreWatchField();
+      watchDismissal=null;
       watchKeyboardOpen=false;
       watchNativeKeyboard=false;
       watchBaseHeight=0;
@@ -3184,10 +3205,24 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     window.addEventListener('resize',scheduleWatchViewport);
     window.addEventListener('scroll',scheduleWatchViewport,{passive:true});
     watchField.addEventListener('focus',()=>{
+      watchDismissal=null;
       watchNativeKeyboard=false;
       scheduleWatchViewport();
     });
-    watchField.addEventListener('blur',scheduleWatchViewport);
+    watchField.addEventListener('blur',()=>{
+      if(watchIOS&&watchKeyboardOpen&&document.body.classList.contains('roomViewing')){
+        const from=parseFloat(document.documentElement.style.getPropertyValue('--watch-height'));
+        const to=watchNativeBase;
+        if(to-from>55){
+          watchDismissal={
+            start:performance.now(),from,to,
+            initialNative:window.visualViewport?.height||window.innerHeight,
+            duration:window.matchMedia('(prefers-reduced-motion: reduce)').matches?0:240
+          };
+        }
+      }
+      scheduleWatchViewport();
+    });
     if(entryRoot.dataset.loopaEntry==='telegram'){
       try{window.Telegram?.WebApp?.onEvent?.('viewportChanged',scheduleWatchViewport);}catch{}
     }
@@ -3209,6 +3244,27 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     }
     chatSendButton.addEventListener('pointerdown',keepRoomChatFocus);
     chatSendButton.addEventListener('mousedown',keepRoomChatFocus);
+    // On iOS the synthesized click can move focus after a touch. Submit the
+    // tap directly and cancel that click while the composer owns the keyboard.
+    if(watchIOS){
+      let sendTouchId=null;
+      chatSendButton.addEventListener('touchstart',event=>{
+        sendTouchId=event.touches.length===1&&document.activeElement===watchField
+          ? event.changedTouches[0].identifier
+          : null;
+      },{passive:true});
+      chatSendButton.addEventListener('touchcancel',()=>{sendTouchId=null;});
+      chatSendButton.addEventListener('touchend',event=>{
+        const touch=Array.from(event.changedTouches).find(item=>item.identifier===sendTouchId);
+        sendTouchId=null;
+        if(!touch||!event.cancelable)return;
+        const hit=document.elementFromPoint(touch.clientX,touch.clientY);
+        if(!chatSendButton.contains(hit))return;
+        event.preventDefault();
+        if(document.activeElement!==watchField)watchField.focus({preventScroll:true});
+        chatForm.requestSubmit(chatSendButton);
+      },{passive:false});
+    }
     // Safari's blue keyboard Send/Return key submits this single-line input.
     watchField.addEventListener('keydown',event=>{
       if(event.key!=='Enter'||event.isComposing||event.keyCode===229||event.shiftKey||event.ctrlKey||event.metaKey||event.altKey)return;
