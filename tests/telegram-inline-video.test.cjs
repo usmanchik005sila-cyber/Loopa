@@ -103,3 +103,42 @@ test('Telegram inline video search requires a signed update, caches results and 
   assert.deepEqual(answers[4].results, [answers[0].results[0]]);
   assert.equal(answers[4].cache_time, 10);
 });
+
+test('tracking commands work only for the bot owner in a private Telegram chat', async () => {
+  const linkId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const rpc = [], messages = [];
+  const env = { TELEGRAM_BOT_TOKEN:token, LOOPA_OWNER_TELEGRAM_ID:'42',
+    SUPABASE_SERVICE_ROLE_KEY:'fixture', SUPABASE_URL:'https://example.test' };
+  let receive;
+  vm.runInNewContext(source,{
+    Deno:{env:{get:key=>env[key]},serve:handler=>{receive=handler;}},
+    crypto:webcrypto,TextEncoder,URL,Response,AbortSignal,
+    createClient:()=>({rpc:async(name,args)=>{
+      rpc.push([name,JSON.parse(JSON.stringify(args))]);
+      return {data:name.startsWith('loopa_create')?linkId:[{id:linkId,label:'Космос',visitors:2}]};
+    }}),
+    fetch:async(url,options)=>{
+      assert.match(url,/sendMessage$/);
+      messages.push(JSON.parse(options.body));
+      return Response.json({ok:true});
+    }
+  });
+  async function command(text, id, type='private'){
+    return receive(new Request('https://example.test/loopa-bot',{
+      method:'POST',headers:{'X-Telegram-Bot-Api-Secret-Token':signature},
+      body:JSON.stringify({message:{chat:{type,id},from:{id},text}})
+    }));
+  }
+  await command('/link Космос', 43);
+  await command('/links', 42, 'group');
+  assert.equal(rpc.length,0);
+  assert.equal(messages.length,0);
+  assert.equal((await command('/link   Космос',42)).status,200);
+  assert.equal((await command('/links 2',42)).status,200);
+  assert.deepEqual(rpc,[
+    ['loopa_create_telegram_tracking_link',{p_label:'Космос'}],
+    ['loopa_list_telegram_tracking_links',{p_page:2}]
+  ]);
+  assert.match(messages[0].text,new RegExp('startapp=ref_'+linkId));
+  assert.match(messages[1].text,/Космос · 2 уник/);
+});
