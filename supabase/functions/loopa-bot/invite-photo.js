@@ -43,11 +43,13 @@ async function readCover(source, fetchImage) {
     if (validSize(header.getUint32(16), header.getUint32(20))) return png.PNG.sync.read(Buffer.from(file));
   }
   if (type === "image/webp") {
-    const info = getWebpInfo(file);
-    // Decode only one simple frame. Extended WebP carries its own canvas size.
-    if (info && !info.hasAnimation && validSize(info.width, info.height)
-        && parseRiff(file).filter(chunk => ["VP8 ", "VP8L"].includes(chunk.fourCC)).length === 1
-        && !info.isExtended) return webp(file);
+    const chunks = parseRiff(file);
+    const frames = chunks.filter(chunk => ["VP8 ", "VP8L"].includes(chunk.fourCC));
+    if (frames.length !== 1 || chunks.some(chunk => chunk.data.length !== chunk.size)) return null;
+    const canvas = getWebpInfo(chunks);
+    const frame = getWebpInfo(frames);
+    if (!canvas.hasAnimation && validSize(frame.width, frame.height)
+        && canvas.width === frame.width && canvas.height === frame.height) return webp(file);
   }
   return null;
 }
