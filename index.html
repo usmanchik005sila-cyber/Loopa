@@ -2703,8 +2703,6 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       pending={op:playing?'play':'pause',seconds:pos,...target};
       flushPlayback();updatePlaybackControls();revealControls();
     });
-    // v85: do not force captions via unsupported IFrame API "track" settings.
-    // Let the YouTube player honor its own caption preferences and native CC menu.
     function readyPlayer(){
       clearTimeout(playerReadyTimer);playerReadyTimer=0;
       if(playerIssue?.kind==='ready-timeout')clearPlayerIssue('ready-timeout');
@@ -2734,7 +2732,14 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         rutubeLoading.hidden=true;
         setPlayerIssue(LOOPAWatchReliability.playerReadyTimeout('rutube',hostHere()));
       };
-      if(url.includes('youtube.com/embed/')){const u=new URL(url);u.searchParams.set('controls','1');u.searchParams.set('fs','1');url=u.toString();}
+      if(url.startsWith('https://www.youtube.com/embed/')){
+        const youtube=new URL(url);
+        youtube.searchParams.set('controls','1');
+        youtube.searchParams.set('fs','1');
+        // Load captions on request so a saved YouTube preference cannot enable them at startup.
+        youtube.searchParams.set('cc_load_policy','3');
+        url=youtube.toString();
+      }
       frame.src=url;
       playerReadyTimer=setTimeout(()=>{
         if(frame!==roomBox())return;
@@ -2747,9 +2752,21 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     function bindRoomPlayers(){
       const frame=roomBox();if(!frame?.src||playerBindingFailed)return;
       if(frame.src.includes('youtube.com/')&&window.YT?.Player&&!ytPlayer){
+        let captionsInitialized=false;
+        const initializeCaptions=({target}={})=>{
+          if(captionsInitialized||frame!==roomBox())return;
+          try{
+            const track=target?.getOption?.('captions','track');
+            if(!track?.languageCode&&!target?.getOption?.('captions','tracklist')?.length)return;
+            captionsInitialized=true;
+            // Some YouTube versions restore a saved track despite the URL policy.
+            if(track?.languageCode)target.setOption?.('captions','track',{});
+          }catch{}
+        };
         try{
           ytPlayer=new YT.Player(frame,{events:{
-            onReady:readyPlayer,
+            onReady:event=>{initializeCaptions(event);readyPlayer();},
+            onApiChange:initializeCaptions,
             onStateChange:samplePlayers,
             onError:event=>setPlayerIssue(LOOPAWatchReliability.playerError('youtube',event?.data)),
             onAutoplayBlocked:()=>{nativeAccess=true;setPlayerIssue(LOOPAWatchReliability.autoplayBlocked(hostHere()));}

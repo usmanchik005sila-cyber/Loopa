@@ -71,7 +71,7 @@ test('RUTUBE resumes after the ad and publishes only the confirmed content posit
 test('guest transport buttons send the current room context and ignore stale replies', async () => {
   const guard = html.slice(html.indexOf('    function guestControlCurrent('), html.indexOf('    function queueGuestControl('));
   const listenerStart = html.indexOf("    playbackControls.addEventListener('click',async e=>");
-  const listener = html.slice(listenerStart, html.indexOf('    // v85:', listenerStart));
+  const listener = html.slice(listenerStart, html.indexOf('    function readyPlayer(', listenerStart));
   const requests = [];
   const applied = [];
   let click;
@@ -130,7 +130,7 @@ test('host drops a pending fetch after the playback grant changed or the app was
 
 test('host does not queue an older click after switching video or sending a newer click', async () => {
   const listenerStart = html.indexOf("    playbackControls.addEventListener('click',async e=>");
-  const listener = html.slice(listenerStart, html.indexOf('    // v85:', listenerStart));
+  const listener = html.slice(listenerStart, html.indexOf('    function readyPlayer(', listenerStart));
   let click;
   let finishSync;
   const writes = [];

@@ -27,6 +27,52 @@ test('identifies provider from the normalized player URL', () => {
   assert.equal(reliability.providerFor('https://vkvideo.ru/video_ext.php?oid=-1&id=2'), 'vk');
 });
 
+test('clears only the initial automatic YouTube caption track', () => {
+  const start = html.indexOf('    function bindRoomPlayers()');
+  const binding = html.slice(start, html.indexOf('    function samplePlayers(', start));
+  let events;
+  let ready = 0;
+  let track;
+  let tracks = [];
+  let clears = 0;
+  const player = {
+    getOption: (_module, option) => option === 'track' ? track : tracks,
+    setOption: (module, option, value) => {
+      assert.equal(module, 'captions');
+      assert.equal(option, 'track');
+      assert.equal(Object.keys(value).length, 0);
+      clears++;
+    },
+  };
+  const frame = {src: 'https://www.youtube.com/embed/dQw4w9WgXcQ'};
+  const YT = {Player: function (_element, options) { events = options.events; }};
+  const context = {
+    roomBox: () => frame, window: {YT}, YT, ytPlayer: null, playerBindingFailed: false,
+    readyPlayer: () => ready++, samplePlayers: () => {},
+  };
+  vm.runInNewContext(binding, context);
+  context.bindRoomPlayers();
+  events.onReady({target: player});
+  assert.equal(ready, 1);
+  assert.equal(clears, 0);
+
+  track = {languageCode:'ru'};
+  events.onApiChange({target: player});
+  assert.equal(clears, 1);
+  track = {languageCode:'en'};
+  events.onApiChange({target: player});
+  assert.equal(clears, 1);
+
+  context.ytPlayer = null;
+  context.bindRoomPlayers();
+  track = {};
+  tracks = [{languageCode:'ru'}];
+  events.onApiChange({target: player});
+  track = tracks[0];
+  events.onApiChange({target: player});
+  assert.equal(clears, 1);
+});
+
 test('maps YouTube playback failures to actionable next steps', () => {
   assert.match(reliability.playerError('youtube', 100).message, /удалено, закрыто или недоступно/);
   assert.match(reliability.playerError('youtube', 101).message, /запретил просмотр.*встроенном плеере/);
