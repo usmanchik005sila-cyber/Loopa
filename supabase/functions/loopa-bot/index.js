@@ -203,7 +203,7 @@ function safeCover(value){
   }catch{}
   return "";
 }
-const fallbackPhoto=WEBHOOK_URL+"/invite.jpg?action=invite_photo";
+const inviteCardUrl=WEBHOOK_URL+"/card-v3.jpg?action=invite_photo";
 const invitePlatform=new Set(["YouTube","VK Видео","RUTUBE"]);
 function cardText(value,maxLength){
   return typeof value==="string"?Array.from(value.normalize("NFC").replace(/\s+/g," ")
@@ -215,10 +215,11 @@ function inviteDetails(title,source,cover,duration){
 }
 async function photoCard(token,id,title,source,cover,url,duration,author){
   const details=inviteDetails(title,source,cover,duration);
-  const sig=await webhookSecret(token,"loopa.invite.photo.v2:"+JSON.stringify(details));
-  const photo=fallbackPhoto+"&"+new URLSearchParams({v:"2",...details,sig});
+  const sig=await webhookSecret(token,"loopa.invite.photo.v3:"+JSON.stringify(details));
+  const photo=inviteCardUrl+"&"+new URLSearchParams({v:"3",...details,sig});
   return {
-    type:"photo",id,photo_url:photo,thumbnail_url:details.cover||fallbackPhoto,photo_width:1280,photo_height:720,
+    // Telegram iOS can display the thumbnail in the outgoing message. Both URLs must serve the card.
+    type:"photo",id:"c3_"+id,photo_url:photo,thumbnail_url:photo,photo_width:1280,photo_height:720,
     title:details.title||"Приглашение в LOOPA",
     description:[details.source,cardText(author,100)].filter(Boolean).join(" · ")||"Совместный просмотр",
     reply_markup:{inline_keyboard:[[{text:"Смотреть вместе",url,style:"primary"}]]}
@@ -229,15 +230,17 @@ async function serveInvitePhoto(url,token,head){
   const details=inviteDetails(params.get("title"),params.get("source"),raw,Number(params.get("seconds")));
   if(url.search.length>7000||raw&&raw!==details.cover)return result({error:"invalid_photo"},403);
   const v=params.get("v");
-  if(v==="2"){
-    if(!sameSecret(sig,await webhookSecret(token,"loopa.invite.photo.v2:"+JSON.stringify(details))))
+  if(v==="2"||v==="3"){
+    if(!sameSecret(sig,await webhookSecret(token,"loopa.invite.photo.v"+v+":"+JSON.stringify(details))))
       return result({error:"invalid_photo"},403);
   }else{
     if(v||details.title||details.source||details.seconds||raw&&!sameSecret(sig,
       await webhookSecret(token,"loopa.invite.photo.v1:"+details.cover)))return result({error:"invalid_photo"},403);
   }
   const photo=head?null:await (await import("./invite-photo.js")).invitePhoto(details.cover,details);
-  return new Response(photo,{headers:{"Content-Type":"image/jpeg","Cache-Control":details.cover?"public, max-age=60":"public, max-age=86400","X-Content-Type-Options":"nosniff"}});
+  const headers={"Content-Type":"image/jpeg","Cache-Control":details.cover?"public, max-age=60":"public, max-age=86400","X-Content-Type-Options":"nosniff"};
+  if(photo)headers["Content-Length"]=String(photo.byteLength);
+  return new Response(photo,{headers});
 }
 function roomVideoMetadata(video){
   try{
