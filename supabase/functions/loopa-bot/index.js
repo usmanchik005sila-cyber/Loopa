@@ -190,6 +190,150 @@ async function processAccountDeletion(db,token,requestId,actorId,ownerId){
     };
   }
 }
+function safeCover(value){
+  if(typeof value!=="string"||value.length>800)return "";
+  try{
+    const url=new URL(value);
+    if(url.protocol==="https:"&&!url.username&&!url.password&&!url.port&&
+      /(^|\.)(ytimg\.com|rtbcdn\.ru|rutube\.ru|userapi\.com|vkusercdn\.ru|vkvideo\.ru)$/.test(url.hostname)){
+      url.hash="";
+      return url.href;
+    }
+  }catch{}
+  return "";
+}
+const fallbackPhoto=WEBHOOK_URL+"/invite.jpg?action=invite_photo";
+async function photoCard(token,id,title,source,cover,url,duration){
+  title=typeof title==="string"?Array.from(title.trim()).slice(0,220).join(""):"";
+  const image=safeCover(cover);
+  let photo=fallbackPhoto;
+  if(image){
+    const sig=await webhookSecret(token,"loopa.invite.photo.v1:"+image);
+    photo+="&"+new URLSearchParams({cover:image,sig});
+  }
+  const seconds=Number.isSafeInteger(duration)&&duration>0?duration:0;
+  const time=seconds?Math.floor(seconds/60)+":"+String(seconds%60).padStart(2,"0"):"";
+  const details=[source,time].filter(Boolean).join(" · ");
+  return {
+    type:"photo",id,photo_url:photo,thumbnail_url:image||photo,photo_width:960,photo_height:540,
+    title:title||"Приглашение в LOOPA",
+    description:details||"Совместный просмотр",
+    caption:[title,details,"Заходи, посмотрим вместе 🍿"].filter(Boolean).join("\n"),
+    reply_markup:{inline_keyboard:[[{text:"Смотреть вместе",url}]]}
+  };
+}
+async function serveInvitePhoto(url,token,head){
+  const raw=url.searchParams.get("cover")||"";
+  const cover=safeCover(raw);
+  if(url.search.length>3500||raw&&(!cover||!sameSecret(url.searchParams.get("sig")||"",
+    await webhookSecret(token,"loopa.invite.photo.v1:"+cover))))return result({error:"invalid_photo"},403);
+  const {invitePhoto}=await import("./invite-photo.js");
+  const photo=head?null:await invitePhoto(cover);
+  return new Response(photo,{headers:{"Content-Type":"image/jpeg","Cache-Control":cover?"public, max-age=60":"public, max-age=86400","X-Content-Type-Options":"nosniff"}});
+}
+function roomVideoMetadata(video){
+  try{
+    const {hostname,pathname,searchParams}=new URL(video);
+    const youtube=/^\/embed\/([A-Za-z0-9_-]{11})$/.exec(pathname)?.[1];
+    if(hostname==="www.youtube.com"&&youtube)return {provider:"youtube",id:youtube,source:"YouTube",
+      cover:"https://i.ytimg.com/vi/"+youtube+"/hqdefault.jpg"};
+    const rutube=/^\/play\/embed\/([a-f0-9]{32})\/?$/i.exec(pathname)?.[1];
+    if(hostname==="rutube.ru"&&rutube)return {provider:"rutube",id:rutube.toLowerCase(),source:"RUTUBE"};
+    const oid=searchParams.get("oid")||"",vid=searchParams.get("id")||"";
+    if(hostname==="vkvideo.ru"&&pathname==="/video_ext.php"&&/^-?\d{1,19}$/.test(oid)&&/^\d{1,19}$/.test(vid))
+      return {provider:"vk",id:oid+"_"+vid,source:"VK Видео"};
+  }catch{}
+  return {};
+}
+async function vkVideos(method,params){
+  const key=Deno.env.get("VK_VIDEO_TOKEN");
+  if(!key)return null;
+  const response=await fetch("https://api.vk.com/method/"+method,{
+    method:"POST",body:new URLSearchParams({...params,access_token:key,v:"5.199"}),
+    redirect:"error",signal:AbortSignal.timeout(1600)
+  });
+  if(!response.ok)return null;
+  const data=await response.json();
+  return Array.isArray(data?.response?.items)?data.response.items:null;
+}
+function decodeHtmlText(text){
+  return text.replace(/&(?:amp|quot|apos|lt|gt|#\d+|#x[a-f0-9]+);/gi,entity=>{
+    if(entity[1]!=="#")return ({amp:"&",quot:'"',apos:"'",lt:"<",gt:">"})[entity.slice(1,-1).toLowerCase()]||entity;
+    const hex=entity[2].toLowerCase()==="x";
+    const code=parseInt(entity.slice(hex?3:2,-1),hex?16:10);
+    return code>0&&code<=0x10ffff?String.fromCodePoint(code):"";
+  });
+}
+async function vkPublicMetadata(id){
+  const response=await fetch("https://vkvideo.ru/video"+id,{
+    redirect:"error",signal:AbortSignal.timeout(1300)
+  });
+  if(!response.ok||!response.headers.get("content-type")?.includes("text/html")||!response.body)return null;
+  const reader=response.body.getReader(),decoder=new TextDecoder();
+  let html="",size=0;
+  try{
+    while(size<160_000&&!/<\/head>/i.test(html)){
+      const {done,value}=await reader.read();
+      if(done)break;
+      html+=decoder.decode(value.subarray(0,160_000-size),{stream:true});
+      size+=value.length;
+    }
+  }finally{await reader.cancel();}
+  const properties=new Map();
+  for(const [tag] of html.matchAll(/<meta\s[^>]*>/gi)){
+    const attrs=new Map([...tag.matchAll(/([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g)]
+      .map(([,key,quoted,single])=>[key.toLowerCase(),quoted??single]));
+    if(attrs.has("property")&&attrs.has("content"))properties.set(attrs.get("property"),decodeHtmlText(attrs.get("content")));
+  }
+  const original=properties.get("og:url")||"";
+  if(!["https://vkvideo.ru/video"+id,"https://vk.com/video"+id].includes(original.split("?")[0].replace(/\/$/,"")))return null;
+  return {title:properties.get("og:title"),cover:safeCover(properties.get("og:image"))};
+}
+const roomMetadataCache=new Map();
+async function roomInviteDetails(code,jwt){
+  const key=Deno.env.get("SUPABASE_ANON_KEY"),url=Deno.env.get("SUPABASE_URL");
+  if(!key||!url)throw Error("room_invite_config_missing");
+  const client=createClient(url,key,{global:{headers:{Authorization:"Bearer "+jwt}},
+    auth:{autoRefreshToken:false,persistSession:false}});
+  const {data,error}=await client.rpc("loopa_room_invite_details",{p_code:code.toUpperCase()})
+    .abortSignal(AbortSignal.timeout(1600));
+  if(error)throw error;
+  return data;
+}
+async function getRoomVideoCard(room,jwt){
+  const info=roomVideoMetadata(room.video);
+  if(!info.id)return info;
+  info.title=room.title==="Видео"?"":room.title;
+  info.cover=safeCover(room.image)||info.cover;
+  if(info.title&&info.cover)return info;
+  const key=info.provider+":"+info.id,cached=roomMetadataCache.get(key);
+  if(cached?.expires>Date.now()){
+    const record=await cached.task;
+    return {...info,title:info.title||record?.title,cover:info.cover||record?.cover,duration:record?.duration};
+  }
+  const task=(async()=>{
+    if(info.provider==="vk"){
+      const [items,publicMetadata]=await Promise.all([
+        vkVideos("video.get",{videos:info.id}).catch(()=>null),vkPublicMetadata(info.id).catch(()=>null)
+      ]);
+      const hit=items?.find(item=>item.owner_id+"_"+item.id===info.id&&!item.is_private);
+      return hit?{title:hit.title,cover:safeCover(hit.image?.at(-1)?.url)||publicMetadata?.cover,duration:hit.duration}:publicMetadata;
+    }
+    const response=await fetch("https://"+PROJECT_REF+".supabase.co/functions/v1/video-search",{
+      method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+jwt},
+      body:JSON.stringify({provider:info.provider,id:info.id,mode:"metadata"}),
+      redirect:"error",signal:AbortSignal.timeout(1600)
+    });
+    const {item}=response.ok?await response.json():{};
+    return item&&{title:item.title,cover:item.image,duration:item.duration};
+  })().catch(()=>null);
+  if(roomMetadataCache.size>=80)roomMetadataCache.delete(roomMetadataCache.keys().next().value);
+  const entry={task,expires:Date.now()+30_000};
+  roomMetadataCache.set(key,entry);
+  const record=await task;
+  if(record)entry.expires=Date.now()+600_000;
+  return {...info,title:info.title||record?.title,cover:info.cover||record?.cover,duration:record?.duration};
+}
 async function miniAppAction(request,token){
   if(request.headers.get("Origin")!==SITE_ORIGIN)return result({error:"invalid_origin"},403);
   const jwt=/^Bearer (.+)$/i.exec(request.headers.get("Authorization")||"")?.[1];
@@ -217,6 +361,16 @@ async function miniAppAction(request,token){
     const chatId=Number(claim.telegram_id);
     if(!Number.isSafeInteger(chatId)||chatId<=0)return result({status:"not_eligible"});
     try{
+      const room=await roomInviteDetails(claim.code,jwt).catch(()=>null);
+      if(room){
+        const info=await getRoomVideoCard(room,jwt).catch(()=>({}));
+        const card=await photoCard(token,"invite",info.title,info.source,info.cover,roomLink(claim.code),info.duration);
+        try{
+          await botAPI(token,"sendPhoto",{chat_id:chatId,photo:card.photo_url,
+            caption:card.caption,reply_markup:card.reply_markup});
+          return result({status:"sent"});
+        }catch{}
+      }
       await botAPI(token,"sendMessage",{
         chat_id:chatId,
         text:"🎬 <b>Приглашение в LOOPA</b>\n\n<b>"+escapeHtml(claim.sender_name||"Друг")+"</b> зовёт тебя посмотреть видео вместе.\n\n<i>Один экран. Общие моменты.</i>",
@@ -228,25 +382,16 @@ async function miniAppAction(request,token){
   }
   const code=String(input.code||"");
   if(!/^[a-f0-9]{12}$/i.test(code))return result({error:"invalid_room"},400);
-  const {data:room,error:roomError}=await db.from("loopa_rooms16").select("host").eq("code",code.toUpperCase()).maybeSingle();
-  if(roomError)throw roomError;
-  if(room?.host!==uid)return result({error:"not_room_host"},403);
+  const room=await roomInviteDetails(code,jwt);
+  if(!room)return result({error:"not_room_host"},403);
   const {data:link,error:linkError}=await db.from("telegram_miniapp_links").select("telegram_id").eq("user_id",uid).maybeSingle();
   if(linkError)throw linkError;
   const telegramId=Number(link?.telegram_id);
   if(!Number.isSafeInteger(telegramId)||telegramId<=0)return result({error:"telegram_not_linked"},409);
+  const info=await getRoomVideoCard(room,jwt).catch(()=>({}));
+  const card=await photoCard(token,crypto.randomUUID(),info.title,info.source,info.cover,roomLink(code),info.duration);
   const prepared=await botAPI(token,"savePreparedInlineMessage",{
-    user_id:telegramId,
-    result:{
-      type:"article",id:crypto.randomUUID(),title:"LOOPA — совместный просмотр",
-      description:"Приглашение в твою комнату",
-      input_message_content:{
-        message_text:"<b><i>🎬 Смотри со мной в LOOPA! 🍿</i></b>\n\n"+roomLink(code),
-        parse_mode:"HTML",
-        link_preview_options:{is_disabled:false}
-      },
-      reply_markup:{inline_keyboard:[[{text:"🎞 Открыть комнату",url:roomLink(code)}]]}
-    },
+    user_id:telegramId,result:card,
     allow_user_chats:true,allow_group_chats:true
   });
   return result({status:"ready",message_id:prepared.id});
@@ -301,7 +446,7 @@ async function botAPI(token,method,payload={}) {
 }
 const inlineVideos=new Map();
 const inlineVideoId=/^[A-Za-z0-9_-]{11}$/;
-async function youtubeInlineResults(query){
+async function youtubeInlineResults(token,query){
   const key=Deno.env.get("YOUTUBE_API_KEY");
   if(!key)return null;
   const params=new URLSearchParams({
@@ -314,20 +459,14 @@ async function youtubeInlineResults(query){
   const {items}=await response.json();
   if(!Array.isArray(items))return null;
   const ids=new Set();
-  return items.flatMap(item=>{
+  return Promise.all(items.filter(item=>{
     const id=item?.id?.videoId;
-    const title=typeof item?.snippet?.title==="string"?item.snippet.title.trim().slice(0,180):"";
-    if(!inlineVideoId.test(id||"")||ids.has(id)||!title)return [];
+    if(!inlineVideoId.test(id||"")||ids.has(id)||!item?.snippet?.title)return false;
     ids.add(id);
-    const author=typeof item.snippet.channelTitle==="string"?item.snippet.channelTitle.trim().slice(0,100):"";
-    const buttonUrl="https://t.me/"+BOT_NAME+"/loopa?startapp=yt_"+id;
-    return [{
-      type:"article",id:"yt_"+id,title,description:author?"YouTube · "+author:"YouTube",
-      thumbnail_url:"https://i.ytimg.com/vi/"+id+"/hqdefault.jpg",
-      input_message_content:{message_text:title,link_preview_options:{is_disabled:true}},
-      reply_markup:{inline_keyboard:[[{text:"Смотреть вместе",url:buttonUrl}]]}
-    }];
-  });
+    return true;
+  }).map(({id:{videoId},snippet})=>photoCard(token,"yt_"+videoId,snippet.title,"YouTube",
+    "https://i.ytimg.com/vi/"+videoId+"/hqdefault.jpg",
+    "https://t.me/"+BOT_NAME+"/loopa?startapp=yt_"+videoId)));
 }
 const inlineRutubeUrl="https://functions.yandexcloud.net/d4e8n1se4iuc8ql4rm82";
 const inlineRutubeId=/^https:\/\/rutube\.ru\/video\/([a-f0-9]{32})\/$/i;
@@ -342,24 +481,25 @@ async function rutubeInlineResults(token,query){
   const {items}=await response.json();
   if(!Array.isArray(items))return null;
   const ids=new Set();
-  return items.slice(0,8).flatMap(item=>{
+  return Promise.all(items.slice(0,8).flatMap(item=>{
     const id=inlineRutubeId.exec(item?.url||"")?.[1]?.toLowerCase();
-    const title=typeof item?.title==="string"?item.title.trim().slice(0,180):"";
-    if(!id||!title||ids.has(id))return [];
+    if(!id||!item?.title||ids.has(id))return [];
     ids.add(id);
-    const author=typeof item.author==="string"?item.author.trim().slice(0,100):"";
-    const card={
-      type:"article",id:"rt_"+id,title,description:author?"RUTUBE · "+author:"RUTUBE",
-      input_message_content:{message_text:title,link_preview_options:{is_disabled:true}},
-      reply_markup:{inline_keyboard:[[{text:"Смотреть вместе",url:"https://t.me/"+BOT_NAME+"/loopa?startapp=rt_"+id}]]}
-    };
-    try{
-      const cover=new URL(item.image);
-      if(cover.protocol==="https:"&&/(^|\.)(rutube|rtbcdn)\.ru$/.test(cover.hostname)&&!cover.username&&!cover.password)
-        card.thumbnail_url=cover.href;
-    }catch{/* Cards can omit a cover. */}
-    return [card];
-  });
+    return [photoCard(token,"rt_"+id,item.title,"RUTUBE",item.image,
+      "https://t.me/"+BOT_NAME+"/loopa?startapp=rt_"+id,item.duration)];
+  }));
+}
+async function vkInlineResults(token,query){
+  const items=await vkVideos("video.search",{q:query,count:"8",adult:"0"});
+  if(!items)return null;
+  const ids=new Set();
+  return Promise.all(items.flatMap(item=>{
+    const id=item?.owner_id+"_"+item?.id;
+    if(!/^-?\d{1,19}_\d{1,19}$/.test(id)||!item.title||item.is_private||ids.has(id))return [];
+    ids.add(id);
+    return [photoCard(token,"vk_"+id,item.title,"VK Видео",item.image?.at(-1)?.url,
+      "https://t.me/"+BOT_NAME+"/loopa?startapp=vk_"+id,item.duration)];
+  }));
 }
 async function verifyInlineRutube(request,token){
   const proof=request.headers.get("X-Loopa-Inline-Proof")||"";
@@ -404,16 +544,18 @@ async function handleInlineVideo(token,query){
         const {data,error}=await adminClient().rpc("loopa_take_inline_video_budget",{p_actor:actor})
           .abortSignal(AbortSignal.timeout(1500));
         if(!error&&data===true){
-          const [youtube,rutube]=await Promise.all([
-            youtubeInlineResults(term).catch(()=>null),
-            rutubeInlineResults(token,term).catch(()=>null)
+          const [youtube,rutube,vk]=await Promise.all([
+            youtubeInlineResults(token,term).catch(()=>null),
+            rutubeInlineResults(token,term).catch(()=>null),
+            vkInlineResults(token,term).catch(()=>null)
           ]);
-          const count=Math.max(youtube?.length||0,rutube?.length||0);
+          const count=Math.max(youtube?.length||0,rutube?.length||0,vk?.length||0);
           for(let index=0;index<count;index++){
             if(youtube?.[index])results.push(youtube[index]);
             if(rutube?.[index])results.push(rutube[index]);
+            if(vk?.[index])results.push(vk[index]);
           }
-          if(youtube||rutube){
+          if(youtube||rutube||vk){
             cacheTime=youtube&&rutube?60:10;
             if(inlineVideos.size>=100)inlineVideos.delete(inlineVideos.keys().next().value);
             inlineVideos.set(key,{results,cacheTime,expires:Date.now()+(youtube&&rutube?300000:10000)});
@@ -440,13 +582,16 @@ async function getStatus(token){
     inlineMode:!!bot.supports_inline_queries,
     inlineWebhook:!info.allowed_updates?.length||info.allowed_updates.includes("inline_query"),
     inlineProvider:!!Deno.env.get("YOUTUBE_API_KEY"),
-    trackingOwnerConfigured:ownerTelegramId()!==null};
+    trackingOwnerConfigured:ownerTelegramId()!==null,
+    vkSearchConfigured:!!Deno.env.get("VK_VIDEO_TOKEN")};
 }
 Deno.serve(async request=>{
   try{
     const token=Deno.env.get("TELEGRAM_BOT_TOKEN");
     if(!token)return result({error:"bot_token_not_configured"},503);
     const url=new URL(request.url);
+    if(["GET","HEAD"].includes(request.method)&&url.searchParams.get("action")==="invite_photo")
+      return await serveInvitePhoto(url,token,request.method==="HEAD");
     if(request.method==="GET"&&url.searchParams.get("action")==="status"){
       const info=await getStatus(token);
       return result(info,info.error?409:200);
