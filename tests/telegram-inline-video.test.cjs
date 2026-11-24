@@ -58,7 +58,7 @@ test('Telegram inline video search requires a signed update, caches results and 
         assert.equal((await verify(options.body, proof)).status, 200);
         assert.equal((await verify(options.body, proof)).status, 401);
         return Response.json({ items: [{ url: 'https://rutube.ru/video/' + rtId + '/',
-          title: 'Ролик RUTUBE', author: 'Канал', image: 'https://pic.rutube.ru/cover.jpg' }] });
+          title: 'Ролик RUTUBE', author: 'Канал', duration: 772, image: 'https://pic.rutubelist.ru/cover.jpg' }] });
       }
       assert.equal(endpoint.pathname, '/bot' + token + '/answerInlineQuery');
       answers.push(JSON.parse(options.body));
@@ -74,25 +74,35 @@ test('Telegram inline video search requires a signed update, caches results and 
   assert.equal(answers.length, 0);
   assert.equal((await update('query-1', ' Аниме ')).status, 200);
   assert.equal(answers[0].inline_query_id, 'query-1');
-  assert.equal(answers[0].results.length, 2);
-  assert.equal(answers[0].results[0].description, 'YouTube');
+  assert.equal(answers[0].results.length, 3);
+  assert.equal(answers[0].results[0].description, 'YouTube · Автор');
   assert.equal(answers[0].results[0].type, 'photo');
-  assert.equal(answers[0].results[0].photo_width / answers[0].results[0].photo_height, 16 / 9);
-  assert.match(answers[0].results[0].caption, /Пример\nYouTube\nЗаходи, посмотрим вместе/);
+  assert.equal(answers[0].results[0].photo_width, 1280);
+  assert.equal(answers[0].results[0].photo_height, 720);
+  assert.equal(answers[0].results[0].caption, undefined);
   const photo = new URL(answers[0].results[0].photo_url);
   assert.equal(photo.searchParams.get('action'), 'invite_photo');
   assert.match(photo.searchParams.get('sig'), /^[a-f0-9]{64}$/);
+  assert.equal(photo.searchParams.get('title'), 'Пример');
+  assert.equal(photo.searchParams.get('source'), 'YouTube');
   assert.equal(answers[0].results[0].input_message_content, undefined);
-  photo.searchParams.set('cover','https://www.rutube.ru/redirect-test');
-  assert.equal((await receive(new Request(photo))).status,403);
+  assert.equal((await receive(new Request(photo,{method:'HEAD'}))).headers.get('content-type'),'image/jpeg');
+  for(const [field,value] of [['cover','https://www.rutube.ru/redirect-test'],['title','Подмена'],['seconds','45']]){
+    const changed=new URL(photo);
+    changed.searchParams.set(field,value);
+    assert.equal((await receive(new Request(changed,{method:'HEAD'}))).status,403);
+  }
   assert.equal(answers[0].results[0].reply_markup.inline_keyboard[0][0].url,
     'https://t.me/LOOPAvideo_bot/loopa?startapp=yt_K8vD4XbI2Ww');
 
-  assert.equal(answers[0].results[1].description, 'RUTUBE');
+  assert.equal(answers[0].results[1].description, 'RUTUBE · Канал');
   assert.equal(answers[0].results[1].type, 'photo');
+  assert.equal(new URL(answers[0].results[1].photo_url).searchParams.get('seconds'), '772');
   assert.equal(answers[0].results[1].reply_markup.inline_keyboard[0][0].url,
     'https://t.me/LOOPAvideo_bot/loopa?startapp=rt_' + rtId);
   assert.equal(consumed.size, 1);
+  assert.equal(answers[0].results[2].type, 'article');
+  assert.equal(answers[0].results[2].id, 'loopa_open');
 
   await update('query-2', 'аниме');
   assert.deepEqual(answers[1].results, answers[0].results);
@@ -110,7 +120,7 @@ test('Telegram inline video search requires a signed update, caches results and 
   allowed = true;
   rutubeAvailable = false;
   await update('query-5', 'Музыка');
-  assert.deepEqual(answers[4].results, [answers[0].results[0]]);
+  assert.deepEqual(answers[4].results, [answers[0].results[0], answers[0].results[2]]);
   assert.equal(answers[4].cache_time, 10);
 });
 
@@ -163,9 +173,13 @@ test('room invites send a photo with the original room link and require the host
   assert.equal(message.allow_user_chats, true);
   assert.equal(message.allow_group_chats, true);
   assert.equal(message.result.type, 'photo');
-  assert.equal(message.result.caption, 'Тестовое видео\nVK Видео · 1:33\nЗаходи, посмотрим вместе 🍿');
+  assert.equal(message.result.caption, undefined);
+  const photo = new URL(message.result.photo_url);
+  assert.equal(photo.searchParams.get('title'),'Тестовое видео');
+  assert.equal(photo.searchParams.get('source'),'VK Видео');
+  assert.equal(photo.searchParams.get('seconds'),'93');
   assert.deepEqual(message.result.reply_markup.inline_keyboard, [[{
-    text: 'Смотреть вместе', url: 'https://t.me/LOOPAvideo_bot/loopa?startapp=room_abcdef123456'
+    text: 'Смотреть вместе', url: 'https://t.me/LOOPAvideo_bot/loopa?startapp=room_abcdef123456', style: 'primary'
   }]]);
 });
 

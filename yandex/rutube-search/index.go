@@ -17,10 +17,11 @@ import (
 var inlineProof = regexp.MustCompile(`^[a-f0-9]{64}$`)
 
 type catalogVideo struct {
-	ID     string `json:"id"`
-	Title  string `json:"title"`
-	Image  string `json:"thumbnail_url"`
-	Author struct {
+	ID       string          `json:"id"`
+	Title    string          `json:"title"`
+	Image    string          `json:"thumbnail_url"`
+	Duration json.RawMessage `json:"duration"`
+	Author   struct {
 		Name string `json:"name"`
 	} `json:"author"`
 	Deleted bool `json:"is_deleted"`
@@ -30,7 +31,7 @@ type catalogVideo struct {
 	Private bool `json:"is_private"`
 }
 
-func (v catalogVideo) item() map[string]string {
+func (v catalogVideo) item() map[string]interface{} {
 	if !videoID.MatchString(v.ID) || v.Title == "" || v.Deleted || v.Hidden || v.Paid || v.Locked || v.Private {
 		return nil
 	}
@@ -38,7 +39,12 @@ func (v catalogVideo) item() map[string]string {
 	if u, err := url.Parse(v.Image); err == nil && u.Scheme == "https" && u.Host != "" && u.User == nil {
 		image = v.Image
 	}
-	return map[string]string{"title": v.Title, "author": v.Author.Name, "image": image, "url": "https://rutube.ru/video/" + v.ID + "/"}
+	item := map[string]interface{}{"title": v.Title, "author": v.Author.Name, "image": image, "url": "https://rutube.ru/video/" + v.ID + "/"}
+	var duration int
+	if json.Unmarshal(v.Duration, &duration) == nil && duration > 0 && duration <= 604800 {
+		item["duration"] = duration
+	}
+	return item
 }
 
 var videoID = regexp.MustCompile(`^[a-fA-F0-9]{32}$`)
@@ -249,7 +255,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		fail(w, 502, "Не удалось прочитать каталог RUTUBE")
 		return
 	}
-	items := []map[string]string{}
+	items := []map[string]interface{}{}
 	for _, video := range *data.Results {
 		if item := video.item(); item != nil {
 			items = append(items, item)

@@ -195,7 +195,8 @@ function safeCover(value){
   try{
     const url=new URL(value);
     if(url.protocol==="https:"&&!url.username&&!url.password&&!url.port&&
-      /(^|\.)(ytimg\.com|rtbcdn\.ru|rutube\.ru|userapi\.com|vkusercdn\.ru|vkvideo\.ru)$/.test(url.hostname)){
+      (url.hostname==="pic.rutubelist.ru"||
+      /(^|\.)(ytimg\.com|rtbcdn\.ru|rutube\.ru|userapi\.com|vkusercdn\.ru|vkvideo\.ru)$/.test(url.hostname))){
       url.hash="";
       return url.href;
     }
@@ -203,33 +204,40 @@ function safeCover(value){
   return "";
 }
 const fallbackPhoto=WEBHOOK_URL+"/invite.jpg?action=invite_photo";
-async function photoCard(token,id,title,source,cover,url,duration){
-  title=typeof title==="string"?Array.from(title.trim()).slice(0,220).join(""):"";
-  const image=safeCover(cover);
-  let photo=fallbackPhoto;
-  if(image){
-    const sig=await webhookSecret(token,"loopa.invite.photo.v1:"+image);
-    photo+="&"+new URLSearchParams({cover:image,sig});
-  }
-  const seconds=Number.isSafeInteger(duration)&&duration>0?duration:0;
-  const time=seconds?Math.floor(seconds/60)+":"+String(seconds%60).padStart(2,"0"):"";
-  const details=[source,time].filter(Boolean).join(" · ");
+const invitePlatform=new Set(["YouTube","VK Видео","RUTUBE"]);
+function cardText(value,maxLength){
+  return typeof value==="string"?Array.from(value.normalize("NFC").replace(/\s+/g," ")
+    .replace(/[\p{Cc}\p{Cf}]/gu,"").trim()).slice(0,maxLength).join(""):"";
+}
+function inviteDetails(title,source,cover,duration){
+  return {title:cardText(title,220),source:invitePlatform.has(source)?source:"",cover:safeCover(cover),
+    seconds:Number.isSafeInteger(duration)&&duration>0&&duration<=604800?duration:0};
+}
+async function photoCard(token,id,title,source,cover,url,duration,author){
+  const details=inviteDetails(title,source,cover,duration);
+  const sig=await webhookSecret(token,"loopa.invite.photo.v2:"+JSON.stringify(details));
+  const photo=fallbackPhoto+"&"+new URLSearchParams({v:"2",...details,sig});
   return {
-    type:"photo",id,photo_url:photo,thumbnail_url:image||photo,photo_width:960,photo_height:540,
-    title:title||"Приглашение в LOOPA",
-    description:details||"Совместный просмотр",
-    caption:[title,details,"Заходи, посмотрим вместе 🍿"].filter(Boolean).join("\n"),
-    reply_markup:{inline_keyboard:[[{text:"Смотреть вместе",url}]]}
+    type:"photo",id,photo_url:photo,thumbnail_url:details.cover||fallbackPhoto,photo_width:1280,photo_height:720,
+    title:details.title||"Приглашение в LOOPA",
+    description:[details.source,cardText(author,100)].filter(Boolean).join(" · ")||"Совместный просмотр",
+    reply_markup:{inline_keyboard:[[{text:"Смотреть вместе",url,style:"primary"}]]}
   };
 }
 async function serveInvitePhoto(url,token,head){
-  const raw=url.searchParams.get("cover")||"";
-  const cover=safeCover(raw);
-  if(url.search.length>3500||raw&&(!cover||!sameSecret(url.searchParams.get("sig")||"",
-    await webhookSecret(token,"loopa.invite.photo.v1:"+cover))))return result({error:"invalid_photo"},403);
-  const {invitePhoto}=await import("./invite-photo.js");
-  const photo=head?null:await invitePhoto(cover);
-  return new Response(photo,{headers:{"Content-Type":"image/jpeg","Cache-Control":cover?"public, max-age=60":"public, max-age=86400","X-Content-Type-Options":"nosniff"}});
+  const params=url.searchParams,raw=params.get("cover")||"",sig=params.get("sig")||"";
+  const details=inviteDetails(params.get("title"),params.get("source"),raw,Number(params.get("seconds")));
+  if(url.search.length>7000||raw&&raw!==details.cover)return result({error:"invalid_photo"},403);
+  const v=params.get("v");
+  if(v==="2"){
+    if(!sameSecret(sig,await webhookSecret(token,"loopa.invite.photo.v2:"+JSON.stringify(details))))
+      return result({error:"invalid_photo"},403);
+  }else{
+    if(v||details.title||details.source||details.seconds||raw&&!sameSecret(sig,
+      await webhookSecret(token,"loopa.invite.photo.v1:"+details.cover)))return result({error:"invalid_photo"},403);
+  }
+  const photo=head?null:await (await import("./invite-photo.js")).invitePhoto(details.cover,details);
+  return new Response(photo,{headers:{"Content-Type":"image/jpeg","Cache-Control":details.cover?"public, max-age=60":"public, max-age=86400","X-Content-Type-Options":"nosniff"}});
 }
 function roomVideoMetadata(video){
   try{
@@ -287,7 +295,8 @@ async function vkPublicMetadata(id){
   }
   const original=properties.get("og:url")||"";
   if(!["https://vkvideo.ru/video"+id,"https://vk.com/video"+id].includes(original.split("?")[0].replace(/\/$/,"")))return null;
-  return {title:properties.get("og:title"),cover:safeCover(properties.get("og:image"))};
+  return {title:properties.get("og:title"),cover:safeCover(properties.get("og:image")),
+    duration:Number(properties.get("video:duration"))};
 }
 const roomMetadataCache=new Map();
 async function roomInviteDetails(code,jwt){
@@ -305,7 +314,7 @@ async function getRoomVideoCard(room,jwt){
   if(!info.id)return info;
   info.title=room.title==="Видео"?"":room.title;
   info.cover=safeCover(room.image)||info.cover;
-  if(info.title&&info.cover)return info;
+  if(info.title&&info.cover&&info.provider!=="rutube")return info;
   const key=info.provider+":"+info.id,cached=roomMetadataCache.get(key);
   if(cached?.expires>Date.now()){
     const record=await cached.task;
@@ -317,7 +326,8 @@ async function getRoomVideoCard(room,jwt){
         vkVideos("video.get",{videos:info.id}).catch(()=>null),vkPublicMetadata(info.id).catch(()=>null)
       ]);
       const hit=items?.find(item=>item.owner_id+"_"+item.id===info.id&&!item.is_private);
-      return hit?{title:hit.title,cover:safeCover(hit.image?.at(-1)?.url)||publicMetadata?.cover,duration:hit.duration}:publicMetadata;
+      return hit?{title:hit.title,cover:safeCover(hit.image?.at(-1)?.url)||publicMetadata?.cover,
+        duration:hit.duration||publicMetadata?.duration}:publicMetadata;
     }
     const response=await fetch("https://"+PROJECT_REF+".supabase.co/functions/v1/video-search",{
       method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+jwt},
@@ -366,16 +376,14 @@ async function miniAppAction(request,token){
         const info=await getRoomVideoCard(room,jwt).catch(()=>({}));
         const card=await photoCard(token,"invite",info.title,info.source,info.cover,roomLink(claim.code),info.duration);
         try{
-          await botAPI(token,"sendPhoto",{chat_id:chatId,photo:card.photo_url,
-            caption:card.caption,reply_markup:card.reply_markup});
+          await botAPI(token,"sendPhoto",{chat_id:chatId,photo:card.photo_url,reply_markup:card.reply_markup});
           return result({status:"sent"});
         }catch{}
       }
       await botAPI(token,"sendMessage",{
         chat_id:chatId,
-        text:"🎬 <b>Приглашение в LOOPA</b>\n\n<b>"+escapeHtml(claim.sender_name||"Друг")+"</b> зовёт тебя посмотреть видео вместе.\n\n<i>Один экран. Общие моменты.</i>",
-        parse_mode:"HTML",
-        reply_markup:{inline_keyboard:[[{text:"🎞 Присоединиться",url:roomLink(claim.code)}]]}
+        text:"Посмотрим вместе?",
+        reply_markup:{inline_keyboard:[[{text:"Смотреть вместе",url:roomLink(claim.code),style:"primary"}]]}
       });
       return result({status:"sent"});
     }catch{return result({status:"telegram_unavailable"});}
@@ -466,7 +474,7 @@ async function youtubeInlineResults(token,query){
     return true;
   }).map(({id:{videoId},snippet})=>photoCard(token,"yt_"+videoId,snippet.title,"YouTube",
     "https://i.ytimg.com/vi/"+videoId+"/hqdefault.jpg",
-    "https://t.me/"+BOT_NAME+"/loopa?startapp=yt_"+videoId)));
+    "https://t.me/"+BOT_NAME+"/loopa?startapp=yt_"+videoId,undefined,snippet.channelTitle)));
 }
 const inlineRutubeUrl="https://functions.yandexcloud.net/d4e8n1se4iuc8ql4rm82";
 const inlineRutubeId=/^https:\/\/rutube\.ru\/video\/([a-f0-9]{32})\/$/i;
@@ -486,7 +494,7 @@ async function rutubeInlineResults(token,query){
     if(!id||!item?.title||ids.has(id))return [];
     ids.add(id);
     return [photoCard(token,"rt_"+id,item.title,"RUTUBE",item.image,
-      "https://t.me/"+BOT_NAME+"/loopa?startapp=rt_"+id,item.duration)];
+      "https://t.me/"+BOT_NAME+"/loopa?startapp=rt_"+id,item.duration,item.author)];
   }));
 }
 async function vkInlineResults(token,query){
@@ -564,7 +572,12 @@ async function handleInlineVideo(token,query){
       }catch{/* Leave the query retryable if the provider or quota check is unavailable. */}
     }
   }
-  await botAPI(token,"answerInlineQuery",{inline_query_id:id,results,cache_time:cacheTime});
+  // Telegram uses a vertical list when inline results include an article.
+  // Keep video results as photos so sending one doesn't require an edit or BotFather feedback.
+  const catalog={type:"article",id:"loopa_open",title:"Открыть LOOPA",
+    input_message_content:{message_text:"Открыть LOOPA",link_preview_options:{is_disabled:true}},
+    reply_markup:{inline_keyboard:[[{text:"Открыть LOOPA",url:"https://t.me/"+BOT_NAME+"/loopa",style:"primary"}]]}};
+  await botAPI(token,"answerInlineQuery",{inline_query_id:id,results:results.length?[...results,catalog]:[],cache_time:cacheTime});
 }
 function webhookState(url){
   return !url?"empty":url===WEBHOOK_URL?"loopa":"external";

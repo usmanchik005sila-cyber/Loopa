@@ -28,7 +28,7 @@ func run(t *testing.T, auth string, quotaStatus int, quotaBody string) (*httptes
 			}
 		case "rutube.ru":
 			upstream++
-			body = `{"results":[{"id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","title":"Video","thumbnail_url":"https://pic.rtbcdn.ru/cover.jpg","author":{"name":"Author"}},{"id":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","title":"Private","is_hidden":true}],"has_next":true}`
+			body = `{"results":[{"id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","title":"Video","duration":772,"thumbnail_url":"https://pic.rtbcdn.ru/cover.jpg","author":{"name":"Author"}},{"id":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","title":"Private","is_hidden":true}],"has_next":true}`
 			if r.URL.Query().Get("per_page") != "12" {
 				t.Fatal("pagination changed")
 			}
@@ -45,7 +45,8 @@ func run(t *testing.T, auth string, quotaStatus int, quotaBody string) (*httptes
 }
 func TestSearch(t *testing.T) {
 	w, n := run(t, "Bearer fixture", 200, `{"allowed":true}`)
-	if w.Code != 200 || n != 1 || !strings.Contains(w.Body.String(), `"next":"2"`) || strings.Contains(w.Body.String(), "Private") {
+	if w.Code != 200 || n != 1 || !strings.Contains(w.Body.String(), `"next":"2"`) ||
+		!strings.Contains(w.Body.String(), `"duration":772`) || strings.Contains(w.Body.String(), "Private") {
 		t.Fatal(w.Code, w.Body.String(), n)
 	}
 }
@@ -160,7 +161,7 @@ func TestVideoMetadataUsesExactIDAndExistingQuota(t *testing.T) {
 				if r.URL.Path != "/api/video/"+id+"/" || r.URL.RawQuery != "" {
 					t.Fatal("metadata used the wrong RUTUBE URL")
 				}
-				payload = `{"id":"` + id + `","title":"Космос","thumbnail_url":"https://pic.rtbcdn.ru/cover.jpg"}`
+				payload = `{"id":"` + id + `","title":"Космос","duration":"invalid","thumbnail_url":"https://pic.rtbcdn.ru/cover.jpg"}`
 			case strings.HasSuffix(r.URL.Path, "/loopa_search_budget"):
 				payload = `{"allowed":false}`
 				if allowed {
@@ -175,7 +176,8 @@ func TestVideoMetadataUsesExactIDAndExistingQuota(t *testing.T) {
 		request.Header.Set("X-Loopa-Authorization", "Bearer fixture")
 		response := httptest.NewRecorder()
 		Handler(response, request)
-		if allowed && (response.Code != 200 || upstream != 1 || !strings.Contains(response.Body.String(), "Космос")) {
+		if allowed && (response.Code != 200 || upstream != 1 || !strings.Contains(response.Body.String(), "Космос") ||
+			strings.Contains(response.Body.String(), `"duration"`)) {
 			t.Fatal(response.Code, upstream, response.Body.String())
 		}
 		if !allowed && (response.Code != 429 || upstream != 0) {
