@@ -114,7 +114,7 @@ test("file cleanup precedes Auth deletion and a cleanup retry supports an alread
     botAPI: async (_token, _method, payload) => { calls.push("notice:" + payload.chat_id); },
     editDeletionNotice: async () => {}, console: { error() {} },
   };
-  vm.runInNewContext(bot.slice(start, bot.indexOf("async function miniAppAction(", start)), context);
+  vm.runInNewContext(bot.slice(start, bot.indexOf("function safeCover(", start)), context);
   const run = (actor = account) => context.processAccountDeletion(db, "fake", request, actor, null);
 
   rules.storageError = true;
