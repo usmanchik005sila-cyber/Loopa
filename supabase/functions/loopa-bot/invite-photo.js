@@ -59,6 +59,33 @@ async function readCover(source, fetchImage) {
   return null;
 }
 
+function decoderGrayShare({data, width}, y) {
+  let gray = 0, samples = 0;
+  const step = Math.max(1, Math.floor(width / 90));
+  const right = Math.floor(width * 0.98);
+  for (let x = Math.ceil(width * 0.02); x < right; x += step) {
+    const i = (y * width + x) * 4;
+    const r = data[i], g = data[i + 1], b = data[i + 2];
+    if (r >= 125 && r <= 131 && r === g && g === b && data[i + 3] === 255) gray++;
+    samples++;
+  }
+  return samples ? gray / samples : 0;
+}
+
+function repairRutubeCover(image) {
+  const {height, width} = image;
+  const step = Math.max(1, Math.floor(height / 180));
+  let y = height - 1;
+  // A recompressed, incomplete JPEG can have a valid checksum and still contain a decoder-gray tail.
+  while (y >= 0 && decoderGrayShare(image, y) >= 0.96) y -= step;
+  if (height - 1 - y < Math.max(14, height / 10)) return image;
+  // The first incomplete MCU row may have a mixture of source and decoder pixels.
+  while (y >= 0 && decoderGrayShare(image, y) >= 0.12) y -= step;
+  const cleanHeight = y + 1;
+  if (cleanHeight < height * 0.55) return null;
+  return {...image, height: cleanHeight, data: image.data.subarray(0, width * cleanHeight * 4)};
+}
+
 const atlas = png.PNG.sync.read(Buffer.from(atlasPng, "base64"));
 const edge = 62;
 const titleWidth = width - 2 * edge - 25;
@@ -180,10 +207,11 @@ function compose(cover, {title, source, seconds}) {
   const dx = cover ? (cover.width - width / scale) / 2 : 0;
   const dy = cover ? (cover.height - height / scale) / 2 : 0;
   const coverX = Int32Array.from({length: width}, (_, x) => Math.floor(x / scale + dx) * 4);
-  const fadeStart = Math.max(145, firstBaseline - 255);
+  const fadeStart = Math.max(145, firstBaseline - 250);
   for (let y = 0; y < height; y++) {
     const cy = cover ? Math.floor(y / scale + dy) * cover.width * 4 : 0;
-    const footer = 0.96 * Math.max(0, (y - fadeStart) / (height - fadeStart)) ** 1.1;
+    const shade = Math.max(0, Math.min(1, (y - fadeStart) / (636 - fadeStart)));
+    const footer = 0.985 * shade ** 2 * (3 - 2 * shade);
     const top = 0.38 * Math.max(0, 1 - y / 192) ** 2;
     const corner = 0.95 * Math.max(0, 1 - Math.max(0, y - 83) / 115) ** 2;
     const backdropY = ((y - 80) / 780) ** 2;
@@ -221,8 +249,10 @@ export async function invitePhoto(cover, metadata = {}, fetchImage = fetch) {
   entry.photo = (async () => {
     if (cover) {
       try {
-        const image = await readCover(cover, fetchImage);
-        if (image && validSize(image.width, image.height) && image.data.length === image.width * image.height * 4) {
+        const decoded = await readCover(cover, fetchImage);
+        if (decoded && validSize(decoded.width, decoded.height) && decoded.data.length === decoded.width * decoded.height * 4) {
+          const image = source === "RUTUBE" ? repairRutubeCover(decoded) : decoded;
+          if (!image) return compose(null, details);
           const photo = compose(image, details);
           entry.until = Date.now() + 3_600_000;
           return photo;
