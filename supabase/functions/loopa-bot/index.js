@@ -379,7 +379,8 @@ async function miniAppAction(request,token){
         const info=await getRoomVideoCard(room,jwt).catch(()=>({}));
         const card=await photoCard(token,"invite",info.title,info.source,info.cover,roomLink(claim.code),info.duration);
         try{
-          await botAPI(token,"sendPhoto",{chat_id:chatId,photo:card.photo_url,reply_markup:card.reply_markup});
+          const photo=await invitationPhotoBytes(card,AbortSignal.timeout(3500));
+          await uploadInvitationPhoto(token,chatId,photo,AbortSignal.timeout(5000),card.reply_markup);
           return result({status:"sent"});
         }catch{}
       }
@@ -401,8 +402,9 @@ async function miniAppAction(request,token){
   if(!Number.isSafeInteger(telegramId)||telegramId<=0)return result({error:"telegram_not_linked"},409);
   const info=await getRoomVideoCard(room,jwt).catch(()=>({}));
   const card=await photoCard(token,crypto.randomUUID(),info.title,info.source,info.cover,roomLink(code),info.duration);
+  const [preparedCard]=await useCachedInvitationPhotos(token,[card]);
   const prepared=await botAPI(token,"savePreparedInlineMessage",{
-    user_id:telegramId,result:card,
+    user_id:telegramId,result:preparedCard,
     allow_user_chats:true,allow_group_chats:true
   });
   return result({status:"ready",message_id:prepared.id});
@@ -446,14 +448,93 @@ async function webhookSecret(token,context="loopa.telegram.webhook.v1") {
   ));
   return [...signature].map(x=>x.toString(16).padStart(2,"0")).join("");
 }
-async function botAPI(token,method,payload={}) {
+async function botAPI(token,method,payload={},signal=AbortSignal.timeout(10000)) {
+  const multipart=typeof FormData!=="undefined"&&payload instanceof FormData;
   const response=await fetch("https://api.telegram.org/bot"+token+"/"+method,{
-    method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify(payload),signal:AbortSignal.timeout(10000)
+    method:"POST",headers:multipart?undefined:{"Content-Type":"application/json"},
+    body:multipart?payload:JSON.stringify(payload),signal
   });
   const data=await response.json().catch(()=>null);
-  if(!response.ok||!data?.ok)throw Error("telegram_request_failed");
+  if(!response.ok||!data?.ok){
+    const error=Error("telegram_request_failed");
+    if(response.status===429)error.retryAfter=data?.parameters?.retry_after||30;
+    throw error;
+  }
   return data.result;
+}
+async function invitationPhotoBytes(card,signal){
+  const response=await fetch(card.photo_url,{redirect:"error",signal});
+  const length=Number(response.headers.get("Content-Length"));
+  if(!response.ok||response.headers.get("Content-Type")!=="image/jpeg"||
+    !Number.isSafeInteger(length)||length<4||length>5_000_000)throw Error("invalid_invitation_photo");
+  const photo=new Uint8Array(await response.arrayBuffer());
+  if(photo.length!==length||photo[0]!==0xff||photo[1]!==0xd8||
+    photo[length-2]!==0xff||photo[length-1]!==0xd9)throw Error("incomplete_invitation_photo");
+  return new Blob([photo],{type:"image/jpeg"});
+}
+function uploadInvitationPhoto(token,chatId,photo,signal,replyMarkup){
+  const form=new FormData();
+  form.set("chat_id",chatId);
+  form.set("photo",photo,"loopa-invitation.jpg");
+  if(replyMarkup)form.set("reply_markup",JSON.stringify(replyMarkup));
+  else form.set("disable_notification","true");
+  return botAPI(token,"sendPhoto",form,signal);
+}
+const invitationPhotoIds=new Map();
+const invitationUploads=new Map();
+const invitationUploadConcurrency=3;
+let invitationChannelCheck=null,invitationUploadsPausedUntil=0;
+async function isPrivateInvitationChannel(token,chatId,signal){
+  if(invitationChannelCheck?.chatId!==chatId||invitationChannelCheck.expires<=Date.now()){
+    const promise=botAPI(token,"getChat",{chat_id:chatId},signal)
+      .then(chat=>chat?.type==="channel"&&!chat.username&&!chat.active_usernames?.length)
+      .catch(()=>false);
+    invitationChannelCheck={chatId,promise,expires:Date.now()+30_000};
+  }
+  return invitationChannelCheck.promise;
+}
+async function invitationPhotoId(token,chatId,card,signal){
+  const key=chatId+"\n"+card.photo_url;
+  const stored=invitationPhotoIds.get(key);
+  if(stored?.expires>Date.now())return stored.fileId;
+  if(invitationUploads.has(key))return invitationUploads.get(key);
+  if(signal.aborted||invitationUploadsPausedUntil>Date.now()||
+    invitationUploads.size>=invitationUploadConcurrency)return null;
+  const upload=(async()=>{
+    try{
+      const photo=await invitationPhotoBytes(card,signal);
+      const message=await uploadInvitationPhoto(token,chatId,photo,signal);
+      const largest=(message?.photo||[]).filter(size=>typeof size.file_id==="string"&&size.file_id)
+        .sort((a,b)=>b.width*b.height-a.width*a.height)[0];
+      if(!largest)return null;
+      invitationPhotoIds.delete(key);
+      if(invitationPhotoIds.size>=256)invitationPhotoIds.delete(invitationPhotoIds.keys().next().value);
+      invitationPhotoIds.set(key,{fileId:largest.file_id,expires:Date.now()+86_400_000});
+      return largest.file_id;
+    }catch(error){
+      if(error?.retryAfter)invitationUploadsPausedUntil=Math.max(invitationUploadsPausedUntil,Date.now()+error.retryAfter*1000);
+      return null;
+    }
+  })();
+  invitationUploads.set(key,upload);
+  try{return await upload;}finally{invitationUploads.delete(key);}
+}
+async function useCachedInvitationPhotos(token,cards){
+  const chatId=Deno.env.get("LOOPA_TELEGRAM_MEDIA_CHAT_ID")||"";
+  if(!cards.length||!/^-100\d{6,16}$/.test(chatId))return cards;
+  const signal=AbortSignal.timeout(3500);
+  if(!await isPrivateInvitationChannel(token,chatId,signal))return cards;
+  const results=cards.slice();
+  let next=0;
+  await Promise.all(Array.from({length:Math.min(cards.length,invitationUploadConcurrency)},async()=>{
+    while(next<cards.length){
+      const index=next++;
+      const {photo_url,thumbnail_url,photo_width,photo_height,...card}=cards[index];
+      const fileId=await invitationPhotoId(token,chatId,cards[index],signal);
+      if(fileId)results[index]={...card,id:card.id.replace(/^c4_/,"f4_"),photo_file_id:fileId};
+    }
+  }));
+  return results;
 }
 const inlineVideos=new Map();
 const inlineVideoId=/^[A-Za-z0-9_-]{11}$/;
@@ -580,7 +661,10 @@ async function handleInlineVideo(token,query){
   const catalog={type:"article",id:"loopa_open",title:"Открыть LOOPA",
     input_message_content:{message_text:"Открыть LOOPA",link_preview_options:{is_disabled:true}},
     reply_markup:{inline_keyboard:[[{text:"Открыть LOOPA",url:"https://t.me/"+BOT_NAME+"/loopa",style:"primary"}]]}};
-  await botAPI(token,"answerInlineQuery",{inline_query_id:id,results:results.length?[...results,catalog]:[],cache_time:cacheTime});
+  const photos=await useCachedInvitationPhotos(token,results);
+  if(Deno.env.get("LOOPA_TELEGRAM_MEDIA_CHAT_ID")&&photos.some(photo=>photo.photo_url))
+    cacheTime=Math.min(cacheTime,10);
+  await botAPI(token,"answerInlineQuery",{inline_query_id:id,results:photos.length?[...photos,catalog]:[],cache_time:cacheTime});
 }
 function webhookState(url){
   return !url?"empty":url===WEBHOOK_URL?"loopa":"external";
