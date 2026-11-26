@@ -222,7 +222,7 @@ async function photoCard(token,id,title,source,cover,url,duration,author){
     type:"photo",id:"c4_"+id,photo_url:photo,thumbnail_url:photo,photo_width:1280,photo_height:720,
     title:details.title||"Приглашение в LOOPA",
     description:[details.source,cardText(author,100)].filter(Boolean).join(" · ")||"Совместный просмотр",
-    reply_markup:{inline_keyboard:[[{text:"Смотреть вместе",url,style:"primary"}]]}
+    reply_markup:{inline_keyboard:[[{text:"Смотреть вместе",url,style:"danger"}]]}
   };
 }
 async function serveInvitePhoto(url,token,head){
@@ -386,7 +386,7 @@ async function miniAppAction(request,token){
       await botAPI(token,"sendMessage",{
         chat_id:chatId,
         text:"Посмотрим вместе?",
-        reply_markup:{inline_keyboard:[[{text:"Смотреть вместе",url:roomLink(claim.code),style:"primary"}]]}
+        reply_markup:{inline_keyboard:[[{text:"Смотреть вместе",url:roomLink(claim.code),style:"danger"}]]}
       });
       return result({status:"sent"});
     }catch{return result({status:"telegram_unavailable"});}

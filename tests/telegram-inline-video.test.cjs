@@ -83,6 +83,7 @@ test('Telegram inline video search requires a signed update, caches results and 
   const photo = new URL(answers[0].results[0].photo_url);
   assert.equal(answers[0].results[0].id, 'c4_yt_K8vD4XbI2Ww');
   assert.equal(answers[0].results[0].thumbnail_url, photo.href);
+  assert.equal(answers[0].results[0].reply_markup.inline_keyboard[0][0].style, 'danger');
   assert.match(photo.pathname, /\/card-v4\.jpg$/);
   assert.equal(photo.searchParams.get('v'), '4');
   assert.equal(photo.searchParams.get('action'), 'invite_photo');
@@ -185,7 +186,7 @@ test('room invites send a photo with the original room link and require the host
   assert.equal(photo.searchParams.get('source'),'VK Видео');
   assert.equal(photo.searchParams.get('seconds'),'93');
   assert.deepEqual(message.result.reply_markup.inline_keyboard, [[{
-    text: 'Смотреть вместе', url: 'https://t.me/LOOPAvideo_bot/loopa?startapp=room_abcdef123456', style: 'primary'
+    text: 'Смотреть вместе', url: 'https://t.me/LOOPAvideo_bot/loopa?startapp=room_abcdef123456', style: 'danger'
   }]]);
 });
 
