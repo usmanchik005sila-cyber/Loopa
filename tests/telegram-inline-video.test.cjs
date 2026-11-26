@@ -81,10 +81,10 @@ test('Telegram inline video search requires a signed update, caches results and 
   assert.equal(answers[0].results[0].photo_height, 720);
   assert.equal(answers[0].results[0].caption, undefined);
   const photo = new URL(answers[0].results[0].photo_url);
-  assert.equal(answers[0].results[0].id, 'c3_yt_K8vD4XbI2Ww');
+  assert.equal(answers[0].results[0].id, 'c4_yt_K8vD4XbI2Ww');
   assert.equal(answers[0].results[0].thumbnail_url, photo.href);
-  assert.match(photo.pathname, /\/card-v3\.jpg$/);
-  assert.equal(photo.searchParams.get('v'), '3');
+  assert.match(photo.pathname, /\/card-v4\.jpg$/);
+  assert.equal(photo.searchParams.get('v'), '4');
   assert.equal(photo.searchParams.get('action'), 'invite_photo');
   assert.match(photo.searchParams.get('sig'), /^[a-f0-9]{64}$/);
   assert.equal(photo.searchParams.get('title'), 'Пример');

@@ -8,6 +8,8 @@ import { atlasPng, glyphs } from "./invite-font.js";
 const width = 1280;
 const height = 720;
 const byteLimit = 2 * 1024 * 1024;
+// A 58,970-byte card worked on the reported iPhone. This target is empirical.
+const deliveryTarget = 59_000;
 const cache = new Map();
 const validSize = (w, h) => w > 0 && h > 0 && w <= 2048 && h <= 2048 && w * h <= 2_100_000;
 
@@ -87,10 +89,13 @@ function repairRutubeCover(image) {
 }
 
 const atlas = png.PNG.sync.read(Buffer.from(atlasPng, "base64"));
-const edge = 62;
-const titleWidth = width - 2 * edge - 25;
-const leftShade = Float32Array.from({length: width}, (_, x) =>
-  Math.max(0, 1 - (Math.max(0, x - 215) / 340) ** 1.3));
+const layout = {
+  edge:64, radius:17, badgeY:46, badgeHeight:56, opacity:0.83, outline:0.08, logoScale:0.81,
+  titleSize:51, titleWidth:900, lastBaseline:609, taglineBaseline:654, fadeStart:330, fadeEnd:607,
+};
+const silver = [239,241,246];
+const titleColor = [239,241,244];
+const taglineColor = [190,196,205];
 const backdropX = Float32Array.from({length: width}, (_, x) => ((x - 338) / 1000) ** 2);
 
 function glyph(face, character) {
@@ -101,17 +106,16 @@ function textWidth(face, text, scale = 1) {
   return Array.from(text).reduce((sum, character) => sum + glyph(face, character)[6], 0) * scale;
 }
 
-function wrapTitle(text, scale) {
-  if (!text) return [];
+function wrapTitle(title, scale, maxWidth) {
   const lines = [];
   let line = "";
-  for (const word of text.split(" ")) {
-    if (line && textWidth("title", line + " " + word, scale) > titleWidth) {
+  for (const word of title.split(" ")) {
+    if (line && textWidth("title", line + " " + word, scale) > maxWidth) {
       lines.push(line);
       line = "";
     }
     for (const character of (line ? " " : "") + word) {
-      if (line && textWidth("title", line + character, scale) > titleWidth) {
+      if (line && textWidth("title", line + character, scale) > maxWidth) {
         lines.push(line);
         line = "";
       }
@@ -122,13 +126,8 @@ function wrapTitle(text, scale) {
   return lines;
 }
 
-function titleLayout(title) {
-  const single = wrapTitle(title, 1);
-  if (single.length < 2) return {lines: single, scale: 1};
-  const oneLineScale = titleWidth / textWidth("title", title);
-  if (oneLineScale >= 55 / 64) return {lines: [title], scale: oneLineScale};
-  const scale = 58 / 64;
-  const lines = wrapTitle(title, scale);
+function titleLayout(title, scale, maxWidth) {
+  const lines = wrapTitle(title, scale, maxWidth);
   if (lines.length === 2) {
     const words = title.split(" ");
     let balance = Infinity;
@@ -137,20 +136,20 @@ function titleLayout(title) {
       const right = words.slice(i).join(" ");
       const a = textWidth("title", left, scale);
       const b = textWidth("title", right, scale);
-      if (!/^[-–—]/.test(right) && Math.max(a, b) <= titleWidth && Math.abs(a - b) < balance) {
+      if (!/^[–—-]/.test(right) && Math.max(a, b) <= maxWidth && Math.abs(a - b) < balance) {
         balance = Math.abs(a - b);
         lines[0] = left;
         lines[1] = right;
       }
     }
   }
-  if (lines.length > 3) {
-    lines.length = 3;
-    let last = Array.from(lines[2].trimEnd());
-    while (textWidth("title", last.join("") + "…", scale) > titleWidth) last.pop();
-    lines[2] = last.join("").trimEnd().replace(/[ ,:–—-]+$/, "") + "…";
+  if (lines.length > 2) {
+    lines.length = 2;
+    const last = Array.from(lines[1].trimEnd().replace(/[ ,:–—-]+$/, ""));
+    while (textWidth("title", last.join("") + "…", scale) > maxWidth) last.pop();
+    lines[1] = last.join("").trimEnd().replace(/[ ,:–—-]+$/, "") + "…";
   }
-  return {lines, scale};
+  return lines;
 }
 
 function blend(data, index, color, alpha) {
@@ -176,18 +175,38 @@ function drawText(data, face, text, x, baseline, color, scale = 1) {
   }
 }
 
-function badge(data, label) {
-  if (!label) return;
-  const radius = 30;
-  const badgeWidth = Math.ceil(textWidth("detail", label, 0.9)) + 54;
-  const start = width - edge - badgeWidth;
-  for (let y = 48; y < 108; y++) {
-    const inset = Math.ceil(radius - Math.sqrt(radius ** 2 - (y - 77.5) ** 2));
-    for (let x = start + inset; x < width - edge - inset; x++) {
-      blend(data, (y * width + x) * 4, [14,16,23], 0.62);
+function plate(data, x0, y0, w, h, radius, opacity, outline) {
+  const fill = [12,15,21];
+  for (let y = 0; y < h; y++) {
+    const dy = Math.max(0, radius - Math.min(y + .5, h - y - .5));
+    for (let x = 0; x < w; x++) {
+      const dx = Math.max(0, radius - Math.min(x + .5, w - x - .5));
+      const distance = dx || dy ? Math.hypot(dx, dy) - radius : -radius;
+      const coverage = Math.max(0, Math.min(1, .5 - distance));
+      if (!coverage) continue;
+      const i = ((y0 + y) * width + x0 + x) * 4;
+      blend(data, i, fill, opacity * coverage);
+      const border = Math.max(0, distance + 1.5);
+      if (border && outline) blend(data, i, silver, outline * coverage * Math.min(1, border));
     }
   }
-  drawText(data, "detail", label, start + 27, 87, [240,241,245], 0.9);
+}
+
+function badges(data, source, duration) {
+  const {edge, badgeY, badgeHeight, radius, opacity, outline, logoScale} = layout;
+  const logoPad = 18;
+  const logoWidth = Math.ceil(textWidth("logo", "LOOPA", logoScale)) + logoPad * 2;
+  plate(data, edge, badgeY, logoWidth, badgeHeight, radius, opacity, outline);
+  drawText(data, "logo", "LOOPA", edge + logoPad, badgeY + Math.round(badgeHeight * .72), silver, logoScale);
+
+  const label = [source, duration].filter(Boolean).join("  ·  ");
+  if (!label) return;
+  const labelScale = .93;
+  const labelWidth = textWidth("detail", label, labelScale);
+  const w = Math.ceil(labelWidth) + 46;
+  const x = width - edge - w;
+  plate(data, x, badgeY, w, badgeHeight, radius, Math.max(.87, opacity), outline);
+  drawText(data, "detail", label, x + (w - labelWidth) / 2, badgeY + Math.round(badgeHeight * .69), silver, labelScale);
 }
 
 function durationLabel(seconds) {
@@ -198,27 +217,37 @@ function durationLabel(seconds) {
   return h ? h + ":" + String(m).padStart(2, "0") + ":" + s : m + ":" + s;
 }
 
+function encodeCard(image) {
+  const initial = jpeg.encode(image, 72).data;
+  if (initial.byteLength <= deliveryTarget) return initial;
+  const ratio = deliveryTarget / initial.byteLength;
+  const quality = Math.max(18, Math.min(68, Math.floor(72 * ratio ** 1.7)));
+  const compressed = jpeg.encode(image, quality).data;
+  if (compressed.byteLength <= deliveryTarget || quality <= 18) return compressed;
+  return jpeg.encode(image, 18).data;
+}
+
 function compose(cover, {title, source, seconds}) {
-  const text = titleLayout(title);
-  const step = Math.floor(64 * text.scale * 1.1);
-  const firstBaseline = 615 - Math.max(0, text.lines.length - 1) * step;
+  const titleScale = layout.titleSize / 64;
+  const lines = titleLayout(title, titleScale, layout.titleWidth);
+  const lineHeight = Math.round(layout.titleSize * 1.15);
+  const firstBaseline = layout.lastBaseline - Math.max(0, lines.length - 1) * lineHeight;
   const data = new Uint8Array(width * height * 4);
   const scale = cover ? Math.max(width / cover.width, height / cover.height) : 1;
   const dx = cover ? (cover.width - width / scale) / 2 : 0;
   const dy = cover ? (cover.height - height / scale) / 2 : 0;
   const coverX = Int32Array.from({length: width}, (_, x) => Math.floor(x / scale + dx) * 4);
-  const fadeStart = Math.max(145, firstBaseline - 250);
+  const fadeStart = Math.min(layout.fadeStart, firstBaseline - 160);
   for (let y = 0; y < height; y++) {
     const cy = cover ? Math.floor(y / scale + dy) * cover.width * 4 : 0;
-    const shade = Math.max(0, Math.min(1, (y - fadeStart) / (636 - fadeStart)));
-    const footer = 0.985 * shade ** 2 * (3 - 2 * shade);
-    const top = 0.38 * Math.max(0, 1 - y / 192) ** 2;
-    const corner = 0.95 * Math.max(0, 1 - Math.max(0, y - 83) / 115) ** 2;
+    const shade = Math.max(0, Math.min(1, (y - fadeStart) / (layout.fadeEnd - fadeStart)));
+    const footer = 0.994 * shade ** 2 * (3 - 2 * shade);
+    const top = .13 * Math.max(0, 1 - y / 148) ** 2;
     const backdropY = ((y - 80) / 780) ** 2;
     for (let x = 0; x < width; x++) {
       const i = (y * width + x) * 4;
       const j = cy + coverX[x];
-      const fade = 1 - Math.max(footer, top, corner * leftShade[x]);
+      const fade = 1 - Math.max(footer, top);
       const alpha = cover ? cover.data[j + 3] / 255 * fade : 0;
       const dark = 9 + (cover ? 0 : 27 * Math.max(0, 1 - backdropX[x] - backdropY));
       data[i] = alpha ? cover.data[j] * alpha + dark * (1 - alpha) : dark;
@@ -227,13 +256,11 @@ function compose(cover, {title, source, seconds}) {
       data[i + 3] = 255;
     }
   }
-  drawText(data, "logo", "LOOPA", edge, 92, [240,241,245]);
-  const duration = durationLabel(seconds);
-  badge(data, [source, duration].filter(Boolean).join("  ·  "));
-  text.lines.forEach((line, index) =>
-    drawText(data, "title", line, edge, firstBaseline + index * step, [247,247,248], text.scale));
-  drawText(data, "detail", "Ближе, даже на расстоянии", edge, 665, [211,214,222]);
-  return jpeg.encode({data, width, height}, 87).data;
+  badges(data, source, durationLabel(seconds));
+  lines.forEach((line, index) =>
+    drawText(data, "title", line, layout.edge, firstBaseline + index * lineHeight, titleColor, titleScale));
+  drawText(data, "detail", "Ближе, даже на расстоянии", layout.edge, layout.taglineBaseline, taglineColor, .88);
+  return encodeCard({data, width, height});
 }
 
 export async function invitePhoto(cover, metadata = {}, fetchImage = fetch) {
