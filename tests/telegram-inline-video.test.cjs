@@ -5,10 +5,13 @@ const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
 
-const source = readFileSync(path.join(__dirname, '../supabase/functions/loopa-bot/index.js'), 'utf8')
-  .replace(/^import .*\n/, '');
+const filename = path.join(__dirname, '../supabase/functions/loopa-bot/index.js');
+const source = readFileSync(filename, 'utf8').replace(/^import .*\n/, '');
+const vmOptions = {filename, importModuleDynamically: vm.constants.USE_MAIN_CONTEXT_DEFAULT_LOADER};
 const token = 'fixture-bot-token';
 const signature = createHmac('sha256', token).update('loopa.telegram.webhook.v1').digest('hex');
+const mediaChannel = '-1001234567890';
+const photoBytes = Uint8Array.of(255, 216, 1, 2, 255, 217);
 
 test('Telegram inline video search requires a signed update, caches results and respects quota', async () => {
   const env = {
@@ -17,6 +20,7 @@ test('Telegram inline video search requires a signed update, caches results and 
   };
   const answers = [];
   let receive, searches = 0, quotaChecks = 0, allowed = true, rutubeAvailable = true;
+  let uploads = 0, truncated = false;
   const consumed = new Set();
   const rtId = '1234567890abcdef1234567890abcdef';
   const verify = (body, proof) => receive(new Request('https://example.test/loopa-bot?action=verify-inline-rutube', {
@@ -24,7 +28,7 @@ test('Telegram inline video search requires a signed update, caches results and 
   }));
   vm.runInNewContext(source, {
     Deno: { env: { get: key => env[key] }, serve: handler => { receive = handler; } },
-    crypto: webcrypto, TextEncoder, TextDecoder, URL, URLSearchParams, AbortSignal, Response,
+    crypto: webcrypto, TextEncoder, TextDecoder, URL, URLSearchParams, AbortSignal, Response, FormData, Blob,
     createClient: () => ({
       rpc(name, args) {
         if (name === 'loopa_consume_inline_rutube_ticket') {
@@ -44,7 +48,7 @@ test('Telegram inline video search requires a signed update, caches results and 
       const endpoint = new URL(url);
       if (endpoint.hostname === 'www.googleapis.com') {
         searches++;
-        assert.ok(['Аниме','Музыка'].includes(endpoint.searchParams.get('q')));
+        assert.ok(['Аниме','Музыка','Тест'].includes(endpoint.searchParams.get('q')));
         assert.equal(endpoint.searchParams.get('videoEmbeddable'), 'true');
         return Response.json({ items: [
           { id: { videoId: 'K8vD4XbI2Ww' }, snippet: { title: 'Пример', channelTitle: 'Автор' } },
@@ -60,11 +64,32 @@ test('Telegram inline video search requires a signed update, caches results and 
         return Response.json({ items: [{ url: 'https://rutube.ru/video/' + rtId + '/',
           title: 'Ролик RUTUBE', author: 'Канал', duration: 772, image: 'https://pic.rutubelist.ru/cover.jpg' }] });
       }
+      if (endpoint.pathname.endsWith('/getChat')) {
+        assert.equal(JSON.parse(options.body).chat_id, mediaChannel);
+        return Response.json({ ok: true, result: { type: 'channel' } });
+      }
+      if (endpoint.pathname.endsWith('/card-v4.jpg')) {
+        const bytes = truncated && endpoint.searchParams.get('source') === 'RUTUBE' ? photoBytes.subarray(0, 4) : photoBytes;
+        return new Response(bytes, { headers: { 'content-type': 'image/jpeg', 'content-length': String(photoBytes.length) } });
+      }
+      if (endpoint.pathname.endsWith('/sendPhoto')) {
+        assert.equal(options.body.get('chat_id'), mediaChannel);
+        assert.equal(options.body.get('disable_notification'), 'true');
+        assert.equal(options.body.has('caption'), false);
+        const photo = options.body.get('photo');
+        assert.equal(photo.type, 'image/jpeg');
+        assert.deepEqual(new Uint8Array(await photo.arrayBuffer()), photoBytes);
+        uploads++;
+        return Response.json({ ok: true, result: { photo: [
+          { file_id: 'small', width: 100, height: 60 },
+          { file_id: 'large', width: 1280, height: 720 },
+        ] } });
+      }
       assert.equal(endpoint.pathname, '/bot' + token + '/answerInlineQuery');
       answers.push(JSON.parse(options.body));
       return Response.json({ ok: true, result: true });
     }
-  });
+  }, vmOptions);
   const update = (id, query, secret = signature) => receive(new Request('https://example.test/loopa-bot', {
     method: 'POST',
     headers: { 'X-Telegram-Bot-Api-Secret-Token': secret },
@@ -128,9 +153,42 @@ test('Telegram inline video search requires a signed update, caches results and 
   await update('query-5', 'Музыка');
   assert.deepEqual(answers[4].results, [answers[0].results[0], answers[0].results[2]]);
   assert.equal(answers[4].cache_time, 10);
+
+  env.LOOPA_TELEGRAM_MEDIA_CHAT_ID = mediaChannel;
+  truncated = true;
+  await update('query-6', 'Аниме');
+  const [cachedYoutube, fallbackRutube] = answers[5].results;
+  assert.equal(cachedYoutube.photo_file_id, 'large');
+  assert.equal(cachedYoutube.photo_url, undefined);
+  assert.equal(cachedYoutube.thumbnail_url, undefined);
+  assert.equal(cachedYoutube.id, 'f4_yt_K8vD4XbI2Ww');
+  assert.deepEqual(cachedYoutube.reply_markup, answers[0].results[0].reply_markup);
+  assert.equal(fallbackRutube.photo_url, answers[0].results[1].photo_url);
+  assert.equal(answers[5].cache_time, 10);
+  assert.equal(uploads, 1);
+
+  truncated = false;
+  await update('query-7', 'Аниме');
+  assert.deepEqual(answers[6].results[0], cachedYoutube);
+  assert.equal(answers[6].results[1].photo_file_id, 'large');
+  assert.equal(uploads, 2);
+
+  env.LOOPA_INVITE_SIGNING_SECRET = 'a'.repeat(64);
+  rutubeAvailable = true;
+  await update('query-8', 'Тест');
+  const previews = answers[7].results.slice(0, 2);
+  for (const [index, preview] of previews.entries()) {
+    assert.equal(preview.type, 'article');
+    assert.equal(preview.photo_url, undefined);
+    assert.equal(preview.photo_file_id, undefined);
+    assert.match(preview.input_message_content.link_preview_options.url, /^https:\/\/loopacinema\.ru\/invite\//);
+    assert.equal(preview.reply_markup.inline_keyboard[0][0].url, answers[0].results[index].reply_markup.inline_keyboard[0][0].url);
+    assert.equal(preview.reply_markup.inline_keyboard[0][0].style, 'primary');
+  }
+  assert.equal(uploads, 2);
 });
 
-test('room invites send a photo with the original room link and require the host', async () => {
+test('room invites preserve the original room link and require the host', async () => {
   const code = 'ABCDEF123456';
   const media = 'https://vkvideo.ru/video_ext.php?oid=-7&id=42';
   const env = {
@@ -141,7 +199,7 @@ test('room invites send a photo with the original room link and require the host
   let receive;
   vm.runInNewContext(source, {
     Deno: { env: { get: key => env[key] }, serve: handler => { receive = handler; } },
-    crypto: webcrypto, TextEncoder, TextDecoder, URL, URLSearchParams, AbortSignal, Response,
+    crypto: webcrypto, TextEncoder, TextDecoder, URL, URLSearchParams, AbortSignal, Response, FormData, Blob,
     createClient: (_url, key, opts) => key === env.SUPABASE_ANON_KEY ? {
       rpc(name, args) {
         assert.equal(name, 'loopa_room_invite_details');
@@ -163,11 +221,20 @@ test('room invites send a photo with the original room link and require the host
         ] } });
       }
       if (url === 'https://vkvideo.ru/video-7_42') return new Response(null, { status: 503 });
+      if (url.endsWith('/getChat')) return Response.json({ ok: true, result: { type: 'channel' } });
+      if (new URL(url).pathname.endsWith('/card-v4.jpg')) {
+        assert.equal(new URL(url).searchParams.get('source'), 'VK Видео');
+        return new Response(photoBytes, { headers: { 'content-type': 'image/jpeg', 'content-length': String(photoBytes.length) } });
+      }
+      if (url.endsWith('/sendPhoto')) {
+        assert.equal(options.body.get('chat_id'), mediaChannel);
+        return Response.json({ ok: true, result: { photo: [{ file_id: 'vk-file', width: 1280, height: 720 }] } });
+      }
       assert.match(url, /\/savePreparedInlineMessage$/);
       prepared.push(JSON.parse(options.body));
       return Response.json({ ok: true, result: { id: 'fixture-message' } });
     }
-  });
+  }, vmOptions);
   const invite = jwt => receive(new Request('https://example.test/loopa-bot', {
     method: 'POST', headers: { Origin: 'https://loopacinema.ru', Authorization: 'Bearer ' + jwt },
     body: JSON.stringify({ action: 'share_room', code: code.toLowerCase() })
@@ -188,6 +255,19 @@ test('room invites send a photo with the original room link and require the host
   assert.deepEqual(message.result.reply_markup.inline_keyboard, [[{
     text: 'Смотреть вместе', url: 'https://t.me/LOOPAvideo_bot/loopa?startapp=room_abcdef123456', style: 'danger'
   }]]);
+  env.LOOPA_TELEGRAM_MEDIA_CHAT_ID = mediaChannel;
+  assert.equal((await invite('host')).status, 200);
+  assert.equal(prepared[1].result.photo_file_id, 'vk-file');
+  assert.equal(prepared[1].result.photo_url, undefined);
+  assert.deepEqual(prepared[1].result.reply_markup, message.result.reply_markup);
+
+  env.LOOPA_INVITE_SIGNING_SECRET = 'a'.repeat(64);
+  assert.equal((await invite('host')).status, 200);
+  const preview = prepared[2].result;
+  assert.equal(preview.type, 'article');
+  assert.equal(preview.photo_file_id, undefined);
+  assert.equal(preview.input_message_content.message_text, 'LOOPA');
+  assert.equal(preview.reply_markup.inline_keyboard[0][0].url, message.result.reply_markup.inline_keyboard[0][0].url);
 });
 
 test('tracking commands work only for the bot owner in a private Telegram chat', async () => {
