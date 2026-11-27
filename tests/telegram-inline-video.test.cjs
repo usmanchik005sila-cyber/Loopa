@@ -5,8 +5,9 @@ const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
 
-const source = readFileSync(path.join(__dirname, '../supabase/functions/loopa-bot/index.js'), 'utf8')
-  .replace(/^import .*\n/, '');
+const filename = path.join(__dirname, '../supabase/functions/loopa-bot/index.js');
+const source = readFileSync(filename, 'utf8').replace(/^import .*\n/, '');
+const vmOptions = {filename, importModuleDynamically: vm.constants.USE_MAIN_CONTEXT_DEFAULT_LOADER};
 const token = 'fixture-bot-token';
 const signature = createHmac('sha256', token).update('loopa.telegram.webhook.v1').digest('hex');
 const mediaChannel = '-1001234567890';
@@ -47,7 +48,7 @@ test('Telegram inline video search requires a signed update, caches results and 
       const endpoint = new URL(url);
       if (endpoint.hostname === 'www.googleapis.com') {
         searches++;
-        assert.ok(['Аниме','Музыка'].includes(endpoint.searchParams.get('q')));
+        assert.ok(['Аниме','Музыка','Тест'].includes(endpoint.searchParams.get('q')));
         assert.equal(endpoint.searchParams.get('videoEmbeddable'), 'true');
         return Response.json({ items: [
           { id: { videoId: 'K8vD4XbI2Ww' }, snippet: { title: 'Пример', channelTitle: 'Автор' } },
@@ -88,7 +89,7 @@ test('Telegram inline video search requires a signed update, caches results and 
       answers.push(JSON.parse(options.body));
       return Response.json({ ok: true, result: true });
     }
-  });
+  }, vmOptions);
   const update = (id, query, secret = signature) => receive(new Request('https://example.test/loopa-bot', {
     method: 'POST',
     headers: { 'X-Telegram-Bot-Api-Secret-Token': secret },
@@ -171,9 +172,23 @@ test('Telegram inline video search requires a signed update, caches results and 
   assert.deepEqual(answers[6].results[0], cachedYoutube);
   assert.equal(answers[6].results[1].photo_file_id, 'large');
   assert.equal(uploads, 2);
+
+  env.LOOPA_INVITE_SIGNING_SECRET = 'a'.repeat(64);
+  rutubeAvailable = true;
+  await update('query-8', 'Тест');
+  const previews = answers[7].results.slice(0, 2);
+  for (const [index, preview] of previews.entries()) {
+    assert.equal(preview.type, 'article');
+    assert.equal(preview.photo_url, undefined);
+    assert.equal(preview.photo_file_id, undefined);
+    assert.match(preview.input_message_content.link_preview_options.url, /^https:\/\/loopacinema\.ru\/invite\//);
+    assert.equal(preview.reply_markup.inline_keyboard[0][0].url, answers[0].results[index].reply_markup.inline_keyboard[0][0].url);
+    assert.equal(preview.reply_markup.inline_keyboard[0][0].style, 'primary');
+  }
+  assert.equal(uploads, 2);
 });
 
-test('room invites send a photo with the original room link and require the host', async () => {
+test('room invites preserve the original room link and require the host', async () => {
   const code = 'ABCDEF123456';
   const media = 'https://vkvideo.ru/video_ext.php?oid=-7&id=42';
   const env = {
@@ -219,7 +234,7 @@ test('room invites send a photo with the original room link and require the host
       prepared.push(JSON.parse(options.body));
       return Response.json({ ok: true, result: { id: 'fixture-message' } });
     }
-  });
+  }, vmOptions);
   const invite = jwt => receive(new Request('https://example.test/loopa-bot', {
     method: 'POST', headers: { Origin: 'https://loopacinema.ru', Authorization: 'Bearer ' + jwt },
     body: JSON.stringify({ action: 'share_room', code: code.toLowerCase() })
@@ -245,6 +260,14 @@ test('room invites send a photo with the original room link and require the host
   assert.equal(prepared[1].result.photo_file_id, 'vk-file');
   assert.equal(prepared[1].result.photo_url, undefined);
   assert.deepEqual(prepared[1].result.reply_markup, message.result.reply_markup);
+
+  env.LOOPA_INVITE_SIGNING_SECRET = 'a'.repeat(64);
+  assert.equal((await invite('host')).status, 200);
+  const preview = prepared[2].result;
+  assert.equal(preview.type, 'article');
+  assert.equal(preview.photo_file_id, undefined);
+  assert.equal(preview.input_message_content.message_text, 'LOOPA');
+  assert.equal(preview.reply_markup.inline_keyboard[0][0].url, message.result.reply_markup.inline_keyboard[0][0].url);
 });
 
 test('tracking commands work only for the bot owner in a private Telegram chat', async () => {

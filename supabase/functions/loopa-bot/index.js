@@ -225,6 +225,16 @@ async function photoCard(token,id,title,source,cover,url,duration,author){
     reply_markup:{inline_keyboard:[[{text:"Смотреть вместе",url,style:"danger"}]]}
   };
 }
+async function invitationCard(token,id,title,source,cover,url,duration,author){
+  const signingSecret=Deno.env.get("LOOPA_INVITE_SIGNING_SECRET");
+  if(!signingSecret)return photoCard(token,id,title,source,cover,url,duration,author);
+  const web=await import("./invite-web.mjs");
+  if(!web.webInviteConfigured(signingSecret))return photoCard(token,id,title,source,cover,url,duration,author);
+  const details=inviteDetails(title,source,cover,duration);
+  const subtitle=[details.source,cardText(author,100)].filter(Boolean).join(" · ")||"Совместный просмотр";
+  const destination=new URL(url).searchParams.get("startapp");
+  return web.createInviteArticle(signingSecret,id,details,destination,subtitle,Deno.env.get("LOOPA_INVITE_PUBLIC_ORIGIN"));
+}
 async function serveInvitePhoto(url,token,head){
   const params=url.searchParams,raw=params.get("cover")||"",sig=params.get("sig")||"";
   const details=inviteDetails(params.get("title"),params.get("source"),raw,Number(params.get("seconds")));
@@ -375,9 +385,14 @@ async function miniAppAction(request,token){
     if(!Number.isSafeInteger(chatId)||chatId<=0)return result({status:"not_eligible"});
     try{
       const room=await roomInviteDetails(claim.code,jwt).catch(()=>null);
-      if(room){
-        const info=await getRoomVideoCard(room,jwt).catch(()=>({}));
-        const card=await photoCard(token,"invite",info.title,info.source,info.cover,roomLink(claim.code),info.duration);
+      if(room||Deno.env.get("LOOPA_INVITE_SIGNING_SECRET")){
+        const info=room?await getRoomVideoCard(room,jwt).catch(()=>({})):{};
+        const card=await invitationCard(token,"invite",info.title,info.source,info.cover,roomLink(claim.code),info.duration);
+        if(card.type==="article"){
+          const {message_text:text,...settings}=card.input_message_content;
+          await botAPI(token,"sendMessage",{chat_id:chatId,text,...settings,reply_markup:card.reply_markup});
+          return result({status:"sent"});
+        }
         try{
           const photo=await invitationPhotoBytes(card,AbortSignal.timeout(3500));
           await uploadInvitationPhoto(token,chatId,photo,AbortSignal.timeout(5000),card.reply_markup);
@@ -401,7 +416,7 @@ async function miniAppAction(request,token){
   const telegramId=Number(link?.telegram_id);
   if(!Number.isSafeInteger(telegramId)||telegramId<=0)return result({error:"telegram_not_linked"},409);
   const info=await getRoomVideoCard(room,jwt).catch(()=>({}));
-  const card=await photoCard(token,crypto.randomUUID(),info.title,info.source,info.cover,roomLink(code),info.duration);
+  const card=await invitationCard(token,crypto.randomUUID(),info.title,info.source,info.cover,roomLink(code),info.duration);
   const [preparedCard]=await useCachedInvitationPhotos(token,[card]);
   const prepared=await botAPI(token,"savePreparedInlineMessage",{
     user_id:telegramId,result:preparedCard,
@@ -521,7 +536,7 @@ async function invitationPhotoId(token,chatId,card,signal){
 }
 async function useCachedInvitationPhotos(token,cards){
   const chatId=Deno.env.get("LOOPA_TELEGRAM_MEDIA_CHAT_ID")||"";
-  if(!cards.length||!/^-100\d{6,16}$/.test(chatId))return cards;
+  if(!cards[0]?.photo_url||!/^-100\d{6,16}$/.test(chatId))return cards;
   const signal=AbortSignal.timeout(3500);
   if(!await isPrivateInvitationChannel(token,chatId,signal))return cards;
   const results=cards.slice();
@@ -556,7 +571,7 @@ async function youtubeInlineResults(token,query){
     if(!inlineVideoId.test(id||"")||ids.has(id)||!item?.snippet?.title)return false;
     ids.add(id);
     return true;
-  }).map(({id:{videoId},snippet})=>photoCard(token,"yt_"+videoId,snippet.title,"YouTube",
+  }).map(({id:{videoId},snippet})=>invitationCard(token,"yt_"+videoId,snippet.title,"YouTube",
     "https://i.ytimg.com/vi/"+videoId+"/hqdefault.jpg",
     "https://t.me/"+BOT_NAME+"/loopa?startapp=yt_"+videoId,undefined,snippet.channelTitle)));
 }
@@ -577,7 +592,7 @@ async function rutubeInlineResults(token,query){
     const id=inlineRutubeId.exec(item?.url||"")?.[1]?.toLowerCase();
     if(!id||!item?.title||ids.has(id))return [];
     ids.add(id);
-    return [photoCard(token,"rt_"+id,item.title,"RUTUBE",item.image,
+    return [invitationCard(token,"rt_"+id,item.title,"RUTUBE",item.image,
       "https://t.me/"+BOT_NAME+"/loopa?startapp=rt_"+id,item.duration,item.author)];
   }));
 }
@@ -589,7 +604,7 @@ async function vkInlineResults(token,query){
     const id=item?.owner_id+"_"+item?.id;
     if(!/^-?\d{1,19}_\d{1,19}$/.test(id)||!item.title||item.is_private||ids.has(id))return [];
     ids.add(id);
-    return [photoCard(token,"vk_"+id,item.title,"VK Видео",item.image?.at(-1)?.url,
+    return [invitationCard(token,"vk_"+id,item.title,"VK Видео",item.image?.at(-1)?.url,
       "https://t.me/"+BOT_NAME+"/loopa?startapp=vk_"+id,item.duration)];
   }));
 }
@@ -656,15 +671,13 @@ async function handleInlineVideo(token,query){
       }catch{/* Leave the query retryable if the provider or quota check is unavailable. */}
     }
   }
-  // Telegram uses a vertical list when inline results include an article.
-  // Keep video results as photos so sending one doesn't require an edit or BotFather feedback.
   const catalog={type:"article",id:"loopa_open",title:"Открыть LOOPA",
     input_message_content:{message_text:"Открыть LOOPA",link_preview_options:{is_disabled:true}},
     reply_markup:{inline_keyboard:[[{text:"Открыть LOOPA",url:"https://t.me/"+BOT_NAME+"/loopa",style:"primary"}]]}};
-  const photos=await useCachedInvitationPhotos(token,results);
-  if(Deno.env.get("LOOPA_TELEGRAM_MEDIA_CHAT_ID")&&photos.some(photo=>photo.photo_url))
+  const invitations=await useCachedInvitationPhotos(token,results);
+  if(Deno.env.get("LOOPA_TELEGRAM_MEDIA_CHAT_ID")&&invitations.some(invite=>invite.photo_url))
     cacheTime=Math.min(cacheTime,10);
-  await botAPI(token,"answerInlineQuery",{inline_query_id:id,results:photos.length?[...photos,catalog]:[],cache_time:cacheTime});
+  await botAPI(token,"answerInlineQuery",{inline_query_id:id,results:invitations.length?[...invitations,catalog]:[],cache_time:cacheTime});
 }
 function webhookState(url){
   return !url?"empty":url===WEBHOOK_URL?"loopa":"external";
