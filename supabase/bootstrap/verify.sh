@@ -28,6 +28,9 @@ create table auth.users (
   id uuid primary key,
   email character varying(255),
   email_confirmed_at timestamptz,
+  confirmed_at timestamptz generated always as (email_confirmed_at) stored,
+  deleted_at timestamptz,
+  is_anonymous boolean not null default false,
   created_at timestamptz not null default now(),
   raw_app_meta_data jsonb default '{}'::jsonb,
   raw_user_meta_data jsonb default '{}'::jsonb
@@ -89,6 +92,7 @@ for key, fingerprint in expected.items():
 if not match:
     sys.exit('Schema comparison failed')
 PY
+db < ../migrations/20261128160957_owner_bot_stats.sql
 printf 'SQL suites (fresh connection per suite):\n'
 failed=0
 for suite in ../../tests/*.sql; do

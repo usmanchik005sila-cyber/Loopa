@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'supabase/bootstrap/**'
+      - 'supabase/migrations/*_owner_bot_stats.sql'
       - 'tests/*.sql'
       - '.github/workflows/verify-schema-bootstrap.yml'
 

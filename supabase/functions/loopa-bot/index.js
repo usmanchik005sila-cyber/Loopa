@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { handleOwnerStats, STATS_REFRESH } from "./owner-stats.mjs";
 // LOOPA Bot welcome handler. No secret credentials stored in GitHub.
 // Supabase Edge Function "loopa-bot"; Telegram webhook requests are verified.
 const BOT_NAME = "LOOPAvideo_bot";
@@ -22,6 +23,20 @@ function ownerTelegramId(){
   const value=String(Deno.env.get("LOOPA_OWNER_TELEGRAM_ID")||"").trim();
   const id=Number(value);
   return /^[1-9][0-9]{0,19}$/.test(value)&&Number.isSafeInteger(id)?id:null;
+}
+function serveOwnerStats(token, update){
+  return handleOwnerStats({
+    ownerId:ownerTelegramId(),
+    message:update.message,
+    callback:update.callback_query,
+    api:(method,payload)=>botAPI(token,method,payload),
+    load:async()=>{
+      const {data,error}=await adminClient().rpc("loopa_owner_bot_stats")
+        .abortSignal(AbortSignal.timeout(3500));
+      if(error){console.error("owner_stats_unavailable");throw Error("owner_stats_unavailable");}
+      return data;
+    }
+  });
 }
 function trackingLink(id){
   if(!REQUEST_ID_RE.test(id||""))throw Error("invalid_tracking_link");
@@ -473,6 +488,9 @@ async function botAPI(token,method,payload={},signal=AbortSignal.timeout(10000))
   if(!response.ok||!data?.ok){
     const error=Error("telegram_request_failed");
     if(response.status===429)error.retryAfter=data?.parameters?.retry_after||30;
+    if(method==="editMessageText"&&response.status===400&&
+      data?.description?.startsWith("Bad Request: message is not modified"))
+      error.code="message_not_modified";
     throw error;
   }
   return data.result;
@@ -694,6 +712,7 @@ async function getStatus(token){
     issues:!!info.last_error_date,
     inlineMode:!!bot.supports_inline_queries,
     inlineWebhook:!info.allowed_updates?.length||info.allowed_updates.includes("inline_query"),
+    statsRefreshWebhook:!info.allowed_updates?.length||info.allowed_updates.includes("callback_query"),
     inlineProvider:!!Deno.env.get("YOUTUBE_API_KEY"),
     trackingOwnerConfigured:ownerTelegramId()!==null,
     vkSearchConfigured:!!Deno.env.get("VK_VIDEO_TOKEN")};
@@ -724,6 +743,10 @@ Deno.serve(async request=>{
     const raw=await request.text();
     if(raw.length>65536)return result({error:"payload_too_large"},413);
     const update=JSON.parse(raw);
+    if(update?.callback_query?.data===STATS_REFRESH){
+      await serveOwnerStats(token,{callback_query:update.callback_query});
+      return result({ok:true});
+    }
     if(update?.inline_query){
       await handleInlineVideo(token,update.inline_query);
       return result({ok:true});
@@ -746,13 +769,17 @@ Deno.serve(async request=>{
     }
     const message=update?.message;
     if(!message||message.chat?.type!=="private")return result({ok:true});
-    const command=String(message.text||"").trim().match(/^\/(start|help|stop|myid|links?)(?:@([A-Za-z0-9_]+))?(?:\s+([\s\S]*))?$/i);
+    const command=String(message.text||"").trim().match(/^\/(start|help|stop|myid|links?|stats)(?:@([A-Za-z0-9_]+))?(?:\s+([\s\S]*))?$/i);
     if(!command||(command[2]&&command[2].toLowerCase()!==BOT_NAME.toLowerCase()))
       return result({ok:true});
     const chatId=message.chat.id;
     if(!Number.isSafeInteger(chatId))return result({ok:true});
     if(message.from?.id!==chatId)return result({ok:true});
     const name=command[1].toLowerCase();
+    if(name==="stats"){
+      await serveOwnerStats(token,{message});
+      return result({ok:true});
+    }
     if(name==="link"||name==="links"){
       if(chatId===ownerTelegramId())await handleTrackingCommand(token,chatId,name,command[3]||"");
       return result({ok:true});
@@ -787,7 +814,7 @@ Deno.serve(async request=>{
     }
     await botAPI(token,"sendMessage",{
       chat_id:chatId,
-      text:name==="start"?WELCOME:HELP+(chatId===ownerTelegramId()?"\n\n/link Название — создать ссылку\n/links — статистика ссылок":""),
+      text:name==="start"?WELCOME:HELP+(chatId===ownerTelegramId()?"\n\n/link Название — создать ссылку\n/links — статистика ссылок\n/stats — статистика LOOPA":""),
       parse_mode:"HTML",
       link_preview_options:{is_disabled:true},
       reply_markup:{
