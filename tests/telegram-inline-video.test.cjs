@@ -183,7 +183,7 @@ test('Telegram inline video search requires a signed update, caches results and 
     assert.equal(preview.photo_file_id, undefined);
     assert.match(preview.input_message_content.link_preview_options.url, /^https:\/\/loopacinema\.ru\/invite\//);
     assert.equal(preview.reply_markup.inline_keyboard[0][0].url, answers[0].results[index].reply_markup.inline_keyboard[0][0].url);
-    assert.equal(preview.reply_markup.inline_keyboard[0][0].style, 'primary');
+    assert.equal(preview.reply_markup.inline_keyboard[0][0].style, 'danger');
   }
   assert.equal(uploads, 2);
 });

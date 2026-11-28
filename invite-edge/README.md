@@ -6,7 +6,7 @@ The Worker returns crawler-readable HTML for signed invitation links. The bot an
 
 Deploy the default Worker to a separate Workers.dev hostname. Set `LOOPA_INVITE_PUBLIC_ORIGIN` to that HTTPS origin, without a trailing slash, in both the Worker and the bot under test. Install the rehearsal signing secret in both services. Use a separate test bot or a designated test chat. In tests, assert that the page responds anonymously with `text/html` and that `og:image` can be fetched by Telegram.
 
-Check a YouTube, VK Видео and RUTUBE invitation in Telegram. Inspect the inline result and the sent message. Test the button and the landing link for a room. The bot requests a large preview above the message text and the blue `primary` button style. Telegram chooses the actual crop, may reuse cached metadata, and can ignore the size preference for unsupported URLs.
+Check a YouTube, VK Видео and RUTUBE invitation in Telegram. Inspect the inline result and the sent message. Test the button and the landing link for a room. The bot requests a large preview above the message text and the red `danger` button style. Telegram chooses the actual crop, may reuse cached metadata, and can ignore the size preference for unsupported URLs.
 
 ## Production after approval
 

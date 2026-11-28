@@ -88,7 +88,7 @@ export async function createInviteArticle(secret, id, details, destination, subt
       entities: [{type: "text_link", offset: 0, length: text.length, url}],
       link_preview_options: {url, prefer_large_media: true, show_above_text: true}
     },
-    reply_markup: {inline_keyboard: [[{text: "Смотреть вместе", url: openUrl + "?startapp=" + destination, style: "primary"}]]}
+    reply_markup: {inline_keyboard: [[{text: "Смотреть вместе", url: openUrl + "?startapp=" + destination, style: "danger"}]]}
   };
 }
 
