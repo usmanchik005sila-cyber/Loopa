@@ -43,7 +43,7 @@ function withContentSecurityPolicy(source) {
   return html.replace(marker, '<meta http-equiv="Content-Security-Policy" content="' + policy + '">');
 }
 
-function buildPages(root = path.resolve(__dirname, '..'), output = path.join(root, '_site')) {
+function buildPages(root = path.resolve(__dirname, '..'), output = path.join(root, '_site'), transform = source => source) {
   let source = readFileSync(path.join(root, 'index.html'), 'utf8');
   const main = source.match(/<script defer>([\s\S]*?)<\/script>/);
   if (!main) throw new Error('Missing startup application script');
@@ -53,7 +53,7 @@ function buildPages(root = path.resolve(__dirname, '..'), output = path.join(roo
     source = source.replace(tag, '');
     return readFileSync(path.join(root, 'assets', name), 'utf8');
   });
-  const bundle = [...modules, main[1]].join('\n;\n');
+  const bundle = transform("'use strict';\n" + [...modules, main[1]].join('\n;\n'));
   const version = createHash('sha256').update(bundle).digest('hex').slice(0, 16);
   const script = `loopa-app.${version}.js`;
   const scriptMarker = '<!-- LOOPA_APP_SCRIPT -->';
@@ -66,6 +66,9 @@ function buildPages(root = path.resolve(__dirname, '..'), output = path.join(roo
   writeFileSync(path.join(output, 'index.html'), html);
 }
 
-if (require.main === module) buildPages();
+if (require.main === module) {
+  const { minify_sync } = require('terser');
+  buildPages(undefined, undefined, source => minify_sync(source).code);
+}
 
 module.exports = { withContentSecurityPolicy, buildPages };
