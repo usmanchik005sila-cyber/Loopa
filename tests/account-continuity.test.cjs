@@ -148,7 +148,9 @@ test('Telegram welcome checks an existing link before offering explicit registra
       actions.push(action);
       return action === 'login' ? { status: 'unlinked' } : { status: 'login_ready', token_hash: 'fixture' };
     },
-    client: { auth: { verifyOtp: async () => ({ data: { user: account } }) } },
+    client: {},
+    launch: {begin(){}, complete(){}, failed:()=>false},
+    verifyTelegramOtp: async () => ({ data: { user: account } }),
     showPage: page => { pages.push(page); context.lastPage = page; },
     displayAccount: async user => assert.equal(user, account),
     pauseInlineVideoCard() {},
@@ -176,9 +178,9 @@ test('browser entry keeps Telegram launches and auth recovery callbacks on their
   const start = html.indexOf('    const entryRoot=');
   const source = html.slice(start, html.indexOf('    try{const m=localStorage', start));
   const chooseEntry = (search, hash, inTelegram = false) => {
-    const root = { dataset: {}, classList: { contains: () => inTelegram } };
+    const root = { dataset: {}, classList: { toggle() {} } };
     vm.runInNewContext(source, {
-      URLSearchParams, window: {},
+      URLSearchParams, window: {Telegram: inTelegram ? {WebApp:{initData:'fixture'}} : undefined},
       location: { search, hash },
       document: { documentElement: root },
     });
@@ -203,6 +205,7 @@ test('cached sessions in the Mini App open only after the signed Telegram pairin
     const session = { user, access_token: 'fixture-session' };
     const context = {
       isTelegramMiniApp: true, currentUser: null, telegramMiniLinked: false,
+      launch: {begin(){}, complete(){}, failed:()=>false},
       pendingInvite: null, pendingInlineVideo: video ? 'https://rutube.ru/video/fixture/' : null,
       client: { auth: { getSession: async () => ({ data: { session } }) } },
       telegramMiniRequest: async (action, token) => {

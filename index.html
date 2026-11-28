@@ -12,27 +12,148 @@
   <meta name="description" content="LOOPA — ближе, даже на расстоянии. Совместный просмотр с теми, кто важен.">
   <title>LOOPA — Ближе, даже на расстоянии</title>
   <meta name="loopa-version" content="v94">
-  <meta name="loopa-build" content="v97-telegram-secure-auth">
+  <meta name="loopa-build" content="v98-launch-recovery">
   <link rel="preconnect" href="https://wnubqzwsvclvcvozibtc.supabase.co" crossorigin>
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script>
+    // Keep this independent of the SDKs and of any subsequent script parsing.
+    window.loopaLaunch=(function(){
+      var root=document.documentElement;
+      var start=Date.now(),timer,phase='libraries',code='',done=false,nativeReady=false;
+      var launchHint=/(?:^|[#&?])tgWebAppData=/.test(location.hash)
+        || /(?:^|[?&])tgWebAppStartParam=/.test(location.search);
+      try {
+        var stored=JSON.parse(sessionStorage.getItem('__telegram__initParams')||'null');
+        launchHint=launchHint||!!(stored&&stored.tgWebAppData);
+      } catch (_) {}
+      var relevant=launchHint||/(?:^|[?&])(?:recovery=1|code=|error_code=)/.test(location.search)
+        || /(?:^|[#&])(?:access_token|error_code)=/.test(location.hash);
+      if(launchHint){
+        root.classList.add('telegram-miniapp');
+        root.dataset.loopaEntry='telegram';
+      }
+      var events=[];
+      function note(event){
+        if(events.length===16)events.shift();
+        events.push({event:event,ms:Date.now()-start});
+      }
+      function signalNative(allowFallback){
+        if(nativeReady)return;
+        var app=window.Telegram&&window.Telegram.WebApp;
+        if(app&&app.initData)relevant=true;
+        if(!(launchHint||(app&&app.initData)))return;
+        if(app&&typeof app.ready==='function'){
+          try {
+            app.ready();nativeReady=true;note('native-ready');return;
+          } catch (_) {note('native-ready-error');}
+        }
+        if(!allowFallback)return;
+        try {
+          if(window.TelegramWebviewProxy&&typeof window.TelegramWebviewProxy.postEvent==='function')
+            window.TelegramWebviewProxy.postEvent('web_app_ready','""');
+          else if(window.external&&typeof window.external.notify==='function')
+            window.external.notify('{"eventType":"web_app_ready","eventData":""}');
+          else return;
+          nativeReady=true;note('native-ready');
+        } catch (_) {note('native-ready-error');}
+      }
+      function renderFailure(){
+        var panel=document.getElementById('loopaStartupRecovery');
+        if(!code||!panel)return;
+        root.setAttribute('data-loopa-launch-error','');
+        var launchSplash=document.getElementById('loopaLaunchSplash');
+        if(launchSplash)launchSplash.hidden=true;
+        var dialogs=document.querySelectorAll('dialog[open]');
+        for(var i=0;i<dialogs.length;i++){
+          try{dialogs[i].close();}
+          catch(_){dialogs[i].removeAttribute('open');}
+        }
+        var app=document.querySelector('body>.app');
+        if(app){app.setAttribute('inert','');app.setAttribute('aria-hidden','true');}
+        panel.hidden=false;
+        document.getElementById('loopaStartupCode').textContent='Код запуска: '+code;
+        signalNative(true);
+      }
+      function fail(reason){
+        if(code||done||!relevant)return false;
+        code=reason;clearTimeout(timer);note(reason);renderFailure();
+        return true;
+      }
+      function begin(stage,timeout){
+        if(code||done)return;
+        phase=stage;note(stage);clearTimeout(timer);
+        timer=setTimeout(function(){fail(phase+'-timeout');},timeout);
+      }
+      document.addEventListener('load',function(event){
+        if(event.target&&event.target.id==='loopaTelegramSdk'){
+          var app=window.Telegram&&window.Telegram.WebApp;
+          if(app&&app.initData){
+            relevant=true;root.classList.add('telegram-miniapp');root.dataset.loopaEntry='telegram';
+            note('telegram-sdk-loaded');signalNative(false);
+          }else if(launchHint)fail('telegram-launch-missing');
+        }
+      },true);
+      window.addEventListener('error',function(event){
+        var target=event.target;
+        var dependency=target&&target.getAttribute&&target.getAttribute('data-loopa-boot');
+        if(dependency){fail(dependency+'-load');return;}
+        if(!done&&!code&&event.message&&(!event.filename||event.filename.indexOf(location.origin+'/')===0)){
+          note('javascript-error');
+          if(event.filename)fail('javascript-error');
+        }
+      },true);
+      window.addEventListener('unhandledrejection',function(){if(!done&&!code)note('promise-rejection');});
+      document.addEventListener('securitypolicyviolation',function(event){
+        var directive=event.effectiveDirective||'';
+        if(done||code||!/^script-src/.test(directive))return;
+        note('script-csp');
+        if(event.blockedURI==='inline'&&directive!=='script-src-attr')fail('startup-csp');
+      });
+      begin('libraries',9000);
+      return {
+        mount:function(){
+          var retry=document.getElementById('loopaStartupRetry');
+          retry.addEventListener('click',function(){
+            // Preserve the launch hash, OAuth parameters and destination.
+            location.reload();
+          });
+          renderFailure();
+        },
+        begin:begin,fail:fail,failed:function(){return !!code;},
+        complete:function(){if(!code&&!done){done=true;clearTimeout(timer);note('app-ready');}},
+        shell:function(){
+          signalNative(false);
+          var splash=document.getElementById('loopaLaunchSplash');
+          if(splash)splash.classList.add('is-hidden');
+          var app=document.querySelector('body>.app');
+          if(app)app.removeAttribute('inert');
+        },
+        snapshot:function(){return {phase:phase,code:code,nativeReady:nativeReady,events:events.slice()};}
+      };
+    })();
+  </script>
+  <script id="loopaTelegramSdk" data-loopa-boot="telegram-sdk" defer src="https://telegram.org/js/telegram-web-app.js"></script>
 
 <script>
-    // Detect Telegram before the stylesheet paints to prevent a flash of the app.
-    try{const tg=window.Telegram?.WebApp;if(tg?.initData){document.documentElement.classList.add('telegram-miniapp');try{tg.setHeaderColor?.('#090a0c');tg.setBackgroundColor?.('#090a0c');}catch{}}}catch{}
-    // This switch only selects a view. Account access is validated by Auth and the server.
+    // Entry selection is UI-only. Signed Telegram initData is validated on the server.
     const entryRoot=document.documentElement;
     const entryQuery=new URLSearchParams(location.search);
     const entryFragment=new URLSearchParams(location.hash.slice(1));
-    const telegramStartParam=window.Telegram?.WebApp?.initDataUnsafe?.start_param
-      ||entryQuery.get('tgWebAppStartParam')||'';
-    if(entryRoot.classList.contains('telegram-miniapp')&&/^rt_[a-f0-9]{32}$/i.test(telegramStartParam)){
-      const connection=document.createElement('link');
-      connection.rel='preconnect';connection.href='https://rutube.ru';document.head.append(connection);
-    }
     const entryAuthCallback=entryQuery.has('code')||entryQuery.has('error_code')
       ||entryFragment.has('access_token')||entryFragment.has('error_code');
-    entryRoot.dataset.loopaEntry=entryRoot.classList.contains('telegram-miniapp')?'telegram'
-      :entryQuery.get('recovery')==='1'||entryAuthCallback?'recovery':'browser';
+    let telegramStartParam='';
+    function resolveApplicationEntry(){
+      const tg=window.Telegram?.WebApp;
+      const miniApp=!!tg?.initData;
+      entryRoot.classList.toggle('telegram-miniapp',miniApp);
+      entryRoot.dataset.loopaEntry=miniApp?'telegram'
+        :entryQuery.get('recovery')==='1'||entryAuthCallback?'recovery':'browser';
+      telegramStartParam=miniApp?(tg.initDataUnsafe?.start_param||entryQuery.get('tgWebAppStartParam')||''):'';
+      if(miniApp&&/^rt_[a-f0-9]{32}$/i.test(telegramStartParam)){
+        const connection=document.createElement('link');
+        connection.rel='preconnect';connection.href='https://rutube.ru';document.head.append(connection);
+      }
+    }
+    if(entryRoot.dataset.loopaEntry!=='telegram')resolveApplicationEntry();
     try{const m=localStorage.getItem('loopa-wallpaper-motion');document.documentElement.dataset.wallpaperExplicit=String(m==='on');document.documentElement.dataset.wallpaperMotion=m==='off'?'off':'on';}catch{document.documentElement.dataset.wallpaperExplicit='false';document.documentElement.dataset.wallpaperMotion='on';}
   </script>
   <style>
@@ -1411,6 +1532,14 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
     html.telegram-miniapp .loopa-launch-splash.is-hidden{
       opacity:0;visibility:hidden;
     }
+    html[data-loopa-launch-error] #loopaLaunchSplash{display:none!important}
+    html[data-loopa-launch-error] body>.app{visibility:hidden}
+    #loopaStartupRecovery:not([hidden]){
+      position:fixed;inset:0;z-index:100001;display:grid;place-items:center;
+      background:#090a0c;padding:24px;color:#fff
+    }
+    #loopaStartupRecovery .browser-entry-card{max-width:100%}
+    #loopaStartupCode{display:block;margin-top:12px;color:#a7a4a7}
     .loopa-launch-content{
       display:flex;flex-direction:column;align-items:center;
       width:min(100%,430px);padding:36px 28px;
@@ -1597,6 +1726,15 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
 </style>
 </head>
 <body>
+  <section id="loopaStartupRecovery" hidden aria-label="Повторный запуск LOOPA">
+    <div class="browser-entry-card">
+      <h1>LOOPA</h1>
+      <p role="alert">Не удалось запустить приложение. Проверь подключение и попробуй ещё раз. Если повторный запуск не поможет, закрой LOOPA и открой её заново в Telegram.</p>
+      <button type="button" id="loopaStartupRetry" class="action">Запустить снова</button>
+      <small id="loopaStartupCode"></small>
+    </div>
+  </section>
+  <script>window.loopaLaunch.mount();</script>
   <main id="browser-entry">
     <div class="browser-entry-card">
       <h1>LOOPA</h1>
@@ -1638,7 +1776,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
          <div class="loopa-launch-dots" aria-hidden="true"><i></i><i></i><i></i></div>
        </div>
      </div>
-     <div class="app">
+     <div class="app" inert>
     <div class="scenery" aria-hidden="true"><svg class="scenery-art" viewBox="0 0 640 1500" preserveAspectRatio="xMaxYMin slice" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="obsidianPlane" x1="0" y1="0" x2="1" y2=".3"><stop stop-color="#fff" stop-opacity="0"/><stop offset=".65" stop-color="#fff" stop-opacity=".025"/><stop offset="1" stop-color="#fff" stop-opacity=".16"/></linearGradient><linearGradient id="obsidianShade" x1="1" y1="0" x2="0" y2=".65"><stop stop-color="#e5e8ee" stop-opacity=".13"/><stop offset=".55" stop-color="#b5bac4" stop-opacity=".025"/><stop offset="1" stop-color="#11131a" stop-opacity="0"/></linearGradient><linearGradient id="obsidianEdge" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#fff" stop-opacity="0"/><stop offset=".75" stop-color="#e9ebf2" stop-opacity=".24"/><stop offset="1" stop-color="#fff" stop-opacity=".06"/></linearGradient></defs><path d="M386 0H640V621L386 496Z" fill="url(#obsidianPlane)"/><path d="M476 0H640V1020L476 877Z" fill="url(#obsidianShade)"/><path d="M0 331L640 509V688L0 388Z" fill="url(#obsidianShade)"/><path d="M640 253L245 579L640 764Z" fill="url(#obsidianPlane)"/><path d="M640 770L205 1025L640 1156Z" fill="url(#obsidianShade)"/><path d="M0 331L640 509M386 0V496L640 621M476 0V877L640 1020M640 253L245 579M640 770L205 1025" fill="none" stroke="url(#obsidianEdge)" stroke-width=".7"/><path d="M593 0V1140M555 0V1105" fill="none" stroke="#e8ebf2" stroke-opacity=".055" stroke-width=".7"/></svg></div>
     <header class="top">
       <div class="brand">LOOPA</div>
@@ -2037,19 +2175,25 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     <button id="telegramAuthCancel" class="telegram-dialog-cancel" type="button">Не сейчас</button>
     <p id="telegramAuthError" class="auth-feedback error" role="status" aria-live="polite" hidden></p>
   </dialog>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js" integrity="sha384-uteMfOloLDGt042uDz+xHGF3ym63/WQ6rFq7murQRG8Ih7QrXGEGNtWd8688sb4O" crossorigin="anonymous"></script>
+  <script defer data-loopa-boot="supabase-sdk" src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js" integrity="sha384-uteMfOloLDGt042uDz+xHGF3ym63/WQ6rFq7murQRG8Ih7QrXGEGNtWd8688sb4O" crossorigin="anonymous"></script>
   <div id="tgViewportDiagnostics" hidden role="region" aria-label="Диагностика Telegram Mini App">
   <div class="tgDiagHeader"><strong id="tgDiagTitle" class="tgDiagTitle">Telegram · диагностика экрана</strong><button id="tgDiagRefresh" type="button">Обновить</button><button id="tgDiagClose" type="button">Закрыть</button></div>
   <p>Отчёт остаётся на устройстве. Данные входа и initData не собираются.</p>
   <textarea id="tgDiagOutput" readonly aria-label="Отчёт диагностики Telegram"></textarea>
   <div class="tgDiagActions"><button id="tgDiagCopy" type="button">Скопировать отчёт</button><span id="tgDiagCopyStatus" role="status"></span></div>
 </div>
-  <script src="./assets/room-watch-reliability.js"></script>
-  <script src="./assets/account-continuity.js"></script>
-  <script src="./assets/resume-storage.js"></script>
-  <script src="./assets/direct-messages.js?v=stable-inbox"></script>
+  <script defer data-loopa-boot="app-dependency" src="./assets/room-watch-reliability.js"></script>
+  <script defer data-loopa-boot="app-dependency" src="./assets/account-continuity.js"></script>
+  <script defer data-loopa-boot="app-dependency" src="./assets/resume-storage.js"></script>
+  <script defer data-loopa-boot="app-dependency" src="./assets/direct-messages.js?v=stable-inbox"></script>
   <script defer>
     'use strict';
+    function startLoopaApplication(){
+    const launch=window.loopaLaunch;
+    if(launch.failed())return;
+    resolveApplicationEntry();
+    if(entryRoot.dataset.loopaEntry==='browser'){launch.complete();return;}
+    launch.begin('application',4000);
     const SUPABASE_URL = 'https://wnubqzwsvclvcvozibtc.supabase.co';
     // Это публичный ключ браузерного клиента. Никогда не вставляйте service_role или secret key.
     const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_yuWa66reRpb7j2q3Z4mnAA_bkGwIhpp';
@@ -4290,28 +4434,11 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     }
     if(isTelegramMiniApp){
       document.documentElement.classList.add('telegram-miniapp');
-      // Native Telegram splash is configured in BotFather; this is the matching
-      // non-blocking transition inside the WebView once the page begins loading.
-      const launchSplash=document.getElementById('loopaLaunchSplash');
-      if(launchSplash){
-        let splashHidden=false;
-        const hideLaunchSplash=()=>{
-          if(splashHidden)return;
-          splashHidden=true;
-          launchSplash.classList.add('is-hidden');
-          // Remove it entirely to avoid invisible overlays on iOS WebViews.
-          setTimeout(()=>launchSplash.remove(),500);
-        };
-        if(document.readyState==='complete')setTimeout(hideLaunchSplash,360);
-        else window.addEventListener('load',()=>setTimeout(hideLaunchSplash,360),{once:true});
-        // Always reveal the app even if YouTube/VK loading never fires "load".
-        setTimeout(hideLaunchSplash,1650);
-      }
       let tgDiagnosticsEnabled=new URLSearchParams(location.search).get('tgdebug')==='1';
       const tgDiagPanel=document.getElementById('tgViewportDiagnostics');
       const tgDiagOutput=document.getElementById('tgDiagOutput');
       const tgDiagEvents=[];
-      let tgFullscreenRequest='not attempted',tgReadyCalled=false;
+      let tgFullscreenRequest='not attempted';
       const tgInset=value=>value&&typeof value==='object'?{top:value.top??null,right:value.right??null,bottom:value.bottom??null,left:value.left??null}:null;
       const tgCssValue=name=>{try{return getComputedStyle(document.documentElement).getPropertyValue(name).trim()||null;}catch{return null;}};
       const tgDiagnosticSnapshot=()=>({
@@ -4322,7 +4449,8 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         isFullscreen:!!telegramWebApp.isFullscreen,
         fullscreenApiAvailable:typeof telegramWebApp.requestFullscreen==='function',
         fullscreenApiRequest:tgFullscreenRequest,
-        readyCalled:tgReadyCalled,
+        readyCalled:launch.snapshot().nativeReady,
+        startup:launch.snapshot(),
         telegramViewportHeight:Number.isFinite(telegramWebApp.viewportHeight)?telegramWebApp.viewportHeight:null,
         telegramStableViewportHeight:Number.isFinite(telegramWebApp.viewportStableHeight)?telegramWebApp.viewportStableHeight:null,
         windowInnerHeight:window.innerHeight,
@@ -4381,7 +4509,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       syncTelegramFullscreen('initial-fullscreen-state');
       let tgSupportsFullscreen=false;try{tgSupportsFullscreen=!!telegramWebApp.isVersionAtLeast?.('8.0');}catch{}
       if(typeof telegramWebApp.requestFullscreen==='function'&&tgSupportsFullscreen&&!telegramWebApp.isFullscreen){
-        tgFullscreenRequest='called before ready()';tgRecordDiagnostic('requestFullscreen-called-before-ready');
+        tgFullscreenRequest='called';tgRecordDiagnostic('requestFullscreen-called');
         try{
           const requestResult=telegramWebApp.requestFullscreen();
           if(requestResult&&typeof requestResult.then==='function'){
@@ -4400,7 +4528,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
           else if(lastPage!=='home')showPage('home');
         });
       }catch(error){tgRecordDiagnostic('back-button-listener-error',error);}
-      try{telegramWebApp.ready?.();tgReadyCalled=true;tgRecordDiagnostic('ready-called');}catch(error){tgRecordDiagnostic('ready-error',error);}
+      if(launch.snapshot().nativeReady)tgRecordDiagnostic('ready-called');
       tgRenderDiagnostics();
       setTimeout(()=>tgRecordDiagnostic('snapshot-500ms'),500);setTimeout(()=>tgRecordDiagnostic('snapshot-1800ms'),1800);setTimeout(()=>tgRecordDiagnostic('snapshot-4500ms'),4500);
     }
@@ -5880,6 +6008,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       renderName(savedName);
       void showAvatar(byId('account-avatar'),profileAvatarPath(user),savedName);
       feedback('profile-feedback','');
+      launch.complete();
       try {
         const {data, error} = await client.from('profiles').select('display_name,username,avatar_path,allow_friend_requests,room_invite_policy').eq('id', user.id).maybeSingle();
         if (currentUser?.id !== user.id) return;
@@ -5978,18 +6107,25 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     async function syncSession() {
       if (!client) return;
       const {data, error} = await client.auth.getSession();
+      if(launch.failed())return;
       if (error) showToast(errorText(error));
       let session = data?.session;
       if(isTelegramMiniApp&&session?.user){
         // A WebView can reuse a stored session from another Telegram launch.
         // Resolve the signed launch against the session before showing any account data.
         try{
+          launch.begin('telegram-status',10000);
           const status=await telegramMiniRequest('status',session.access_token);
+          if(launch.failed())return;
           if(status.status==='linked'){
+            launch.begin('confirm-session',10000);
             const latest=(await client.auth.getSession()).data?.session;
+            if(launch.failed())return;
             session=latest?.user?.id===session.user.id?latest:null;
           }else session=null;
-        }catch{
+        }catch(error){
+          if(launch.failed())return;
+          if(error.message==='telegram_timeout'){launch.fail('telegram-status-timeout');return;}
           session=null;
         }
         telegramMiniLinked=!!session;
@@ -6033,16 +6169,25 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     async function telegramMiniRequest(action,accessToken=''){
       if(!client||!isTelegramMiniApp||!telegramWebApp?.initData)
         throw new Error('not_in_telegram');
-      const response=await fetch(SUPABASE_URL+'/functions/v1/telegram-miniapp-auth',{
-        method:'POST',cache:'no-store',
-        headers:{
-          'Content-Type':'application/json',
-          apikey:SUPABASE_PUBLISHABLE_KEY,
-          ...(accessToken?{Authorization:'Bearer '+accessToken}:{})
-        },
-        body:JSON.stringify({action,initData:telegramWebApp.initData})
-      });
-      const result=await response.json().catch(()=>({}));
+      const controller=new AbortController();
+      const timer=setTimeout(()=>controller.abort(),8000);
+      let response,result;
+      try{
+        response=await fetch(SUPABASE_URL+'/functions/v1/telegram-miniapp-auth',{
+          method:'POST',cache:'no-store',signal:controller.signal,
+          headers:{
+            'Content-Type':'application/json',
+            apikey:SUPABASE_PUBLISHABLE_KEY,
+            ...(accessToken?{Authorization:'Bearer '+accessToken}:{})
+          },
+          body:JSON.stringify({action,initData:telegramWebApp.initData})
+        });
+        result=await response.json().catch(()=>({}));
+        if(controller.signal.aborted)throw new Error('telegram_timeout');
+      }catch(error){
+        if(controller.signal.aborted)throw new Error('telegram_timeout');
+        throw error;
+      }finally{clearTimeout(timer);}
       if(!response.ok){
         const message=action==='link'&&response.status===503?'telegram_link_retry':result.error||'backend_unavailable';
         const error=new Error(message);
@@ -6053,6 +6198,8 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       return result;
     }
     function telegramMiniErrorMessage(error){
+      if(error?.message==='telegram_timeout')return 'Telegram не ответил вовремя. Попробуй войти ещё раз.';
+      if(error?.message==='telegram_verify_timeout')return 'Подтверждение входа заняло слишком много времени. Закрой LOOPA и открой заново.';
       if(error?.message==='telegram_registration_pending')
         return 'Сначала заверши начатую регистрацию через Telegram.';
       if(error?.message==='telegram_link_pending')
@@ -6076,6 +6223,17 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       if(error?.message==='login_required')return 'Сначала войди в свой профиль LOOPA.';
       return 'Быстрый вход пока не настроен. Можно войти обычным способом.';
     }
+    async function verifyTelegramOtp(tokenHash){
+      let timeout;
+      try{
+        return await Promise.race([
+          client.auth.verifyOtp({token_hash:tokenHash,type:'magiclink'}),
+          new Promise((_,reject)=>{
+            timeout=setTimeout(()=>reject(new Error('telegram_verify_timeout')),9500);
+          })
+        ]);
+      }finally{clearTimeout(timeout);}
+    }
     async function tryTelegramMiniLogin({register=false}={}){
       if(!isTelegramMiniApp||!client||currentUser||telegramMiniBusy)return;
       telegramMiniBusy=true;
@@ -6085,19 +6243,21 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       retry.textContent='Повторить вход';
       note.textContent=register?'Создаём профиль LOOPA…':'Проверяем вход через Telegram…';
       try{
+        launch.begin('telegram-login',10000);
         const response=await telegramMiniRequest(register?'register':'login');
-        if(currentUser)return;
+        if(currentUser||launch.failed())return;
         if(response.status==='unlinked'){
           pauseInlineVideoCard();
           note.textContent='Имя, ник и доступное фото из Telegram появятся в профиле LOOPA. Их можно изменить.';
           continueButton.hidden=false;
           showPage('profile');
+          launch.complete();
           return;
         }
         if(response.status!=='login_ready'||!response.token_hash)throw new Error('telegram_login_unavailable');
-        const {data,error}=await client.auth.verifyOtp({
-          token_hash:response.token_hash,type:'magiclink'
-        });
+        launch.begin('supabase-verify',10000);
+        const {data,error}=await verifyTelegramOtp(response.token_hash);
+        if(launch.failed())return;
         if(error||!data?.user)throw new Error('reopen_miniapp');
         currentUser=data.user;
         telegramMiniLinked=true;
@@ -6109,11 +6269,15 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         if(!openVideo)await acceptInvite();
         showToast(register?'LOOPA готова — добро пожаловать!':'Вход через Telegram выполнен');
       }catch(error){
-        if(currentUser)return;
+        if(launch.failed())return;
+        if(currentUser){launch.fail('account-render-error');return;}
+        if(error.message==='telegram_timeout'&&launch.fail('telegram-login-timeout'))return;
+        if(error.message==='telegram_verify_timeout'&&launch.fail('supabase-verify-timeout'))return;
         pauseInlineVideoCard();
         note.textContent=telegramMiniErrorMessage(error);
         retry.hidden=false;
         showPage('profile');
+        launch.complete();
       }finally{telegramMiniBusy=false;}
     }
 
@@ -6284,7 +6448,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
               throw new Error('Этот Telegram ещё не зарегистрирован в LOOPA. Выбери «Регистрация» и продолжи через Telegram.');
             if(response.status!=='login_ready'||!response.token_hash)
               throw new Error('Не удалось войти через Telegram. Закрой Mini App и открой заново.');
-            const {data,error}=await client.auth.verifyOtp({token_hash:response.token_hash,type:'magiclink'});
+            const {data,error}=await verifyTelegramOtp(response.token_hash);
             if(error||!data?.user)throw new Error('reopen_miniapp');
             currentUser=data.user;
             telegramMiniLinked=true;
@@ -6314,7 +6478,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         }else{
           message=LOOPAAAccountContinuity.identityLinkError(error,'Telegram')||message;
         }
-        if(['reopen_miniapp','telegram_rate_limited','telegram_link_retry','telegram_link_pending','telegram_registration_pending'].includes(error?.message))message=telegramMiniErrorMessage(error);
+        if(['reopen_miniapp','telegram_rate_limited','telegram_link_retry','telegram_link_pending','telegram_registration_pending','telegram_timeout','telegram_verify_timeout'].includes(error?.message))message=telegramMiniErrorMessage(error);
         feedback('telegramAuthError',message,true);
       }finally{button.disabled=false;}
     };
@@ -6589,12 +6753,14 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     });
     async function init() {
       if (!window.supabase?.createClient) {
+        launch.fail('supabase-sdk-load');
         pauseInlineVideoCard();
         byId('auth-loading').hidden = true;
         displayGuest();
         feedback('auth-feedback','Не удалось загрузить библиотеку Supabase. Проверь подключение к интернету и обнови страницу.',true);
         return;
       }
+      launch.begin('restore-session',12000);
       try {
         client = window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{
           auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
@@ -6602,6 +6768,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         client.auth.onAuthStateChange((event, session) => {
           // Run outside the auth callback to avoid blocking Supabase internal locks.
           setTimeout(() => {
+            if(launch.failed())return;
             const newUser = session?.user || null;
             if(isTelegramMiniApp&&newUser&&newUser.id!==currentUser?.id){
               // Auth events alone do not confirm which Telegram account opened the app.
@@ -6627,8 +6794,11 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
           },0);
         });
         await syncSession();
+        if(launch.failed())return;
         if(isTelegramMiniApp&&!currentUser)await tryTelegramMiniLogin();
+        else launch.complete();
       } catch (err) {
+        if(launch.failed()||(currentUser&&launch.fail('account-render-error')))return;
         // A failure while loading optional profile data must not sign out a valid
         // Supabase session, nor show the register form above the account settings.
         if (currentUser) {
@@ -6639,7 +6809,9 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
           pauseInlineVideoCard();
           displayGuest();
           feedback('auth-feedback',errorText(err),true);
+          if(isTelegramMiniApp)showPage('profile');
         }
+        launch.complete();
       }
     }
     if(entryRoot.dataset.loopaEntry!=='browser'){
@@ -6651,8 +6823,16 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         byId('auth-icloud-details').open=true;
       }
       if(pendingInlineVideo&&!pendingInvite)showInlineVideoCard(pendingInlineVideo,true);
-      init();
+      launch.shell();
+      void init();
     }
+    }
+    function bootLoopa(){
+      try{startLoopaApplication();}
+      catch(_){window.loopaLaunch.fail('application-error');}
+    }
+    if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bootLoopa,{once:true});
+    else bootLoopa();
 
   </script>
 <script async src="https://www.youtube.com/iframe_api"></script><script async src="https://vkvideo.ru/js/api/videoplayer.js"></script>
