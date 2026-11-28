@@ -13,6 +13,32 @@ sandbox.window = sandbox;
 vm.runInNewContext(source, sandbox, {filename: 'room-watch-reliability.js'});
 const reliability = sandbox.LOOPAWatchReliability;
 
+test('player SDKs are requested only after mounting their provider and can retry a failed load', () => {
+  const start = html.indexOf('    const playerSdkRequests=');
+  const end = html.indexOf('    function mountRoomPlayer', start);
+  const scripts = [];
+  const bindRoomPlayers = () => {};
+  const env = {
+    window: {}, bindRoomPlayers,
+    document: {head: {append: script => scripts.push(script)}, createElement: () => ({remove() {}})}
+  };
+  vm.runInNewContext(html.slice(start, end), env);
+  assert.equal(scripts.length, 0);
+  env.loadPlayerSdk('https://rutube.ru/play/embed/0123456789abcdef0123456789abcdef/');
+  assert.equal(scripts.length, 0);
+  const youtube = 'https://www.youtube.com/embed/dQw4w9WgXcQ';
+  env.loadPlayerSdk(youtube);
+  env.loadPlayerSdk(youtube);
+  assert.equal(scripts.length, 1);
+  assert.equal(scripts[0].src, 'https://www.youtube.com/iframe_api');
+  assert.equal(scripts[0].onload, bindRoomPlayers);
+  scripts[0].onerror();
+  env.loadPlayerSdk(youtube);
+  env.loadPlayerSdk('https://vkvideo.ru/video_ext.php?oid=-123&id=456');
+  assert.equal(scripts.length, 3);
+  assert.equal(scripts[2].src, 'https://vkvideo.ru/js/api/videoplayer.js');
+});
+
 test('normalizes accepted video links for the three supported providers', () => {
   assert.match(reliability.normalizeMedia('https://youtu.be/dQw4w9WgXcQ', 'https://loopacinema.ru'), /youtube\.com\/embed\/dQw4w9WgXcQ/);
   assert.match(reliability.normalizeMedia('https://rutube.ru/video/0123456789abcdef0123456789abcdef/', 'https://loopacinema.ru'), /rutube\.ru\/play\/embed\/0123456789abcdef0123456789abcdef\//);

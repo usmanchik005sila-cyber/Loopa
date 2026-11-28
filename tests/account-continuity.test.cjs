@@ -176,11 +176,11 @@ test('browser entry keeps Telegram launches and auth recovery callbacks on their
   const start = html.indexOf('    const entryRoot=');
   const source = html.slice(start, html.indexOf('    try{const m=localStorage', start));
   const chooseEntry = (search, hash, inTelegram = false) => {
-    const root = { dataset: {}, classList: { contains: () => inTelegram } };
+    const root = { dataset: {}, classList: { toggle() {} } };
     vm.runInNewContext(source, {
-      URLSearchParams, window: {},
+      URLSearchParams, window: { Telegram: inTelegram ? { WebApp: { initData: 'fixture' } } : undefined },
       location: { search, hash },
-      document: { documentElement: root },
+      document: { documentElement: root, getElementById: () => ({ addEventListener() {} }) },
     });
     return root.dataset.loopaEntry;
   };
@@ -189,7 +189,37 @@ test('browser entry keeps Telegram launches and auth recovery callbacks on their
   assert.equal(chooseEntry('?recovery=1', ''), 'recovery');
   assert.equal(chooseEntry('?code=fixture', ''), 'recovery');
   assert.equal(chooseEntry('', '#access_token=fixture&type=recovery'), 'recovery');
+  assert.equal(chooseEntry('', '#tgWebAppData=fixture'), 'telegram');
   assert.equal(chooseEntry('?recovery=1', '', true), 'telegram');
+});
+
+test('direct room links join immediately after auth and retain the private-invite fallback', async () => {
+  const start = html.indexOf('    async function acceptInvite()');
+  const source = html.slice(start, html.indexOf('    // Telegram sharing', start));
+  for (const needsInvite of [false, true]) {
+    const events = [];
+    const context = {
+      currentUser: {id:'fixture-profile'}, pendingInvite:'abcdef012345', invitationBusy:false, navigationEpoch:1,
+      roomState:null, URL, location:{href:'https://loopacinema.ru/?room=abcdef012345'},
+      history:{replaceState:() => events.push('clean')}, showToast: assert.fail,
+      async roomCall(op, args) {
+        assert.equal(op,'join');
+        assert.equal(args.room,'ABCDEF012345');
+        events.push('join');
+        if(needsInvite && events.length===1) throw Error('Комната недоступна');
+        context.roomState={code:args.room};
+      },
+      async inviteRPC(op, args) {
+        events.push(op);
+        if (op==='inbox') return [{code:'ABCDEF012345',id:'invite-fixture'}];
+        assert.equal(args.invitation,'invite-fixture');
+      }
+    };
+    vm.runInNewContext(source, context);
+    await context.acceptInvite();
+    assert.deepEqual(events, needsInvite?['join','inbox','accept','join','clean']:['join','clean']);
+    assert.equal(context.pendingInvite,null);
+  }
 });
 
 test('cached sessions in the Mini App open only after the signed Telegram pairing is confirmed', async () => {
@@ -221,8 +251,7 @@ test('cached sessions in the Mini App open only after the signed Telegram pairin
     };
     vm.runInNewContext(source, context);
     await context.syncSession();
-    assert.deepEqual(events, video ? ['status','account','invite','profile ready'] :
-      linked ? ['status','account','profile ready','invite'] : ['status','guest']);
+    assert.deepEqual(events, linked ? ['status','account','invite','profile ready'] : ['status','guest']);
     assert.equal(context.currentUser, linked ? user : null);
   }
 });

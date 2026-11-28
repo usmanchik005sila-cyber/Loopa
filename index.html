@@ -14,27 +14,48 @@
   <meta name="loopa-version" content="v94">
   <meta name="loopa-build" content="v97-telegram-secure-auth">
   <link rel="preconnect" href="https://wnubqzwsvclvcvozibtc.supabase.co" crossorigin>
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script id="telegram-web-app-sdk" defer src="https://telegram.org/js/telegram-web-app.js"></script>
 
 <script>
-    // Detect Telegram before the stylesheet paints to prevent a flash of the app.
-    try{const tg=window.Telegram?.WebApp;if(tg?.initData){document.documentElement.classList.add('telegram-miniapp');try{tg.setHeaderColor?.('#090a0c');tg.setBackgroundColor?.('#090a0c');}catch{}}}catch{}
-    // This switch only selects a view. Account access is validated by Auth and the server.
     const entryRoot=document.documentElement;
     const entryQuery=new URLSearchParams(location.search);
     const entryFragment=new URLSearchParams(location.hash.slice(1));
-    const telegramStartParam=window.Telegram?.WebApp?.initDataUnsafe?.start_param
-      ||entryQuery.get('tgWebAppStartParam')||'';
-    if(entryRoot.classList.contains('telegram-miniapp')&&/^rt_[a-f0-9]{32}$/i.test(telegramStartParam)){
-      const connection=document.createElement('link');
-      connection.rel='preconnect';connection.href='https://rutube.ru';document.head.append(connection);
-    }
     const entryAuthCallback=entryQuery.has('code')||entryQuery.has('error_code')
       ||entryFragment.has('access_token')||entryFragment.has('error_code');
-    entryRoot.dataset.loopaEntry=entryRoot.classList.contains('telegram-miniapp')?'telegram'
-      :entryQuery.get('recovery')==='1'||entryAuthCallback?'recovery':'browser';
+    const browserEntry=entryQuery.get('recovery')==='1'||entryAuthCallback?'recovery':'browser';
+    let telegramStartParam='',telegramShellReady=false;
+    function resolveLoopaEntry(){
+      const tg=window.Telegram?.WebApp;
+      const hasTelegramLaunch=!!tg?.initData;
+      entryRoot.classList.toggle('telegram-miniapp',hasTelegramLaunch);
+      entryRoot.dataset.loopaEntry=hasTelegramLaunch?'telegram':browserEntry;
+      telegramStartParam=hasTelegramLaunch?(tg.initDataUnsafe?.start_param||entryQuery.get('tgWebAppStartParam')||''):'';
+      if(!hasTelegramLaunch||telegramShellReady)return;
+      // Signal readiness once the public shell is in the DOM. Authentication still
+      // runs through the server before currentUser is assigned or private data is read.
+      telegramShellReady=true;
+      try{tg.setHeaderColor?.('#090a0c');tg.setBackgroundColor?.('#090a0c');}catch{}
+      const splash=document.getElementById('loopaLaunchSplash');
+      if(splash){
+        splash.addEventListener('transitionend',()=>splash.remove(),{once:true});
+        splash.classList.add('is-hidden');
+        splash.setAttribute('aria-hidden','true');
+      }
+      try{tg.ready?.();}catch{}
+      performance.mark('loopa-shell-ready');
+    }
+    // The launch parameters choose an inert shell only. The SDK settles the
+    // actual entry mode even when a launch was restored from its session storage.
+    const telegramLaunchHint=entryFragment.has('tgWebAppData')||!!window.Telegram?.WebApp?.initData;
+    entryRoot.dataset.loopaEntry=telegramLaunchHint?'telegram':browserEntry;
+    entryRoot.classList.toggle('telegram-miniapp',telegramLaunchHint);
+    const telegramSdk=document.getElementById('telegram-web-app-sdk');
+    telegramSdk.addEventListener('load',resolveLoopaEntry,{once:true});
+    telegramSdk.addEventListener('error',resolveLoopaEntry,{once:true});
     try{const m=localStorage.getItem('loopa-wallpaper-motion');document.documentElement.dataset.wallpaperExplicit=String(m==='on');document.documentElement.dataset.wallpaperMotion=m==='off'?'off':'on';}catch{document.documentElement.dataset.wallpaperExplicit='false';document.documentElement.dataset.wallpaperMotion='on';}
   </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js" integrity="sha384-uteMfOloLDGt042uDz+xHGF3ym63/WQ6rFq7murQRG8Ih7QrXGEGNtWd8688sb4O" crossorigin="anonymous"></script>
+  <!-- LOOPA_APP_SCRIPT -->
   <style>
     :root {
       color-scheme:dark;
@@ -1406,11 +1427,16 @@ html.telegram-miniapp.telegram-fullscreen body.dmViewing:not(.dmKeyboardOpen) .d
       display:grid;place-items:center;overflow:hidden;
       background:#090a0c;color:#fff;pointer-events:none;
       opacity:1;visibility:visible;
-      transition:opacity .38s ease,visibility .38s ease;
+      transition:opacity .16s ease,visibility .16s ease;
     }
     html.telegram-miniapp .loopa-launch-splash.is-hidden{
       opacity:0;visibility:hidden;
     }
+    .startup-skeleton{height:76px;border-radius:18px;opacity:.45}
+    .startup-skeleton::before,.startup-skeleton::after{
+      content:"";display:block;height:8px;width:min(50%,180px);margin:18px;border-radius:6px;background:#ffffff29
+    }
+    .startup-skeleton::after{width:min(30%,100px);margin-top:0}
     .loopa-launch-content{
       display:flex;flex-direction:column;align-items:center;
       width:min(100%,430px);padding:36px 28px;
@@ -1638,7 +1664,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
          <div class="loopa-launch-dots" aria-hidden="true"><i></i><i></i><i></i></div>
        </div>
      </div>
-     <div class="app">
+     <div class="app" inert>
     <div class="scenery" aria-hidden="true"><svg class="scenery-art" viewBox="0 0 640 1500" preserveAspectRatio="xMaxYMin slice" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="obsidianPlane" x1="0" y1="0" x2="1" y2=".3"><stop stop-color="#fff" stop-opacity="0"/><stop offset=".65" stop-color="#fff" stop-opacity=".025"/><stop offset="1" stop-color="#fff" stop-opacity=".16"/></linearGradient><linearGradient id="obsidianShade" x1="1" y1="0" x2="0" y2=".65"><stop stop-color="#e5e8ee" stop-opacity=".13"/><stop offset=".55" stop-color="#b5bac4" stop-opacity=".025"/><stop offset="1" stop-color="#11131a" stop-opacity="0"/></linearGradient><linearGradient id="obsidianEdge" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#fff" stop-opacity="0"/><stop offset=".75" stop-color="#e9ebf2" stop-opacity=".24"/><stop offset="1" stop-color="#fff" stop-opacity=".06"/></linearGradient></defs><path d="M386 0H640V621L386 496Z" fill="url(#obsidianPlane)"/><path d="M476 0H640V1020L476 877Z" fill="url(#obsidianShade)"/><path d="M0 331L640 509V688L0 388Z" fill="url(#obsidianShade)"/><path d="M640 253L245 579L640 764Z" fill="url(#obsidianPlane)"/><path d="M640 770L205 1025L640 1156Z" fill="url(#obsidianShade)"/><path d="M0 331L640 509M386 0V496L640 621M476 0V877L640 1020M640 253L245 579M640 770L205 1025" fill="none" stroke="url(#obsidianEdge)" stroke-width=".7"/><path d="M593 0V1140M555 0V1105" fill="none" stroke="#e8ebf2" stroke-opacity=".055" stroke-width=".7"/></svg></div>
     <header class="top">
       <div class="brand">LOOPA</div>
@@ -1658,7 +1684,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
             <svg><use href="#i-users"/></svg><span><strong>Мои друзья</strong><small>Твой круг</small></span>
           </button>
         </div>
-        <form id="homeJoin" class="wideJoin"><input id="homeJoinCode" type="text" maxlength="1000" placeholder="Код или ссылка" aria-label="Код или ссылка на комнату"><button type="submit" aria-label="Войти в комнату">→</button></form><div id="homeRecent" class="recentGrid"></div>
+        <form id="homeJoin" class="wideJoin"><input id="homeJoinCode" type="text" maxlength="1000" placeholder="Код или ссылка" aria-label="Код или ссылка на комнату"><button type="submit" aria-label="Войти в комнату">→</button></form><div id="homeRecent" class="recentGrid"></div><div id="homeRecentLoading" class="glass startup-skeleton" hidden aria-hidden="true"></div>
 
       </section>
 
@@ -2037,19 +2063,22 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     <button id="telegramAuthCancel" class="telegram-dialog-cancel" type="button">Не сейчас</button>
     <p id="telegramAuthError" class="auth-feedback error" role="status" aria-live="polite" hidden></p>
   </dialog>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js" integrity="sha384-uteMfOloLDGt042uDz+xHGF3ym63/WQ6rFq7murQRG8Ih7QrXGEGNtWd8688sb4O" crossorigin="anonymous"></script>
   <div id="tgViewportDiagnostics" hidden role="region" aria-label="Диагностика Telegram Mini App">
   <div class="tgDiagHeader"><strong id="tgDiagTitle" class="tgDiagTitle">Telegram · диагностика экрана</strong><button id="tgDiagRefresh" type="button">Обновить</button><button id="tgDiagClose" type="button">Закрыть</button></div>
   <p>Отчёт остаётся на устройстве. Данные входа и initData не собираются.</p>
   <textarea id="tgDiagOutput" readonly aria-label="Отчёт диагностики Telegram"></textarea>
   <div class="tgDiagActions"><button id="tgDiagCopy" type="button">Скопировать отчёт</button><span id="tgDiagCopyStatus" role="status"></span></div>
 </div>
-  <script src="./assets/room-watch-reliability.js"></script>
-  <script src="./assets/account-continuity.js"></script>
-  <script src="./assets/resume-storage.js"></script>
-  <script src="./assets/direct-messages.js?v=stable-inbox"></script>
+  <script defer src="./assets/room-watch-reliability.js"></script>
+  <script defer src="./assets/account-continuity.js"></script>
+  <script defer src="./assets/resume-storage.js"></script>
+  <script defer src="./assets/direct-messages.js"></script>
   <script defer>
     'use strict';
+    function startLoopa(){
+    resolveLoopaEntry();
+    if(entryRoot.dataset.loopaEntry==='browser')return;
+    performance.mark('loopa-app-execution-start');
     const SUPABASE_URL = 'https://wnubqzwsvclvcvozibtc.supabase.co';
     // Это публичный ключ браузерного клиента. Никогда не вставляйте service_role или secret key.
     const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_yuWa66reRpb7j2q3Z4mnAA_bkGwIhpp';
@@ -2709,6 +2738,21 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       resumePlayerReady=true;showResumePromptIfReady();tryApplyResume();
       syncPlayback();updatePlaybackControls();
     }
+    const playerSdkRequests=new Map();
+    function loadPlayerSdk(url){
+      const youtube=url.startsWith('https://www.youtube.com/embed/');
+      const vk=url.startsWith('https://vkvideo.ru/video_ext.php');
+      if((!youtube&&!vk)||(youtube&&window.YT?.Player)||(vk&&window.VK?.VideoPlayer))return;
+      const src=youtube?'https://www.youtube.com/iframe_api':'https://vkvideo.ru/js/api/videoplayer.js';
+      if(playerSdkRequests.has(src))return;
+      const script=document.createElement('script');
+      script.src=src;
+      script.async=true;
+      script.onload=bindRoomPlayers;
+      script.onerror=()=>{playerSdkRequests.delete(src);script.remove();};
+      playerSdkRequests.set(src,script);
+      document.head.append(script);
+    }
     function mountRoomPlayer(url){
       pendingHostControl=null;
       resumePlayerReady=false;resumeRestorePending=null;cancelRutubeResume();hideResumePrompt();
@@ -2741,6 +2785,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         url=youtube.toString();
       }
       frame.src=url;
+      loadPlayerSdk(url);
       playerReadyTimer=setTimeout(()=>{
         if(frame!==roomBox())return;
         rutubeLoading.hidden=true;
@@ -3565,20 +3610,20 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       invitationBusy=true;
       const code=pendingInvite.toUpperCase();
       try{
-        // A Telegram direct link can point to a private room: accepting the
-        // matching in-app invite first grants access, unlike a raw room join.
-        let matchingInvite=null;
+        const owner=currentUser.id;
+        const navigation=navigationEpoch;
         try{
+          await roomCall('join',{room:code});
+        }catch(joinError){
+          if(!/Комната недоступна/.test(joinError.message))throw joinError;
           const incoming=await inviteRPC('inbox');
-          if(Array.isArray(incoming))
-            matchingInvite=incoming.find(item=>String(item.code||'').toUpperCase()===code);
-        }catch(error){console.warn('LOOPA invite lookup:',error.message);}
-        if(matchingInvite){
-          try{await inviteRPC('accept',{invitation:matchingInvite.id});}
-          catch(error){console.warn('LOOPA invite accept:',error.message);}
+          if(currentUser?.id!==owner||pendingInvite?.toUpperCase()!==code||navigation!==navigationEpoch)return;
+          const matchingInvite=Array.isArray(incoming)&&incoming.find(item=>String(item.code||'').toUpperCase()===code);
+          if(!matchingInvite)throw joinError;
+          await inviteRPC('accept',{invitation:matchingInvite.id});
+          if(currentUser?.id!==owner||pendingInvite?.toUpperCase()!==code||navigation!==navigationEpoch)return;
+          await roomCall('join',{room:code});
         }
-        // Use the throwing RPC so a failed join never dismisses a pending invite.
-        await roomCall('join',{room:code});
         if(roomState?.code!==code)return;
         pendingInvite=null;
         const clean=new URL(location.href);
@@ -3635,7 +3680,6 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       }
       catch(e){if(e.name!=='AbortError')showToast('Не удалось поделиться ссылкой');}
     };
-    if(pendingInvite)setTimeout(()=>{if(currentUser)acceptInvite();else{showPage('profile',()=>showToast('Войди, чтобы присоединиться к комнате'));}},1200);
     const catalogDialog=byId('catalog');
     let roomCreating=false,inlineVideoDraft=false;
     const inlineVideoSubmit=catalogDialog.querySelector('[data-room="video"]');
@@ -4061,7 +4105,14 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         if(!error&&currentUser?.id===owner){usageV88Value=rounded;usageV88At=Date.now();}
       }catch{}finally{usageV88Busy=false;}
     }
-    function usageStart(){usageLast=performance.now();usageReady=true;historyCall('start');}
+    function usageStart(){
+      const owner=currentUser?.id;
+      usageLast=performance.now();usageReady=true;
+      if(historyOwner!==owner)byId('homeRecentLoading').hidden=false;
+      void historyCall('start').finally(()=>{
+        if(currentUser?.id===owner)byId('homeRecentLoading').hidden=true;
+      });
+    }
     function usageTick(){const now=performance.now(),elapsed=Math.min(20,Math.max(0,(now-usageLast)/1000));usageLast=now;if(usageReady&&currentUser)historyCall('tick',{elapsed});}
     setInterval(()=>{if(!document.hidden){usageTick();if(roomState?.video)historyCall('record',{room_code:roomState.code});}},15000);
     document.addEventListener('visibilitychange',()=>{if(document.hidden){usageTick();usageReady=false;}else if(currentUser)usageStart();});
@@ -4290,28 +4341,11 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
     }
     if(isTelegramMiniApp){
       document.documentElement.classList.add('telegram-miniapp');
-      // Native Telegram splash is configured in BotFather; this is the matching
-      // non-blocking transition inside the WebView once the page begins loading.
-      const launchSplash=document.getElementById('loopaLaunchSplash');
-      if(launchSplash){
-        let splashHidden=false;
-        const hideLaunchSplash=()=>{
-          if(splashHidden)return;
-          splashHidden=true;
-          launchSplash.classList.add('is-hidden');
-          // Remove it entirely to avoid invisible overlays on iOS WebViews.
-          setTimeout(()=>launchSplash.remove(),500);
-        };
-        if(document.readyState==='complete')setTimeout(hideLaunchSplash,360);
-        else window.addEventListener('load',()=>setTimeout(hideLaunchSplash,360),{once:true});
-        // Always reveal the app even if YouTube/VK loading never fires "load".
-        setTimeout(hideLaunchSplash,1650);
-      }
       let tgDiagnosticsEnabled=new URLSearchParams(location.search).get('tgdebug')==='1';
       const tgDiagPanel=document.getElementById('tgViewportDiagnostics');
       const tgDiagOutput=document.getElementById('tgDiagOutput');
       const tgDiagEvents=[];
-      let tgFullscreenRequest='not attempted',tgReadyCalled=false;
+      let tgFullscreenRequest='not attempted';
       const tgInset=value=>value&&typeof value==='object'?{top:value.top??null,right:value.right??null,bottom:value.bottom??null,left:value.left??null}:null;
       const tgCssValue=name=>{try{return getComputedStyle(document.documentElement).getPropertyValue(name).trim()||null;}catch{return null;}};
       const tgDiagnosticSnapshot=()=>({
@@ -4322,7 +4356,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         isFullscreen:!!telegramWebApp.isFullscreen,
         fullscreenApiAvailable:typeof telegramWebApp.requestFullscreen==='function',
         fullscreenApiRequest:tgFullscreenRequest,
-        readyCalled:tgReadyCalled,
+        readyCalled:telegramShellReady,
         telegramViewportHeight:Number.isFinite(telegramWebApp.viewportHeight)?telegramWebApp.viewportHeight:null,
         telegramStableViewportHeight:Number.isFinite(telegramWebApp.viewportStableHeight)?telegramWebApp.viewportStableHeight:null,
         windowInnerHeight:window.innerHeight,
@@ -4400,7 +4434,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
           else if(lastPage!=='home')showPage('home');
         });
       }catch(error){tgRecordDiagnostic('back-button-listener-error',error);}
-      try{telegramWebApp.ready?.();tgReadyCalled=true;tgRecordDiagnostic('ready-called');}catch(error){tgRecordDiagnostic('ready-error',error);}
+      if(telegramShellReady)tgRecordDiagnostic('ready-called');
       tgRenderDiagnostics();
       setTimeout(()=>tgRecordDiagnostic('snapshot-500ms'),500);setTimeout(()=>tgRecordDiagnostic('snapshot-1800ms'),1800);setTimeout(()=>tgRecordDiagnostic('snapshot-4500ms'),4500);
     }
@@ -5057,19 +5091,6 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       dmPolicyReady=!!ready;
       refreshDmPolicyView();
     }
-    async function loadDmPolicy(owner){
-      if(!client||!owner)return;
-      setDmPolicyView('everyone',false);
-      try{
-        const {data,error}=await client.from('profiles').select('dm_policy').eq('id',owner).maybeSingle();
-        if(currentUser?.id!==owner)return;
-        if(error)throw error;
-        if(!data){setDmPolicyView('everyone',false);return;}
-        setDmPolicyView(data.dm_policy,true);
-      }catch(err){
-        if(currentUser?.id===owner){setDmPolicyView('everyone',false);}
-      }
-    }
     byId('open-dm-policy').addEventListener('click',()=>{
       if(!currentUser)return;
       dmPolicyDialog.querySelectorAll('input[name="dm-policy"]').forEach(input=>input.checked=input.value===dmPolicyValue);
@@ -5431,7 +5452,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       }
     });
     const {openDirectMessage,refreshMessagesInbox,subscribeMessagesInbox,
-      stopMessagesInbox,clearDirectMessageChannel,primeMessagesInbox}=messages;
+      stopMessagesInbox,clearDirectMessageChannel}=messages;
     // v88 uses loopa_history27 as the single active-time counter.
     // Avoid running v87's separate timer: it would double-count active seconds.
 
@@ -5636,10 +5657,10 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         let directory={};
         let presence={};
         if (ids.length) {
-          const {data:profiles,error:profileError} = await lookupPublicProfiles(ids);
-          if (profileError) throw profileError;
-          directory=Object.fromEntries((profiles||[]).map(profile=>[profile.id,profile]));
-          presence=await getPublicPresence(ids);
+          const [profilesResult,visiblePresence]=await Promise.all([lookupPublicProfiles(ids),getPublicPresence(ids)]);
+          if(profilesResult.error)throw profilesResult.error;
+          directory=Object.fromEntries((profilesResult.data||[]).map(profile=>[profile.id,profile]));
+          presence=visiblePresence;
         }
         if (currentUser?.id !== owner) return;
         const activityResult=await client.rpc('loopa_activity26',{action:'friends'});
@@ -5823,7 +5844,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       }
       messages.reset();profilePeer=null;friendProfileRequest++;
       if(dmPolicyDialog.open)dmPolicyDialog.close();setDmPolicyView('everyone',false);
-      historyOwner=null;byId('homeRecent').replaceChildren();byId('usageTime').textContent='—';
+      historyOwner=null;byId('homeRecentLoading').hidden=true;byId('homeRecent').replaceChildren();byId('usageTime').textContent='—';
       byId('roomInboxButton').hidden=true;hideInviteBanner();byId('inviteSheet').close();inviteInbox=[];inviteSeen.clear();updateUnifiedBadge();
       if(lastPage==='rooms')showPage('home');
       else if(!inlineVideoDraft||!pendingInlineVideo||roomState||roomUser)roomExit();
@@ -5848,6 +5869,13 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       stopPresence();
       resetFriends();
     }
+    function applyProfilePreferences(profile) {
+      setDmPolicyView(profile.dm_policy,true);
+      if(typeof profile.notification_sound!=='boolean')return;
+      soundEnabled=profile.notification_sound;
+      notificationSoundControl.checked=soundEnabled;
+      try{localStorage.setItem('loopa-notify-sound',String(soundEnabled));}catch{}
+    }
     async function displayAccount(user) {
       if (!user) return;
       // A confirmed session always owns the profile view; never show both cards.
@@ -5855,11 +5883,17 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       setDmPolicyView('everyone',false);
       if(roomUser && roomUser!==user.id)roomExit();
       resetAvatarViewer(user.id);
-      startPresence(user);
-      void primeMessagesInbox();
+      performance.mark('loopa-account-ready');
       syncFriendsSession();
-      refreshFriendLists();
-      pollInvites();
+      // Start secondary reads after allowing the first account render and a
+      // deep-link join to proceed. The inbox is read on entry to Messages.
+      setTimeout(()=>{
+        if(currentUser?.id!==user.id)return;
+        void startPresence(user);
+        void refreshFriendLists();
+        if(!invitationBusy)void pollInvites();
+        if(lastPage==='messages'){void refreshMessagesInbox();subscribeMessagesInbox();}
+      },0);
       byId('auth-loading').hidden = true;
       byId('auth-guest').hidden = true;
       byId('guest-save-panel').hidden = !user.is_anonymous;
@@ -5881,7 +5915,9 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       void showAvatar(byId('account-avatar'),profileAvatarPath(user),savedName);
       feedback('profile-feedback','');
       try {
-        const {data, error} = await client.from('profiles').select('display_name,username,avatar_path,allow_friend_requests,room_invite_policy').eq('id', user.id).maybeSingle();
+        const {data, error} = await client.from('profiles').select(
+          'display_name,username,avatar_path,allow_friend_requests,room_invite_policy,dm_policy,notification_sound'
+        ).eq('id',user.id).maybeSingle();
         if (currentUser?.id !== user.id) return;
         if (error) {
           feedback('profile-feedback','Для поиска людей сначала выполни SQL из LOOPA-friends-setup.sql в Supabase. '+errorText(error),true);
@@ -5897,18 +5933,22 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
             renderName(data.display_name);
           }
           if (data) {
+            applyProfilePreferences(data);
             byId('allow-friend-requests').checked=data.allow_friend_requests!==false;
             byId('room-invite-policy').value=data.room_invite_policy||'friends';
             byId('allow-friend-requests').disabled=false;
             byId('room-invite-policy').disabled=false;
-            loadBlockedUsers();
           }
           const avatarPath = user.user_metadata?.avatar_path;
           const ownedPath = typeof avatarPath==='string' && new RegExp('^'+user.id+'/avatar\\.(jpg|png|webp)$','i').test(avatarPath) ? avatarPath : null;
           const name = (data?.display_name || savedName || 'Пользователь').trim().slice(0,40);
           if (!data) {
-            const {error:insertErr} = await client.from('profiles').insert({id:user.id,display_name:name,avatar_path:ownedPath,allow_friend_requests:true,room_invite_policy:'friends'});
-            if (insertErr && currentUser?.id===user.id) feedback('profile-feedback',errorText(insertErr),true);
+            const {data:created,error:insertErr} = await client.from('profiles')
+              .insert({id:user.id,display_name:name,avatar_path:ownedPath,allow_friend_requests:true,room_invite_policy:'friends'})
+              .select('dm_policy,notification_sound').single();
+            if(currentUser?.id!==user.id)return;
+            if(insertErr)feedback('profile-feedback',errorText(insertErr),true);
+            else if(created)applyProfilePreferences(created);
           } else if (ownedPath && data.avatar_path!==ownedPath) {
             const {error:avatarErr} = await client.from('profiles').update({avatar_path:ownedPath,updated_at:new Date().toISOString()}).eq('id',user.id);
             if (avatarErr && currentUser?.id===user.id) feedback('profile-feedback',errorText(avatarErr),true);
@@ -5918,18 +5958,6 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         feedback('profile-feedback', errorText(err), true);
       }
       await telegramStatus;
-      if(currentUser?.id!==user.id)return;
-      await loadDmPolicy(user.id);
-      if(client){
-        const {data:notifyPref}=await client.from('profiles').select('notification_sound').eq('id',user.id).maybeSingle();
-        if(currentUser?.id===user.id && typeof notifyPref?.notification_sound==='boolean'){
-          soundEnabled=notifyPref.notification_sound;
-          notificationSoundControl.checked=soundEnabled;
-          localStorage.setItem('loopa-notify-sound',String(soundEnabled));
-        }
-      }
-      // v88+: historyCall/usageStart own the shared usage counter.
-      // Do not call the removed v87 function: it used to abort session restoration.
     }
     function renderAvatar(user) {
       const avatar = byId('account-avatar');
@@ -5997,10 +6025,8 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
       currentUser = session?.user || null;
       if (currentUser) {
         const profile=displayAccount(currentUser);
-        const openVideo=pendingInlineVideo&&!pendingInvite;
-        if(openVideo)void acceptInvite();
+        void acceptInvite();
         await profile;
-        if(!openVideo)void acceptInvite();
       }
       else displayGuest();
     }
@@ -6103,10 +6129,8 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         telegramMiniLinked=true;
         const profile=displayAccount(data.user);
         if(!pendingInvite&&lastPage==='profile')showPage('home');
-        const openVideo=pendingInlineVideo&&!pendingInvite;
-        if(openVideo)void acceptInvite();
+        void acceptInvite();
         await profile;
-        if(!openVideo)await acceptInvite();
         showToast(register?'LOOPA готова — добро пожаловать!':'Вход через Telegram выполнен');
       }catch(error){
         if(currentUser)return;
@@ -6593,6 +6617,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         byId('auth-loading').hidden = true;
         displayGuest();
         feedback('auth-feedback','Не удалось загрузить библиотеку Supabase. Проверь подключение к интернету и обнови страницу.',true);
+        if(pendingInvite)showPage('profile');
         return;
       }
       try {
@@ -6626,8 +6651,10 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
             if (event === 'PASSWORD_RECOVERY') passwordRecovery();
           },0);
         });
+        performance.mark('loopa-auth-start');
         await syncSession();
         if(isTelegramMiniApp&&!currentUser)await tryTelegramMiniLogin();
+        else if(pendingInvite&&!currentUser)showPage('profile');
       } catch (err) {
         // A failure while loading optional profile data must not sign out a valid
         // Supabase session, nor show the register form above the account settings.
@@ -6642,7 +6669,7 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         }
       }
     }
-    if(entryRoot.dataset.loopaEntry!=='browser'){
+    {
       const recovery=entryRoot.dataset.loopaEntry==='recovery';
       selectAuthMode(recovery?'login':'signup');
       resetFriends();
@@ -6651,11 +6678,14 @@ html[data-loopa-entry="recovery"] #auth-guest :is(.auth-intro,.auth-switch,#auth
         byId('auth-icloud-details').open=true;
       }
       if(pendingInlineVideo&&!pendingInvite)showInlineVideoCard(pendingInlineVideo,true);
-      init();
+      document.querySelector('.app').inert=false;
+      performance.mark('loopa-ui-interactive');
+      void init();
     }
-
+    }
+    if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',startLoopa,{once:true});
+    else startLoopa();
   </script>
-<script async src="https://www.youtube.com/iframe_api"></script><script async src="https://vkvideo.ru/js/api/videoplayer.js"></script>
 
 
 </body>
