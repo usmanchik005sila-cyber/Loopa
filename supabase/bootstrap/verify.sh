@@ -92,7 +92,7 @@ for key, fingerprint in expected.items():
 if not match:
     sys.exit('Schema comparison failed')
 PY
-db < ../migrations/20261128160957_owner_bot_stats.sql
+db < ../migrations/20261128161617_owner_bot_stats.sql
 printf 'SQL suites (fresh connection per suite):\n'
 failed=0
 for suite in ../../tests/*.sql; do

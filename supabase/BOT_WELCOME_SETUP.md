@@ -18,7 +18,7 @@
 
 ## Развёртывание
 
-1. Применить миграцию `20261128160957_owner_bot_stats.sql`, затем развернуть папку `supabase/functions/loopa-bot/` вместе с её импортами. Сохранить `verify_jwt=false`, чтобы входящие Telegram-запросы проверялись по HMAC в обработчике.
+1. Применить миграцию `20261128161617_owner_bot_stats.sql`, затем развернуть папку `supabase/functions/loopa-bot/` вместе с её импортами. Сохранить `verify_jwt=false`, чтобы входящие Telegram-запросы проверялись по HMAC в обработчике.
 2. Проверить адрес https://wnubqzwsvclvcvozibtc.supabase.co/functions/v1/loopa-bot?action=status
 3. Убедиться, что токен соответствует @LOOPAvideo_bot и webhook: "empty" либо "loopa". Если "external", НЕ заменять его без анализа существующего обработчика.
 4. Зарегистрировать webhook https://wnubqzwsvclvcvozibtc.supabase.co/functions/v1/loopa-bot через Telegram Bot API setWebhook. Передать secret_token, вычисленный сервером. Нельзя публиковать токен Telegram или подставлять его в URL браузера.
