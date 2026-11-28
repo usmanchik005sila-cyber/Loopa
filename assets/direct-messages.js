@@ -10,10 +10,6 @@
     let inboxRows=new Map(),inboxCursor=null,inboxPaging=false;
     let inboxViewer=null,inboxLoaded=false;
     const renderedConversations=new WeakMap();
-    function primeMessagesInbox(){
-      const owner=getCurrentUser()?.id;
-      if(owner&&(inboxViewer!==owner||!inboxLoaded&&!inboxPaging))return refreshMessagesInbox();
-    }
     function stopMessagesInbox(){
       if(messagesInboxChannel&&getClient())getClient().removeChannel(messagesInboxChannel).catch(()=>{});
       messagesInboxChannel=null;messagesInboxOwner=null;
@@ -323,7 +319,7 @@
       inboxRows=new Map();inboxCursor=null;inboxPaging=false;
       inboxViewer=null;inboxLoaded=false;byId('messagesList').replaceChildren();
     }
-    return Object.freeze({resumeDirectMessage:()=>{const draft=byId('dmInput').value;const pending=openDirectMessage(dmPeer,true);byId('dmInput').value=draft;return pending;},openDirectMessage,refreshMessagesInbox,primeMessagesInbox,subscribeMessagesInbox,
+    return Object.freeze({resumeDirectMessage:()=>{const draft=byId('dmInput').value;const pending=openDirectMessage(dmPeer,true);byId('dmInput').value=draft;return pending;},openDirectMessage,refreshMessagesInbox,subscribeMessagesInbox,
       stopMessagesInbox,clearDirectMessageChannel,reset,get returnPage(){return dmPageReturn;}});
   }
   root.LOOPADirectMessages=Object.freeze({create});

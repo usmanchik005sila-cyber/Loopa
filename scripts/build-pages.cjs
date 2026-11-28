@@ -6,6 +6,7 @@ const path = require('node:path');
 
 const coverDomains = ['ytimg.com', 'youtube.com', 'userapi.com', 'vk.com', 'vk.ru', 'vkvideo.ru', 'rutube.ru', 'rtbcdn.ru'];
 const marker = '<!-- LOOPA_CSP -->';
+const startupModules = ['room-watch-reliability.js', 'account-continuity.js', 'resume-storage.js', 'direct-messages.js'];
 
 function withContentSecurityPolicy(source) {
   // HTML parsers normalize CRLF before comparing inline script hashes.
@@ -42,13 +43,32 @@ function withContentSecurityPolicy(source) {
   return html.replace(marker, '<meta http-equiv="Content-Security-Policy" content="' + policy + '">');
 }
 
-if (require.main === module) {
-  const root = path.resolve(__dirname, '..');
-  const output = path.join(root, '_site');
-  const html = withContentSecurityPolicy(readFileSync(path.join(root, 'index.html'), 'utf8'));
+function buildPages(root = path.resolve(__dirname, '..'), output = path.join(root, '_site'), transform = source => source) {
+  let source = readFileSync(path.join(root, 'index.html'), 'utf8');
+  const main = source.match(/<script defer>([\s\S]*?)<\/script>/);
+  if (!main) throw new Error('Missing startup application script');
+  const modules = startupModules.map(name => {
+    const tag = `<script defer src="./assets/${name}"></script>`;
+    if (!source.includes(tag)) throw new Error('Missing startup resource: ' + name);
+    source = source.replace(tag, '');
+    return readFileSync(path.join(root, 'assets', name), 'utf8');
+  });
+  const bundle = transform("'use strict';\n" + [...modules, main[1]].join('\n;\n'));
+  const version = createHash('sha256').update(bundle).digest('hex').slice(0, 16);
+  const script = `loopa-app.${version}.js`;
+  const scriptMarker = '<!-- LOOPA_APP_SCRIPT -->';
+  if (!source.includes(scriptMarker)) throw new Error('Missing startup script position');
+  source = source.replace(main[0], '').replace(scriptMarker, `<script defer src="./assets/${script}"></script>`);
+  const html = withContentSecurityPolicy(source);
   mkdirSync(output, { recursive: true });
   for (const item of ['assets', 'CNAME']) cpSync(path.join(root, item), path.join(output, item), { recursive: true });
+  writeFileSync(path.join(output, 'assets', script), bundle);
   writeFileSync(path.join(output, 'index.html'), html);
 }
 
-module.exports = { withContentSecurityPolicy };
+if (require.main === module) {
+  const { minify_sync } = require('terser');
+  buildPages(undefined, undefined, source => minify_sync(source).code);
+}
+
+module.exports = { withContentSecurityPolicy, buildPages };
