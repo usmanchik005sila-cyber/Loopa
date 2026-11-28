@@ -4,10 +4,12 @@ const { readFileSync } = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
+const ownerStats = require('../supabase/functions/loopa-bot/owner-stats.mjs');
 
 const filename = path.join(__dirname, '../supabase/functions/loopa-bot/index.js');
-const source = readFileSync(filename, 'utf8').replace(/^import .*\n/, '');
+const source = readFileSync(filename, 'utf8').replace(/^import .*\n/gm, '');
 const vmOptions = {filename, importModuleDynamically: vm.constants.USE_MAIN_CONTEXT_DEFAULT_LOADER};
+const loadBot = globals => vm.runInNewContext(source, { ...ownerStats, ...globals }, vmOptions);
 const token = 'fixture-bot-token';
 const signature = createHmac('sha256', token).update('loopa.telegram.webhook.v1').digest('hex');
 const mediaChannel = '-1001234567890';
@@ -26,7 +28,7 @@ test('Telegram inline video search requires a signed update, caches results and 
   const verify = (body, proof) => receive(new Request('https://example.test/loopa-bot?action=verify-inline-rutube', {
     method: 'POST', headers: { 'X-Loopa-Inline-Proof': proof }, body
   }));
-  vm.runInNewContext(source, {
+  loadBot({
     Deno: { env: { get: key => env[key] }, serve: handler => { receive = handler; } },
     crypto: webcrypto, TextEncoder, TextDecoder, URL, URLSearchParams, AbortSignal, Response, FormData, Blob,
     createClient: () => ({
@@ -89,7 +91,7 @@ test('Telegram inline video search requires a signed update, caches results and 
       answers.push(JSON.parse(options.body));
       return Response.json({ ok: true, result: true });
     }
-  }, vmOptions);
+  });
   const update = (id, query, secret = signature) => receive(new Request('https://example.test/loopa-bot', {
     method: 'POST',
     headers: { 'X-Telegram-Bot-Api-Secret-Token': secret },
@@ -197,7 +199,7 @@ test('room invites preserve the original room link and require the host', async 
   };
   const prepared = [];
   let receive;
-  vm.runInNewContext(source, {
+  loadBot({
     Deno: { env: { get: key => env[key] }, serve: handler => { receive = handler; } },
     crypto: webcrypto, TextEncoder, TextDecoder, URL, URLSearchParams, AbortSignal, Response, FormData, Blob,
     createClient: (_url, key, opts) => key === env.SUPABASE_ANON_KEY ? {
@@ -234,7 +236,7 @@ test('room invites preserve the original room link and require the host', async 
       prepared.push(JSON.parse(options.body));
       return Response.json({ ok: true, result: { id: 'fixture-message' } });
     }
-  }, vmOptions);
+  });
   const invite = jwt => receive(new Request('https://example.test/loopa-bot', {
     method: 'POST', headers: { Origin: 'https://loopacinema.ru', Authorization: 'Bearer ' + jwt },
     body: JSON.stringify({ action: 'share_room', code: code.toLowerCase() })
@@ -276,7 +278,7 @@ test('tracking commands work only for the bot owner in a private Telegram chat',
   const env = { TELEGRAM_BOT_TOKEN:token, LOOPA_OWNER_TELEGRAM_ID:'42',
     SUPABASE_SERVICE_ROLE_KEY:'fixture', SUPABASE_URL:'https://example.test' };
   let receive;
-  vm.runInNewContext(source,{
+  loadBot({
     Deno:{env:{get:key=>env[key]},serve:handler=>{receive=handler;}},
     crypto:webcrypto,TextEncoder,URL,Response,AbortSignal,
     createClient:()=>({from:()=>({upsert:async()=>({error:null})}),rpc:async(name,args)=>{
@@ -318,4 +320,58 @@ test('tracking commands work only for the bot owner in a private Telegram chat',
     'loopa_record_telegram_tracking_open',{p_link_id:linkId,p_visitor_hash:hash}
   ]));
   assert.equal(messages.at(-1).reply_markup.inline_keyboard[0][0].text,'🎬 Открыть LOOPA');
+});
+
+test('stats command and refresh require the verified webhook and the current private owner', async () => {
+  const env = { TELEGRAM_BOT_TOKEN: token, LOOPA_OWNER_TELEGRAM_ID: '42',
+    SUPABASE_SERVICE_ROLE_KEY: 'fixture', SUPABASE_URL: 'https://example.test' };
+  const methods = [];
+  let receive, reads = 0;
+  loadBot({
+    Deno: { env: { get: key => env[key] }, serve: handler => { receive = handler; } },
+    crypto: webcrypto, TextEncoder, URL, Response, AbortSignal,
+    createClient: () => ({
+      rpc(name) {
+        assert.equal(name, 'loopa_owner_bot_stats');
+        reads++;
+        return { abortSignal: async () => ({ data: {
+          as_of: '2026-11-30T04:00:01Z', room_tracking_started_at: '2026-11-28T10:00:00Z',
+          registered: 1, new_today: 0, new_7d: 1, new_30d: 1, online: 0,
+          active_24h: 0, active_30d: 1, active_rooms: 0, watching_together: 0, rooms_created_24h: 0,
+          providers: { youtube: 0, vk: 0, rutube: 0 },
+        } }) };
+      },
+    }),
+    fetch: async (url, options) => {
+      const method = new URL(url).pathname.split('/').at(-1);
+      methods.push([method, JSON.parse(options.body)]);
+      if (method === 'editMessageText') {
+        return Response.json({ ok: false, description: 'Bad Request: message is not modified: new text is the same' }, { status: 400 });
+      }
+      return Response.json({ ok: true, result: true });
+    },
+  });
+  const ownerChat = { id: 42, type: 'private' };
+  const owner = { id: 42 };
+  const command = { chat: ownerChat, from: owner, text: '/stats@LOOPAvideo_bot' };
+  const press = { id: 'callback-1', data: ownerStats.STATS_REFRESH, from: owner,
+    message: { chat: ownerChat, message_id: 7, date: 1795854900 } };
+  const post = (body, secret = signature) => receive(new Request('https://example.test/loopa-bot', {
+    method: 'POST', headers: { 'X-Telegram-Bot-Api-Secret-Token': secret }, body: JSON.stringify(body),
+  }));
+  assert.equal((await post({ message: command }, 'forged')).status, 401);
+  assert.equal((await post({ callback_query: press }, 'forged')).status, 401);
+  await post({ message: { ...command, text: '/stats@OtherBot' } });
+  await post({ message: { ...command, from: { id: 43 } } });
+  await post({ callback_query: { ...press, from: { id: 43 } } });
+  assert.equal(reads, 0);
+  assert.deepEqual(methods, []);
+  assert.equal((await post({ message: command })).status, 200);
+  assert.equal((await post({ callback_query: press })).status, 200);
+  assert.equal(reads, 2);
+  assert.deepEqual(methods.map(([method]) => method), ['sendMessage', 'answerCallbackQuery', 'editMessageText']);
+  assert.equal(methods.at(-1)[1].message_id, 7);
+  env.LOOPA_OWNER_TELEGRAM_ID = '43';
+  assert.equal((await post({ callback_query: press })).status, 200);
+  assert.equal(reads, 2);
 });
