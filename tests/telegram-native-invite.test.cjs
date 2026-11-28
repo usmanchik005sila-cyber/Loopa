@@ -24,7 +24,7 @@ test('native invitations use a real preview URL and keep the original Telegram d
     assert.match(url, /^https:\/\/loopacinema\.ru\/invite\/[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
     assert.deepEqual(content.link_preview_options, {url, prefer_large_media: true, show_above_text: true});
     const target = 'https://t.me/LOOPAvideo_bot/loopa?startapp=' + destination;
-    assert.deepEqual(card.reply_markup, {inline_keyboard: [[{text: 'Смотреть вместе', url: target, style: 'primary'}]]});
+    assert.deepEqual(card.reply_markup, {inline_keyboard: [[{text: 'Смотреть вместе', url: target, style: 'danger'}]]});
 
     const env = {LOOPA_INVITE_SIGNING_SECRET: secret};
     const response = await worker.fetch(new Request(url), env);
